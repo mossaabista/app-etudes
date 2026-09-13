@@ -15,9 +15,9 @@ export default async function TodayPage() {
   const todayName = DAY_NAMES[now.getDay()];
   const todayStr = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
   const endOfDay = new Date(startOfDay.getTime() + 86400000);
-  const endOfWeek = new Date(startOfDay.getTime() + 7 * 86400000);
+  const endOfWeek = new Date(startOfDay.getTime() + 14 * 86400000);
 
   const [schedules, urgentTasks, todayTasks, upcomingAssessments] = await Promise.all([
     prisma.courseSchedule.findMany({
@@ -40,7 +40,7 @@ export default async function TodayPage() {
       where: { userId: user.id, status: { not: "Completed" }, dueDate: { gte: startOfDay, lt: endOfWeek } },
       include: { course: { select: { code: true, color: true } } },
       orderBy: { dueDate: "asc" },
-      take: 5,
+      take: 10,
     }),
   ]);
 
@@ -103,10 +103,10 @@ export default async function TodayPage() {
 
         {/* Upcoming Assessments */}
         <Card>
-          <CardHeader title="Upcoming This Week" action={<ButtonLink href="/assessments" variant="ghost" size="sm">All assessments</ButtonLink>} />
+          <CardHeader title="Upcoming (2 weeks)" action={<ButtonLink href="/assessments" variant="ghost" size="sm">All assessments</ButtonLink>} />
           <CardBody>
             {upcomingAssessments.length === 0 ? (
-              <EmptyState title="No assessments this week" description="Assessments due in the next 7 days will appear here." />
+              <EmptyState title="No upcoming assessments" description="Assessments due in the next 2 weeks will appear here." />
             ) : (
               <div className="space-y-2">
                 {upcomingAssessments.map((a) => (
