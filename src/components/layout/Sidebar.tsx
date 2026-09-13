@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { NAV_ITEMS } from "@/lib/nav";
 import { GraduationCap } from "lucide-react";
 
-export function Sidebar() {
+export function Sidebar({ userName }: { userName?: string }) {
   const pathname = usePathname();
 
   return (
@@ -36,6 +36,16 @@ export function Sidebar() {
           );
         })}
       </nav>
+      {userName && (
+        <div className="border-t border-slate-100 px-4 py-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
+              {userName.charAt(0).toUpperCase()}
+            </div>
+            <span className="text-xs font-medium text-slate-700 truncate">{userName}</span>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }
