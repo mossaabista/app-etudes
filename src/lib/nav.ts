@@ -5,6 +5,7 @@ import {
   ListChecks,
   FolderKanban,
   ClipboardCheck,
+  FlaskConical,
   FileText,
   Settings,
   type LucideIcon,
@@ -24,6 +25,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Tasks", href: "/tasks", icon: ListChecks, mobileNav: true },
   { label: "Projects", href: "/projects", icon: FolderKanban },
   { label: "Assessments", href: "/assessments", icon: ClipboardCheck },
+  { label: "Laboratoire", href: "/labs", icon: FlaskConical },
   { label: "Syllabus", href: "/syllabus", icon: FileText },
   { label: "Settings", href: "/settings", icon: Settings },
 ];

@@ -21,6 +21,7 @@ model User {
   assessments Assessment[]
   events      CalendarEvent[]
   syllabi     Syllabus[]
+  labs        LabSession[]
 }
 
 model Course {
@@ -43,6 +44,7 @@ model Course {
   projects    Project[]
   syllabi     Syllabus[]
   events      CalendarEvent[]
+  labs        LabSession[]
 }
 
 model CourseSchedule {
@@ -170,4 +172,25 @@ model CalendarEvent {
 
   user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   course Course? @relation(fields: [courseId], references: [id], onDelete: SetNull)
+}
+
+model LabSession {
+  id          String    @id @default(cuid())
+  userId      String
+  courseId     String
+  labNumber   Int
+  title       String
+  date        DateTime?
+  room        String?
+  topic       String?
+  deliverable String?
+  dueDate     DateTime?
+  status      String    @default("Upcoming") // Upcoming, Completed, Submitted, Overdue
+  grade       Float?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 }
