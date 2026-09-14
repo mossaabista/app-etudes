@@ -7,6 +7,7 @@ import {
   ClipboardCheck,
   FlaskConical,
   FileText,
+  RefreshCw,
   Settings,
   type LucideIcon,
 } from "lucide-react";
@@ -27,5 +28,6 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Assessments", href: "/assessments", icon: ClipboardCheck },
   { label: "Laboratoire", href: "/labs", icon: FlaskConical },
   { label: "Syllabus", href: "/syllabus", icon: FileText },
+  { label: "Synchronisation", href: "/sync", icon: RefreshCw },
   { label: "Settings", href: "/settings", icon: Settings },
 ];

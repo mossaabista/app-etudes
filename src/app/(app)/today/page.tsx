@@ -4,22 +4,21 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { TaskRow } from "@/components/tasks/TaskRow";
-import { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
+import { AssessmentRow } from "@/components/assessments/AssessmentRow";
 import { ButtonLink } from "@/components/ui/Button";
-
-const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+import { addDays, dayName, formatLongDate, startOfDay } from "@/lib/dates";
 
 export default async function TodayPage() {
   const user = await requireUser();
   const now = new Date();
-  const todayName = DAY_NAMES[now.getDay()];
-  const todayStr = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  const todayName = dayName(now);
+  const todayStr = formatLongDate(now);
 
-  const startOfDay = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
-  const endOfDay = new Date(startOfDay.getTime() + 86400000);
-  const endOfWeek = new Date(startOfDay.getTime() + 14 * 86400000);
+  const dayStart = startOfDay(now);
+  const dayEnd = addDays(dayStart, 1);
+  const upcomingEnd = addDays(dayStart, 15);
 
-  const [schedules, urgentTasks, todayTasks, upcomingAssessments] = await Promise.all([
+  const [schedules, urgentTasks, todayTasks, todayAssessments, upcomingAssessments] = await Promise.all([
     prisma.courseSchedule.findMany({
       where: { course: { userId: user.id }, day: todayName },
       include: { course: { select: { code: true, color: true, name: true } } },
@@ -32,17 +31,24 @@ export default async function TodayPage() {
       take: 5,
     }),
     prisma.task.findMany({
-      where: { userId: user.id, parentId: null, status: { not: "Done" }, dueDate: { gte: startOfDay, lt: endOfDay } },
+      where: { userId: user.id, parentId: null, status: { not: "Done" }, dueDate: { gte: dayStart, lt: dayEnd } },
       include: { course: { select: { code: true, color: true } } },
       orderBy: [{ priority: "desc" }],
     }),
     prisma.assessment.findMany({
-      where: { userId: user.id, status: { not: "Completed" }, dueDate: { gte: startOfDay, lt: endOfWeek } },
+      where: { userId: user.id, status: { not: "Completed" }, dueDate: { gte: dayStart, lt: dayEnd } },
+      include: { course: { select: { code: true, color: true } } },
+      orderBy: { dueDate: "asc" },
+    }),
+    prisma.assessment.findMany({
+      where: { userId: user.id, status: { not: "Completed" }, dueDate: { gte: dayEnd, lt: upcomingEnd } },
       include: { course: { select: { code: true, color: true } } },
       orderBy: { dueDate: "asc" },
       take: 10,
     }),
   ]);
+
+  const dueTodayCount = todayTasks.length + todayAssessments.length;
 
   return (
     <>
@@ -89,12 +95,17 @@ export default async function TodayPage() {
 
         {/* Due Today */}
         <Card>
-          <CardHeader title="Due Today" action={<ButtonLink href="/tasks" variant="ghost" size="sm">All tasks</ButtonLink>} />
+          <CardHeader
+            title="Due Today"
+            subtitle={dueTodayCount > 0 ? `${dueTodayCount} item${dueTodayCount > 1 ? "s" : ""}` : undefined}
+            action={<ButtonLink href="/tasks" variant="ghost" size="sm">All tasks</ButtonLink>}
+          />
           <CardBody>
-            {todayTasks.length === 0 ? (
-              <EmptyState title="Nothing due today" description="Tasks with today's due date will appear here." />
+            {dueTodayCount === 0 ? (
+              <EmptyState title="Nothing due today" description="Tasks and assessments due today will appear here." />
             ) : (
               <div className="space-y-2">
+                {todayAssessments.map((a) => <AssessmentRow key={a.id} a={a} />)}
                 {todayTasks.map((t) => <TaskRow key={t.id} task={t} />)}
               </div>
             )}
@@ -109,22 +120,7 @@ export default async function TodayPage() {
               <EmptyState title="No upcoming assessments" description="Assessments due in the next 2 weeks will appear here." />
             ) : (
               <div className="space-y-2">
-                {upcomingAssessments.map((a) => (
-                  <div key={a.id} className="flex items-center gap-3 rounded-md border border-slate-100 px-4 py-3">
-                    <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: a.course.color }} />
-                    <div className="min-w-0 flex-1">
-                      <span className="text-sm font-medium text-slate-900">{a.title}</span>
-                      <div className="mt-0.5 flex gap-2 text-xs text-slate-500">
-                        <span>{a.course.code}</span>
-                        <span>{a.type}</span>
-                      </div>
-                    </div>
-                    {a.dueDate && (
-                      <span className="text-xs text-slate-500">{new Date(a.dueDate).toLocaleDateString("en-CA")}</span>
-                    )}
-                    <StatusBadge status={a.status} />
-                  </div>
-                ))}
+                {upcomingAssessments.map((a) => <AssessmentRow key={a.id} a={a} />)}
               </div>
             )}
           </CardBody>

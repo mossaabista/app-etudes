@@ -22,6 +22,24 @@ model User {
   events      CalendarEvent[]
   syllabi     Syllabus[]
   labs        LabSession[]
+  syncSources SyncSource[]
+}
+
+model SyncSource {
+  id           String    @id @default(cuid())
+  userId       String
+  provider     String    @default("brightspace")
+  feedUrl      String
+  active       Boolean   @default(true)
+  lastSyncedAt DateTime?
+  lastStatus   String?   // ok, error
+  lastMessage  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
 }
 
 model Course {
@@ -84,12 +102,17 @@ model Assessment {
   status    String   @default("Upcoming") // Upcoming, Completed, Overdue
   grade     Float?
   notes     String?
+  source      String?  // brightspace, or null when created manually
+  externalUid String?  // iCal UID, used to match on re-sync
+  externalUrl String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
   tasks  Task[]
+
+  @@unique([userId, externalUid])
 }
 
 model Task {
@@ -168,10 +191,15 @@ model CalendarEvent {
   endTime   String?
   allDay    Boolean   @default(false)
   notes     String?
+  source      String?
+  externalUid String?
+  externalUrl String?
   createdAt DateTime  @default(now())
 
   user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   course Course? @relation(fields: [courseId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, externalUid])
 }
 
 model LabSession {
