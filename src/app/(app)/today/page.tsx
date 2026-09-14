@@ -80,12 +80,14 @@ export default async function TodayPage() {
                 {schedules.map((s) => (
                   <div key={s.id} className="flex items-center gap-3 rounded-md px-3 py-2" style={{ backgroundColor: s.course.color + "12" }}>
                     <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: s.course.color }} />
-                    <div className="flex-1">
+                    <div className="min-w-0 flex-1">
                       <span className="text-sm font-medium text-slate-900">{s.course.code}</span>
                       <span className="ml-2 text-xs text-slate-500">{s.type}</span>
                     </div>
-                    <span className="text-xs text-slate-600">{s.startTime} – {s.endTime}</span>
-                    {s.room && <span className="text-xs text-slate-400">{s.room}</span>}
+                    <div className="shrink-0 text-right">
+                      <div className="whitespace-nowrap text-xs text-slate-600">{s.startTime} – {s.endTime}</div>
+                      {s.room && <div className="text-[11px] text-slate-400">{s.room}</div>}
+                    </div>
                   </div>
                 ))}
               </div>

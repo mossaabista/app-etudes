@@ -7,11 +7,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await getCurrentUser();
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-dvh">
       <Sidebar userName={user?.name} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Topbar />
-        <main className="flex-1 overflow-y-auto px-4 py-6 md:px-8 pb-20 md:pb-6">
+        <main className="flex-1 overflow-y-auto px-4 py-6 md:px-8 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-6">
           {children}
         </main>
         <BottomNav />

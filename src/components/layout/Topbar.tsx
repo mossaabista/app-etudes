@@ -12,7 +12,7 @@ export function Topbar() {
 
   return (
     <>
-      <header className="md:hidden flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
+      <header className="md:hidden relative z-50 flex items-center justify-between border-b border-slate-200 bg-white px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))]">
         <Link href="/today" className="flex items-center gap-2">
           <GraduationCap size={20} className="text-slate-900" />
           <span className="text-sm font-bold tracking-tight text-slate-900">App Études</span>
@@ -26,7 +26,7 @@ export function Topbar() {
       </header>
 
       {menuOpen && (
-        <div className="md:hidden fixed inset-0 top-[53px] z-50 bg-white">
+        <div className="md:hidden fixed inset-0 z-[45] overflow-y-auto bg-white pt-[var(--mobile-header-h)] pb-[env(safe-area-inset-bottom,0px)]">
           <nav className="space-y-0.5 p-3">
             {NAV_ITEMS.map((item) => {
               const active = pathname === item.href || pathname.startsWith(item.href + "/");

@@ -9,7 +9,7 @@ export function Sidebar({ userName }: { userName?: string }) {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden md:flex h-screen w-56 shrink-0 flex-col border-r border-slate-200 bg-white">
+    <aside className="hidden md:flex h-dvh w-56 shrink-0 flex-col border-r border-slate-200 bg-white">
       <div className="border-b border-slate-100 px-5 py-5">
         <Link href="/today" className="flex items-center gap-2.5">
           <GraduationCap size={22} className="text-slate-900" />

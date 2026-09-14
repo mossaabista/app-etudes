@@ -29,5 +29,8 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api).*)"],
+  // The manifest and the generated icons have to stay reachable signed out: iOS
+  // fetches them when the page is added to the home screen, and redirecting them
+  // to /login costs the installed app its name, icon and standalone mode.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon|apple-icon|manifest.webmanifest|api).*)"],
 };

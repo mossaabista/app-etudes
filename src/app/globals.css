@@ -3,6 +3,12 @@
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;
+  /* Measured height of the mobile topbar (12px + 32px of content + 12px + 1px
+     border), plus whatever the notch takes. The slide-down menu pads its content
+     by this much so it starts below the header. The menu sits behind the header
+     rather than butting up against it, so a few pixels of drift here stay
+     invisible instead of showing a seam. */
+  --mobile-header-h: calc(57px + env(safe-area-inset-top, 0px));
 }
 
 @theme inline {

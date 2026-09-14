@@ -9,7 +9,7 @@ export function BottomNav() {
   const mobileItems = NAV_ITEMS.filter((i) => i.mobileNav);
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur-sm">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-sm">
       <div className="flex items-center justify-around py-2 px-1">
         {mobileItems.map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/");
