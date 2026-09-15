@@ -1,7 +1,10 @@
 // Shared artwork for the generated app icons, so the home-screen icon and the
 // manifest icon can never drift apart. Rendered by Satori via next/og, which
 // supports only a subset of CSS — flexbox only, every container needs an explicit
-// display, and there are no filters or pseudo-elements.
+// display, and there are no filters or pseudo-elements. The mark is inline SVG so
+// it stays a drawn logo rather than a typed character.
+// Satori only resolves url(#id) when <defs> is written inline in the same <svg>;
+// returning it from a component silently yields an invisible stroke.
 // No rounded corners here: iOS and Android apply their own mask.
 export function AppIconArt({ size }: { size: number }) {
   return (
@@ -10,7 +13,6 @@ export function AppIconArt({ size }: { size: number }) {
         width: "100%",
         height: "100%",
         display: "flex",
-        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: "#080b10",
@@ -19,31 +21,27 @@ export function AppIconArt({ size }: { size: number }) {
           "radial-gradient(circle at 30% 22%, #2a3346 0%, #141a25 45%, #080b10 100%)",
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          color: "#e6d6ae",
-          fontSize: size * 0.54,
-          fontWeight: 700,
-          lineHeight: 1,
-          // The accent adds mass above the E and the rule adds it below, so only a
-          // small nudge is needed to sit the pair on the optical centre.
-          marginTop: size * 0.02,
-        }}
-      >
-        É
-      </div>
-      <div
-        style={{
-          width: size * 0.3,
-          height: Math.max(1, size * 0.026),
-          // Close enough to read as the letter's base rule rather than a stray mark.
-          marginTop: size * 0.035,
-          borderRadius: size,
-          backgroundImage:
-            "linear-gradient(90deg, rgba(201,177,132,0) 0%, #cfb98d 25%, #cfb98d 75%, rgba(201,177,132,0) 100%)",
-        }}
-      />
+      <svg width={size * 0.64} height={size * 0.64} viewBox="0 0 100 100" fill="none">
+        <defs>
+          <linearGradient id="gold" x1="12" y1="12" x2="88" y2="88" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#f6e9c8" />
+            <stop offset="55%" stopColor="#d8c08d" />
+            <stop offset="100%" stopColor="#a8894f" />
+          </linearGradient>
+        </defs>
+        {/* Thin ring turns the monogram into a seal — the part that reads as a mark
+            rather than a letter sitting on a background. */}
+        <circle cx="50" cy="50" r="43" stroke="url(#gold)" strokeWidth="2.6" opacity="0.7" />
+        {/* One unbroken stroke: up the left stem, into the valley, up to the right
+            peak, down the right stem. Round joins keep it off the font grid. */}
+        <path
+          d="M30 66 L30 34 L50 57 L70 34 L70 66"
+          stroke="url(#gold)"
+          strokeWidth="10"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
     </div>
   );
 }
