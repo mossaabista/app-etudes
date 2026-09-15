@@ -1,8 +1,8 @@
-import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { runSync } from "@/server/brightspace/sync";
+import { checkCronAuth } from "@/server/cron-auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -12,13 +12,11 @@ type SyncResult =
   | { userId: string; error: string };
 
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) {
+  const auth = checkCronAuth(request);
+  if (auth === "unconfigured") {
     return NextResponse.json({ error: "CRON_SECRET is not configured" }, { status: 500 });
   }
-
-  const provided = request.headers.get("authorization") ?? "";
-  if (!secretsMatch(provided, `Bearer ${secret}`)) {
+  if (auth === "unauthorized") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -49,10 +47,4 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({ ranAt: new Date().toISOString(), sources: results.length, results });
-}
-
-// Hashing first gives both sides a fixed length, so the comparison stays constant-time
-// regardless of how long the supplied header is.
-function secretsMatch(a: string, b: string): boolean {
-  return timingSafeEqual(createHash("sha256").update(a).digest(), createHash("sha256").update(b).digest());
 }

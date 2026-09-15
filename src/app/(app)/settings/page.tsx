@@ -2,9 +2,11 @@ import { requireUser } from "@/server/auth/current-user";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { LogoutButton } from "@/components/settings/LogoutButton";
+import { PushNotifications } from "@/components/settings/PushNotifications";
 
 export default async function SettingsPage() {
   const user = await requireUser();
+  const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
 
   return (
     <>
@@ -25,6 +27,20 @@ export default async function SettingsPage() {
                 </div>
               </div>
             </div>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader title="Notifications" subtitle="Résumé quotidien" />
+          <CardBody>
+            {vapidPublicKey ? (
+              <PushNotifications vapidPublicKey={vapidPublicKey} />
+            ) : (
+              <p className="text-sm text-slate-500">
+                Notifications indisponibles : la clé publique VAPID n&apos;est pas définie dans cet
+                environnement.
+              </p>
+            )}
           </CardBody>
         </Card>
 

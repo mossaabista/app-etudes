@@ -23,6 +23,23 @@ model User {
   syllabi     Syllabus[]
   labs        LabSession[]
   syncSources SyncSource[]
+  pushSubs    PushSubscription[]
+}
+
+model PushSubscription {
+  id         String    @id @default(cuid())
+  userId     String
+  // The push service URL Apple/Google hands out; unique per device install.
+  endpoint   String    @unique
+  p256dh     String
+  auth       String
+  label      String?
+  createdAt  DateTime  @default(now())
+  lastSentAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model SyncSource {
