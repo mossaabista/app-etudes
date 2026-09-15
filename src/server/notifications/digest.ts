@@ -7,7 +7,20 @@ export interface Digest {
   url: string;
 }
 
-const MAX_LISTED = 4;
+const MAX_LISTED = 3;
+const MAX_TITLE = 42;
+
+/**
+ * Notification bodies get truncated hard on iOS, so trim each entry. Brightspace
+ * labels quiz items with their type and the name then repeats it — "Questionnaire :
+ * Questionnaire 4" — which burns a third of the line before saying anything. Only
+ * strips the prefix when the very next word repeats it, and never touches the
+ * stored title.
+ */
+function shortTitle(title: string): string {
+  const deduped = title.replace(/^(\p{L}+)\s*:\s*(?=\1\b)/iu, "").trim();
+  return deduped.length > MAX_TITLE ? `${deduped.slice(0, MAX_TITLE - 1).trimEnd()}…` : deduped;
+}
 
 /** What the user has to do today. Returns null on a day with nothing at all. */
 export async function buildDailyDigest(userId: string): Promise<Digest | null> {
@@ -40,9 +53,9 @@ export async function buildDailyDigest(userId: string): Promise<Digest | null> {
   ]);
 
   const deadlines = [
-    ...assessments.map((a) => `${a.title} (${a.course.code})`),
-    ...labs.map((l) => `${l.title} (${l.course.code})`),
-    ...tasks.map((t) => t.title),
+    ...assessments.map((a) => `${shortTitle(a.title)} (${a.course.code})`),
+    ...labs.map((l) => `${shortTitle(l.title)} (${l.course.code})`),
+    ...tasks.map((t) => shortTitle(t.title)),
   ];
 
   // A day with no classes and nothing due is not worth a notification.
