@@ -74,6 +74,12 @@ export async function addMilestoneAction(_prev: unknown, formData: FormData) {
 }
 
 export async function toggleMilestoneAction(id: string, projectId: string) {
+  const user = await requireUser();
+  // Both ids arrive from the client, so confirm the project is this user's before
+  // touching anything hanging off it.
+  const project = await prisma.project.findFirst({ where: { id: projectId, userId: user.id } });
+  if (!project) return;
+
   const milestone = await prisma.projectMilestone.findFirst({ where: { id, projectId } });
   if (!milestone) return;
 
@@ -92,7 +98,12 @@ export async function toggleMilestoneAction(id: string, projectId: string) {
 }
 
 export async function deleteMilestoneAction(id: string, projectId: string) {
-  await prisma.projectMilestone.delete({ where: { id } });
+  const user = await requireUser();
+  const project = await prisma.project.findFirst({ where: { id: projectId, userId: user.id } });
+  if (!project) return;
+
+  // Scoped to the verified project so a stray id cannot reach another user's row.
+  await prisma.projectMilestone.deleteMany({ where: { id, projectId } });
   revalidatePath(`/projects/${projectId}`);
 }
 
@@ -114,6 +125,10 @@ export async function addMemberAction(_prev: unknown, formData: FormData) {
 }
 
 export async function deleteMemberAction(id: string, projectId: string) {
-  await prisma.projectMember.delete({ where: { id } });
+  const user = await requireUser();
+  const project = await prisma.project.findFirst({ where: { id: projectId, userId: user.id } });
+  if (!project) return;
+
+  await prisma.projectMember.deleteMany({ where: { id, projectId } });
   revalidatePath(`/projects/${projectId}`);
 }
