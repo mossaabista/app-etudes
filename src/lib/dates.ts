@@ -72,6 +72,39 @@ export function dayName(reference: Date = new Date(), timeZone: string = APP_TIM
   return new Intl.DateTimeFormat("en-US", { timeZone, weekday: "long" }).format(reference);
 }
 
+/** "2026-10-09" — the calendar date in `timeZone`, not in UTC. */
+export function toISODate(reference: Date = new Date(), timeZone: string = APP_TIMEZONE): string {
+  const p = zoneParts(reference, timeZone);
+  return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
+}
+
+/** Midnight of an ISO date in `timeZone`. Returns null when the string is malformed. */
+export function fromISODate(value: string, timeZone: string = APP_TIMEZONE): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return null;
+  const date = wallTimeToUtc([+m[1], +m[2], +m[3], 0, 0, 0], timeZone);
+  // Reject the likes of 2026-02-31, which Date.UTC would quietly roll forward.
+  return toISODate(date, timeZone) === value ? date : null;
+}
+
+/** Monday 00:00 of the week containing `reference`. */
+export function startOfWeek(reference: Date = new Date(), timeZone: string = APP_TIMEZONE): Date {
+  const index = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    .indexOf(dayName(reference, timeZone));
+  return addDays(startOfDay(reference, timeZone), -Math.max(index, 0), timeZone);
+}
+
+/** The 1st of the month at 00:00. */
+export function startOfMonth(reference: Date = new Date(), timeZone: string = APP_TIMEZONE): Date {
+  const p = zoneParts(reference, timeZone);
+  return wallTimeToUtc([p.year, p.month, 1, 0, 0, 0], timeZone);
+}
+
+export function addMonths(reference: Date, months: number, timeZone: string = APP_TIMEZONE): Date {
+  const p = zoneParts(reference, timeZone);
+  return wallTimeToUtc([p.year, p.month + months, 1, 0, 0, 0], timeZone);
+}
+
 export function formatLongDate(reference: Date = new Date(), timeZone: string = APP_TIMEZONE): string {
   return new Intl.DateTimeFormat("en-US", {
     timeZone,

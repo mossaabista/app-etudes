@@ -1,133 +1,298 @@
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/server/auth/current-user";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { Card, CardHeader, CardBody } from "@/components/ui/Card";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { TaskRow } from "@/components/tasks/TaskRow";
-import { AssessmentRow } from "@/components/assessments/AssessmentRow";
-import { ButtonLink } from "@/components/ui/Button";
-import { addDays, dayName, formatLongDate, startOfDay } from "@/lib/dates";
+import { DateNav, type Range } from "@/components/today/DateNav";
+import { AddEvent } from "@/components/today/AddEvent";
+import { DeleteEvent } from "@/components/today/DeleteEvent";
+import {
+  APP_TIMEZONE,
+  addDays,
+  addMonths,
+  dayName,
+  fromISODate,
+  startOfDay,
+  startOfMonth,
+  startOfWeek,
+  toISODate,
+  wallTimeToUtc,
+} from "@/lib/dates";
 
-export default async function TodayPage() {
+const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+type Kind = "deadline" | "course" | "perso";
+
+interface Item {
+  key: string;
+  kind: Kind;
+  at: Date | null;
+  time: string;
+  end?: string;
+  title: string;
+  sub?: string;
+  color?: string;
+  eventId?: string;
+}
+
+// en-GB rather than fr-CA: the French locale renders "16 h 00", which would not line up
+// with the "16:00" the timetable stores as plain strings.
+const hhmm = (d: Date) =>
+  new Intl.DateTimeFormat("en-GB", { timeZone: APP_TIMEZONE, hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
+
+const dayLabel = (d: Date) =>
+  new Intl.DateTimeFormat("fr-CA", { timeZone: APP_TIMEZONE, weekday: "long", day: "numeric", month: "long" }).format(d);
+
+export default async function TodayPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ d?: string; r?: string }>;
+}) {
   const user = await requireUser();
-  const now = new Date();
-  const todayName = dayName(now);
-  const todayStr = formatLongDate(now);
+  const params = await searchParams;
 
-  const dayStart = startOfDay(now);
-  const dayEnd = addDays(dayStart, 1);
-  const upcomingEnd = addDays(dayStart, 15);
+  const range: Range = params.r === "week" || params.r === "month" ? params.r : "day";
+  const anchor = (params.d ? fromISODate(params.d) : null) ?? startOfDay(new Date());
 
-  const [schedules, urgentTasks, todayTasks, todayAssessments, upcomingAssessments] = await Promise.all([
+  const from = range === "day" ? startOfDay(anchor) : range === "week" ? startOfWeek(anchor) : startOfMonth(anchor);
+  const to = range === "day" ? addDays(from, 1) : range === "week" ? addDays(from, 7) : addMonths(from, 1);
+
+  const window = { gte: from, lt: to };
+  const scheduleDays = range === "day" ? [dayName(anchor)] : WEEKDAYS;
+
+  const [assessments, labs, tasks, personal, schedules] = await Promise.all([
+    prisma.assessment.findMany({
+      where: { userId: user.id, status: { not: "Completed" }, dueDate: window },
+      include: { course: { select: { code: true, color: true } } },
+      orderBy: { dueDate: "asc" },
+    }),
+    prisma.labSession.findMany({
+      where: { userId: user.id, status: { notIn: ["Completed", "Submitted"] }, dueDate: window },
+      include: { course: { select: { code: true, color: true } } },
+      orderBy: { dueDate: "asc" },
+    }),
+    prisma.task.findMany({
+      where: { userId: user.id, parentId: null, status: { not: "Done" }, dueDate: window },
+      include: { course: { select: { code: true, color: true } } },
+      orderBy: { dueDate: "asc" },
+    }),
+    prisma.calendarEvent.findMany({
+      where: { userId: user.id, date: window },
+      orderBy: { date: "asc" },
+    }),
     prisma.courseSchedule.findMany({
-      where: { course: { userId: user.id }, day: todayName },
+      where: { course: { userId: user.id }, day: { in: scheduleDays } },
       include: { course: { select: { code: true, color: true, name: true } } },
       orderBy: { startTime: "asc" },
     }),
-    prisma.task.findMany({
-      where: { userId: user.id, parentId: null, status: { not: "Done" }, priority: { in: ["High", "Critical"] } },
-      include: { course: { select: { code: true, color: true } } },
-      orderBy: [{ priority: "desc" }, { dueDate: "asc" }],
-      take: 5,
-    }),
-    prisma.task.findMany({
-      where: { userId: user.id, parentId: null, status: { not: "Done" }, dueDate: { gte: dayStart, lt: dayEnd } },
-      include: { course: { select: { code: true, color: true } } },
-      orderBy: [{ priority: "desc" }],
-    }),
-    prisma.assessment.findMany({
-      where: { userId: user.id, status: { not: "Completed" }, dueDate: { gte: dayStart, lt: dayEnd } },
-      include: { course: { select: { code: true, color: true } } },
-      orderBy: { dueDate: "asc" },
-    }),
-    prisma.assessment.findMany({
-      where: { userId: user.id, status: { not: "Completed" }, dueDate: { gte: dayEnd, lt: upcomingEnd } },
-      include: { course: { select: { code: true, color: true } } },
-      orderBy: { dueDate: "asc" },
-      take: 10,
-    }),
   ]);
 
-  const dueTodayCount = todayTasks.length + todayAssessments.length;
+  const deadlines: Item[] = [
+    ...assessments.map((a) => ({
+      key: `a${a.id}`, kind: "deadline" as const, at: a.dueDate, time: a.dueDate ? hhmm(a.dueDate) : "—",
+      title: a.title, sub: `${a.course.code} · ${a.type}${a.weight != null ? ` · ${a.weight} %` : ""}`,
+      color: a.course.color,
+    })),
+    ...labs.map((l) => ({
+      key: `l${l.id}`, kind: "deadline" as const, at: l.dueDate, time: l.dueDate ? hhmm(l.dueDate) : "—",
+      title: l.title, sub: `${l.course.code} · Laboratoire`, color: l.course.color,
+    })),
+    ...tasks.map((t) => ({
+      key: `t${t.id}`, kind: "deadline" as const, at: t.dueDate, time: t.dueDate ? hhmm(t.dueDate) : "—",
+      title: t.title, sub: t.course ? `${t.course.code} · Tâche` : "Tâche", color: t.course?.color,
+    })),
+  ].sort(byTime);
+
+  // Schedule rows store wall-clock strings, so they only become instants once pinned
+  // to a date. In day view that is the anchor; in week view, the matching weekday.
+  const courseItems: Item[] = schedules
+    .map((s) => {
+      const base = range === "day" ? anchor : addDays(from, Math.max(WEEKDAYS.indexOf(s.day), 0));
+      const [h, m] = s.startTime.split(":").map(Number);
+      const p = toISODate(base).split("-").map(Number);
+      return {
+        key: `s${s.id}`,
+        kind: "course" as const,
+        at: range === "month" ? null : wallTimeToUtc([p[0], p[1], p[2], h, m, 0]),
+        time: s.startTime,
+        end: s.endTime,
+        title: s.course.code,
+        sub: `${s.type}${s.room ? ` · ${s.room}` : ""}${range !== "day" ? ` · ${frenchDay(s.day)}` : ""}`,
+        color: s.course.color,
+      };
+    })
+    .sort(byTime);
+
+  const personalItems: Item[] = personal
+    .map((e) => ({
+      key: `e${e.id}`,
+      kind: "perso" as const,
+      at: e.date,
+      time: e.startTime ?? "—",
+      end: e.endTime ?? undefined,
+      title: e.title,
+      sub: e.notes ?? undefined,
+      eventId: e.id,
+    }))
+    .sort(byTime);
+
+  const timeline = [...deadlines, ...courseItems, ...personalItems].sort(byTime);
+
+  const label =
+    range === "day"
+      ? capitalise(dayLabel(anchor))
+      : range === "week"
+        ? `Semaine du ${dayLabel(from)}`
+        : capitalise(new Intl.DateTimeFormat("fr-CA", { timeZone: APP_TIMEZONE, month: "long", year: "numeric" }).format(from));
 
   return (
     <>
-      <PageHeader title="Today" description={todayStr} />
+      <div className="glass-backdrop" aria-hidden />
 
-      <div className="space-y-6">
-        {/* Priority */}
-        <Card>
-          <CardHeader title="Priority" />
-          <CardBody>
-            {urgentTasks.length === 0 ? (
-              <EmptyState title="No urgent tasks" description="Tasks marked as High or Critical priority will appear here." />
-            ) : (
-              <div className="space-y-2">
-                {urgentTasks.map((t) => <TaskRow key={t.id} task={t} />)}
-              </div>
-            )}
-          </CardBody>
-        </Card>
+      <DateNav anchor={anchor} range={range} label={label} />
 
-        {/* Today's Schedule */}
-        <Card>
-          <CardHeader title="Today's Schedule" />
-          <CardBody>
-            {schedules.length === 0 ? (
-              <EmptyState title="No classes today" description="Add course schedules to see your daily timetable." />
-            ) : (
-              <div className="space-y-2">
-                {schedules.map((s) => (
-                  <div key={s.id} className="flex items-center gap-3 rounded-md px-3 py-2" style={{ backgroundColor: s.course.color + "12" }}>
-                    <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: s.course.color }} />
-                    <div className="min-w-0 flex-1">
-                      <span className="text-sm font-medium text-slate-900">{s.course.code}</span>
-                      <span className="ml-2 text-xs text-slate-500">{s.type}</span>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <div className="whitespace-nowrap text-xs text-slate-600">{s.startTime} – {s.endTime}</div>
-                      {s.room && <div className="text-[11px] text-slate-400">{s.room}</div>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardBody>
-        </Card>
+      <div className="grid gap-4 md:grid-cols-3">
+        <Panel title="À rendre" count={deadlines.length}>
+          {deadlines.length === 0 ? (
+            <Empty>Rien à rendre {range === "day" ? "ce jour-là" : "sur cette période"}.</Empty>
+          ) : (
+            deadlines.map((i) => <Row key={i.key} item={i} />)
+          )}
+        </Panel>
 
-        {/* Due Today */}
-        <Card>
-          <CardHeader
-            title="Due Today"
-            subtitle={dueTodayCount > 0 ? `${dueTodayCount} item${dueTodayCount > 1 ? "s" : ""}` : undefined}
-            action={<ButtonLink href="/tasks" variant="ghost" size="sm">All tasks</ButtonLink>}
-          />
-          <CardBody>
-            {dueTodayCount === 0 ? (
-              <EmptyState title="Nothing due today" description="Tasks and assessments due today will appear here." />
-            ) : (
-              <div className="space-y-2">
-                {todayAssessments.map((a) => <AssessmentRow key={a.id} a={a} />)}
-                {todayTasks.map((t) => <TaskRow key={t.id} task={t} />)}
-              </div>
-            )}
-          </CardBody>
-        </Card>
+        <Panel title="Cours" count={courseItems.length}>
+          {courseItems.length === 0 ? (
+            <Empty>Aucun cours {range === "day" ? "ce jour-là" : "enregistré"}.</Empty>
+          ) : (
+            courseItems.map((i) => <Row key={i.key} item={i} />)
+          )}
+        </Panel>
 
-        {/* Upcoming Assessments */}
-        <Card>
-          <CardHeader title="Upcoming (2 weeks)" action={<ButtonLink href="/assessments" variant="ghost" size="sm">All assessments</ButtonLink>} />
-          <CardBody>
-            {upcomingAssessments.length === 0 ? (
-              <EmptyState title="No upcoming assessments" description="Assessments due in the next 2 weeks will appear here." />
-            ) : (
-              <div className="space-y-2">
-                {upcomingAssessments.map((a) => <AssessmentRow key={a.id} a={a} />)}
+        <Panel
+          title="Calendrier perso"
+          count={personalItems.length}
+          action={<AddEvent isoDate={toISODate(range === "day" ? anchor : from)} />}
+        >
+          {personalItems.length === 0 ? (
+            <Empty>Rien de personnel. Touche le + pour ajouter.</Empty>
+          ) : (
+            personalItems.map((i) => <Row key={i.key} item={i} />)
+          )}
+        </Panel>
+      </div>
+
+      <div className="mt-4">
+        <Panel title="La journée" count={timeline.length} wide>
+          {timeline.length === 0 ? (
+            <Empty>Journée vide.</Empty>
+          ) : range === "day" ? (
+            <ol className="space-y-1.5">
+              {timeline.map((i) => <TimelineRow key={i.key} item={i} />)}
+            </ol>
+          ) : (
+            groupByDay(timeline).map(([iso, items]) => (
+              <div key={iso} className="mb-4 last:mb-0">
+                <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {capitalise(dayLabel(fromISODate(iso) ?? from))}
+                </p>
+                <ol className="space-y-1.5">
+                  {items.map((i) => <TimelineRow key={i.key} item={i} />)}
+                </ol>
               </div>
-            )}
-          </CardBody>
-        </Card>
+            ))
+          )}
+        </Panel>
       </div>
     </>
+  );
+}
+
+function byTime(a: Item, b: Item) {
+  if (!a.at) return 1;
+  if (!b.at) return -1;
+  return a.at.getTime() - b.at.getTime();
+}
+
+function groupByDay(items: Item[]): [string, Item[]][] {
+  const map = new Map<string, Item[]>();
+  for (const i of items) {
+    const key = i.at ? toISODate(i.at) : "zzzz";
+    (map.get(key) ?? map.set(key, []).get(key)!).push(i);
+  }
+  return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+}
+
+const FRENCH_DAY: Record<string, string> = {
+  Monday: "lun", Tuesday: "mar", Wednesday: "mer", Thursday: "jeu",
+  Friday: "ven", Saturday: "sam", Sunday: "dim",
+};
+const frenchDay = (d: string) => FRENCH_DAY[d] ?? d;
+const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+const DOT: Record<Kind, string> = {
+  deadline: "bg-rose-500",
+  course: "bg-sky-500",
+  perso: "bg-violet-500",
+};
+
+function Panel({
+  title, count, action, wide, children,
+}: {
+  title: string; count: number; action?: React.ReactNode; wide?: boolean; children: React.ReactNode;
+}) {
+  return (
+    <section className={`glass-card p-5 ${wide ? "" : "flex flex-col"}`}>
+      <header className="mb-3 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-slate-900">
+          {title}
+          {count > 0 && <span className="ml-2 text-xs font-normal text-slate-500">{count}</span>}
+        </h2>
+        {action}
+      </header>
+      {/* Over a week or a month the three columns would otherwise grow to wildly
+          different heights and push the timeline off the screen. */}
+      <div className={wide ? "" : "max-h-[30rem] space-y-2 overflow-y-auto pr-1"}>{children}</div>
+    </section>
+  );
+}
+
+function Empty({ children }: { children: React.ReactNode }) {
+  return <p className="py-6 text-center text-xs text-slate-400">{children}</p>;
+}
+
+// Time first in a fixed column so the title keeps the rest of the width. Titles wrap to
+// two lines rather than truncating — a clipped course code tells the reader nothing.
+function Row({ item }: { item: Item }) {
+  return (
+    <div className="flex items-start gap-2.5 rounded-2xl bg-white/55 px-3 py-2.5">
+      <span className="w-10 shrink-0 pt-0.5 text-right font-mono text-[11px] leading-[18px] tabular-nums">
+        <span className="block text-slate-600">{item.time}</span>
+        {item.end && <span className="block text-slate-400">{item.end}</span>}
+      </span>
+      <span
+        className={`mt-2 h-2 w-2 shrink-0 rounded-full ${item.color ? "" : DOT[item.kind]}`}
+        style={item.color ? { backgroundColor: item.color } : undefined}
+      />
+      <div className="min-w-0 flex-1">
+        <p className="line-clamp-2 text-sm font-medium leading-5 text-slate-900">{item.title}</p>
+        {item.sub && <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-slate-500">{item.sub}</p>}
+      </div>
+      {item.eventId && <DeleteEvent id={item.eventId} />}
+    </div>
+  );
+}
+
+function TimelineRow({ item }: { item: Item }) {
+  return (
+    <li className="flex items-center gap-3 rounded-2xl bg-white/55 px-3 py-2">
+      <span className="w-20 shrink-0 font-mono text-xs tabular-nums text-slate-500">
+        {item.time}
+        {item.end && <span className="text-slate-300">–{item.end}</span>}
+      </span>
+      <span
+        className={`h-2 w-2 shrink-0 rounded-full ${item.color ? "" : DOT[item.kind]}`}
+        style={item.color ? { backgroundColor: item.color } : undefined}
+      />
+      <span className="min-w-0 flex-1 truncate text-sm text-slate-900">{item.title}</span>
+      {item.sub && <span className="hidden shrink-0 truncate text-xs text-slate-500 sm:block">{item.sub}</span>}
+      {item.eventId && <DeleteEvent id={item.eventId} />}
+    </li>
   );
 }
