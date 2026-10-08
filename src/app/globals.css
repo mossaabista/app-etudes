@@ -110,6 +110,99 @@ body {
     opacity: 0.75;
   }
 
+  /* Liquid metal: a dark face with slow-moving bands under a thin iridescent rim.
+     The rim is a conic rainbow masked down to a ring — a plain border cannot refract.
+     Both layers are pseudo-elements animating transform only, so they stay on the
+     compositor however many are on screen. */
+  @keyframes liquid-spin {
+    to { transform: rotate(360deg); }
+  }
+  @keyframes liquid-drift {
+    0%   { transform: translate(-7%, -5%) rotate(0deg) scale(1.5); }
+    50%  { transform: translate(7%, 6%) rotate(180deg) scale(1.75); }
+    100% { transform: translate(-7%, -5%) rotate(360deg) scale(1.5); }
+  }
+
+  .liquid-metal {
+    position: relative;
+    overflow: hidden;
+    border-radius: 9999px;
+    background: #171b23;
+    color: #f1f5f9;
+    box-shadow:
+      0 4px 16px rgba(15, 23, 42, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+  .liquid-metal > * {
+    position: relative;
+    z-index: 1;
+  }
+  .liquid-metal::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: conic-gradient(from 210deg at 38% 32%, #434c60, #0d1016, #5b6880, #10141b, #2b3242, #434c60);
+    filter: blur(5px);
+    animation: liquid-drift 9s ease-in-out infinite;
+  }
+  .liquid-metal::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    z-index: 2;
+    background: conic-gradient(from 0deg, #ff5fa2, #ffd166, #7bf1a8, #5ec8ff, #b388ff, #ff5fa2);
+    -webkit-mask: radial-gradient(closest-side, transparent 86%, #000 93%);
+    mask: radial-gradient(closest-side, transparent 86%, #000 93%);
+    animation: liquid-spin 7s linear infinite;
+    opacity: 0.85;
+  }
+  .liquid-metal:hover::before { animation-duration: 4s; }
+  .liquid-metal:hover::after { animation-duration: 3s; opacity: 1; }
+  .liquid-metal:active { transform: translateY(1px); }
+
+  /* Same idea at dot scale, tinted by the course colour passed in as --c. */
+  .liquid-dot {
+    position: relative;
+    overflow: hidden;
+    border-radius: 9999px;
+    background: color-mix(in oklab, var(--c, #64748b) 70%, #0b1020);
+  }
+  .liquid-dot::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: conic-gradient(
+      from 140deg,
+      color-mix(in oklab, var(--c, #64748b) 60%, white),
+      color-mix(in oklab, var(--c, #64748b) 70%, black),
+      color-mix(in oklab, var(--c, #64748b) 85%, white),
+      color-mix(in oklab, var(--c, #64748b) 60%, black)
+    );
+    filter: blur(1.5px);
+    animation: liquid-drift 12s ease-in-out infinite;
+  }
+  .liquid-dot::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: conic-gradient(from 0deg, #ff5fa2, #ffd166, #7bf1a8, #5ec8ff, #b388ff, #ff5fa2);
+    -webkit-mask: radial-gradient(closest-side, transparent 64%, #000 100%);
+    mask: radial-gradient(closest-side, transparent 64%, #000 100%);
+    animation: liquid-spin 10s linear infinite;
+    opacity: 0.6;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .liquid-metal::before,
+    .liquid-metal::after,
+    .liquid-dot::before,
+    .liquid-dot::after {
+      animation: none;
+    }
+  }
+
   .glass-pill-active {
     background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
     border-color: rgba(255, 255, 255, 0.12);

@@ -226,11 +226,23 @@ const FRENCH_DAY: Record<string, string> = {
 const frenchDay = (d: string) => FRENCH_DAY[d] ?? d;
 const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-const DOT: Record<Kind, string> = {
-  deadline: "bg-rose-500",
-  course: "bg-sky-500",
-  perso: "bg-violet-500",
+// Fallback hues for rows with no course behind them. The dot tints its liquid from
+// whichever colour lands in --c.
+const KIND_COLOR: Record<Kind, string> = {
+  deadline: "#f43f5e",
+  course: "#0ea5e9",
+  perso: "#8b5cf6",
 };
+
+function Dot({ item, className = "" }: { item: Item; className?: string }) {
+  return (
+    <span
+      className={`liquid-dot shrink-0 ${className}`}
+      style={{ "--c": item.color ?? KIND_COLOR[item.kind] } as React.CSSProperties}
+      aria-hidden
+    />
+  );
+}
 
 function Panel({
   title, count, action, wide, children,
@@ -266,10 +278,7 @@ function Row({ item }: { item: Item }) {
         <span className="block text-slate-600">{item.time}</span>
         {item.end && <span className="block text-slate-400">{item.end}</span>}
       </span>
-      <span
-        className={`mt-2 h-2 w-2 shrink-0 rounded-full ${item.color ? "" : DOT[item.kind]}`}
-        style={item.color ? { backgroundColor: item.color } : undefined}
-      />
+      <Dot item={item} className="mt-1 h-3.5 w-3.5" />
       <div className="min-w-0 flex-1">
         <p className="line-clamp-2 text-sm font-medium leading-5 text-slate-900">{item.title}</p>
         {item.sub && <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-slate-500">{item.sub}</p>}
@@ -286,10 +295,7 @@ function TimelineRow({ item }: { item: Item }) {
         {item.time}
         {item.end && <span className="text-slate-300">–{item.end}</span>}
       </span>
-      <span
-        className={`h-2 w-2 shrink-0 rounded-full ${item.color ? "" : DOT[item.kind]}`}
-        style={item.color ? { backgroundColor: item.color } : undefined}
-      />
+      <Dot item={item} className="h-3.5 w-3.5" />
       <span className="min-w-0 flex-1 truncate text-sm text-slate-900">{item.title}</span>
       {item.sub && <span className="hidden shrink-0 truncate text-xs text-slate-500 sm:block">{item.sub}</span>}
       {item.eventId && <DeleteEvent id={item.eventId} />}

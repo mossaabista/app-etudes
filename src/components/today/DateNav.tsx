@@ -25,7 +25,7 @@ export function DateNav({ anchor, range, label }: { anchor: Date; range: Range; 
         <Link
           href={href(shift(anchor, range, -1), range)}
           aria-label="Précédent"
-          className="glass-pill focus-ring flex h-10 w-10 items-center justify-center text-slate-600"
+          className="liquid-metal focus-ring flex h-11 w-11 items-center justify-center"
         >
           <ChevronLeft size={18} />
         </Link>
@@ -42,7 +42,7 @@ export function DateNav({ anchor, range, label }: { anchor: Date; range: Range; 
         <Link
           href={href(shift(anchor, range, 1), range)}
           aria-label="Suivant"
-          className="glass-pill focus-ring flex h-10 w-10 items-center justify-center text-slate-600"
+          className="liquid-metal focus-ring flex h-11 w-11 items-center justify-center"
         >
           <ChevronRight size={18} />
         </Link>
@@ -53,12 +53,13 @@ export function DateNav({ anchor, range, label }: { anchor: Date; range: Range; 
           <Link
             key={r}
             href={href(anchor, r)}
-            data-active={r === range}
-            className={`glass-pill glass-prism focus-ring relative px-4 py-2 text-xs font-medium ${
-              r === range ? "glass-pill-active" : "text-slate-600"
-            }`}
+            className={
+              r === range
+                ? "liquid-metal focus-ring px-5 py-2.5 text-xs font-medium"
+                : "glass-pill glass-prism focus-ring relative px-5 py-2.5 text-xs font-medium text-slate-600"
+            }
           >
-            {RANGE_LABEL[r]}
+            <span>{RANGE_LABEL[r]}</span>
           </Link>
         ))}
       </div>
