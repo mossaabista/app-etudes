@@ -12,7 +12,7 @@ export function DeleteEvent({ id }: { id: string }) {
       onClick={() => start(() => void deleteEvent(id))}
       disabled={pending}
       aria-label="Supprimer l'événement"
-      className="focus-ring rounded-full p-1 text-slate-300 transition-colors hover:text-rose-500 disabled:opacity-40"
+      className="focus-ring rounded-full p-1 text-[var(--ink-faint)] transition-colors hover:text-rose-500 disabled:opacity-40"
     >
       <X size={13} />
     </button>

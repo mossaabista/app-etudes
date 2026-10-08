@@ -210,7 +210,7 @@ export default async function TodayPage({
           ) : (
             groupByDay(timeline).map(([iso, items]) => (
               <div key={iso} className="mb-4 last:mb-0">
-                <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--ink-dim)]">
                   {capitalise(dayLabel(fromISODate(iso) ?? from))}
                 </p>
                 <ol className="space-y-1.5">
@@ -273,9 +273,9 @@ function Panel({
   return (
     <section className={`glass-card p-5 ${wide ? "" : "flex h-full flex-col"}`}>
       <header className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-slate-900">
+        <h2 className="text-sm font-semibold text-[var(--ink)]">
           {title}
-          {count > 0 && <span className="ml-2 text-xs font-normal text-slate-500">{count}</span>}
+          {count > 0 && <span className="ml-2 text-xs font-normal text-[var(--ink-dim)]">{count}</span>}
         </h2>
         {action}
       </header>
@@ -287,22 +287,22 @@ function Panel({
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="py-6 text-center text-xs text-slate-400">{children}</p>;
+  return <p className="py-6 text-center text-xs text-[var(--ink-faint)]">{children}</p>;
 }
 
 // Time first in a fixed column so the title keeps the rest of the width. Titles wrap to
 // two lines rather than truncating — a clipped course code tells the reader nothing.
 function Row({ item }: { item: Item }) {
   return (
-    <div className="flex items-start gap-2.5 rounded-2xl bg-white/55 px-3 py-2.5">
+    <div className="flex items-start gap-2.5 rounded-2xl bg-[var(--row)] px-3 py-2.5">
       <span className="w-10 shrink-0 pt-0.5 text-right font-mono text-[11px] leading-[18px] tabular-nums">
-        <span className="block text-slate-600">{item.time}</span>
-        {item.end && <span className="block text-slate-400">{item.end}</span>}
+        <span className="block text-[var(--ink-dim)]">{item.time}</span>
+        {item.end && <span className="block text-[var(--ink-faint)]">{item.end}</span>}
       </span>
       <Dot item={item} className="mt-1 h-3.5 w-3.5" />
       <div className="min-w-0 flex-1">
-        <p className="line-clamp-2 text-sm font-medium leading-5 text-slate-900">{item.title}</p>
-        {item.sub && <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-slate-500">{item.sub}</p>}
+        <p className="line-clamp-2 text-sm font-medium leading-5 text-[var(--ink)]">{item.title}</p>
+        {item.sub && <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-[var(--ink-dim)]">{item.sub}</p>}
       </div>
       {item.eventId && <DeleteEvent id={item.eventId} />}
     </div>
@@ -311,14 +311,14 @@ function Row({ item }: { item: Item }) {
 
 function TimelineRow({ item }: { item: Item }) {
   return (
-    <li className="flex items-center gap-3 rounded-2xl bg-white/55 px-3 py-2">
-      <span className="w-20 shrink-0 font-mono text-xs tabular-nums text-slate-500">
+    <li className="flex items-center gap-3 rounded-2xl bg-[var(--row)] px-3 py-2">
+      <span className="w-20 shrink-0 font-mono text-xs tabular-nums text-[var(--ink-dim)]">
         {item.time}
-        {item.end && <span className="text-slate-300">–{item.end}</span>}
+        {item.end && <span className="text-[var(--ink-faint)]">–{item.end}</span>}
       </span>
       <Dot item={item} className="h-3.5 w-3.5" />
-      <span className="min-w-0 flex-1 truncate text-sm text-slate-900">{item.title}</span>
-      {item.sub && <span className="hidden shrink-0 truncate text-xs text-slate-500 sm:block">{item.sub}</span>}
+      <span className="min-w-0 flex-1 truncate text-sm text-[var(--ink)]">{item.title}</span>
+      {item.sub && <span className="hidden shrink-0 truncate text-xs text-[var(--ink-dim)] sm:block">{item.sub}</span>}
       {item.eventId && <DeleteEvent id={item.eventId} />}
     </li>
   );

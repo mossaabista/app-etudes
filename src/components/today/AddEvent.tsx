@@ -30,7 +30,7 @@ export function AddEvent({ isoDate }: { isoDate: string }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="glass-pill glass-prism focus-ring relative flex h-9 w-9 items-center justify-center text-slate-600"
+        className="glass-pill glass-prism focus-ring relative flex h-9 w-9 items-center justify-center text-[var(--ink-dim)]"
         aria-label="Ajouter un événement"
       >
         <Plus size={17} />
@@ -48,12 +48,12 @@ export function AddEvent({ isoDate }: { isoDate: string }) {
           required
           autoFocus
           placeholder="Sport, prière, sortie…"
-          className="glass-pill focus-ring min-w-0 flex-1 px-4 py-2 text-sm text-slate-900 placeholder:text-slate-400"
+          className="glass-pill focus-ring min-w-0 flex-1 px-4 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--ink-faint)]"
         />
         <button
           type="button"
           onClick={() => { setOpen(false); setError(null); }}
-          className="glass-pill focus-ring flex h-9 w-9 shrink-0 items-center justify-center text-slate-500"
+          className="glass-pill focus-ring flex h-9 w-9 shrink-0 items-center justify-center text-[var(--ink-dim)]"
           aria-label="Annuler"
         >
           <X size={16} />
@@ -65,14 +65,14 @@ export function AddEvent({ isoDate }: { isoDate: string }) {
           name="startTime"
           type="time"
           aria-label="Heure de début"
-          className="glass-pill focus-ring px-3 py-2 text-sm text-slate-700"
+          className="glass-pill focus-ring px-3 py-2 text-sm text-[var(--ink-dim)]"
         />
-        <span className="text-xs text-slate-400">→</span>
+        <span className="text-xs text-[var(--ink-faint)]">→</span>
         <input
           name="endTime"
           type="time"
           aria-label="Heure de fin"
-          className="glass-pill focus-ring px-3 py-2 text-sm text-slate-700"
+          className="glass-pill focus-ring px-3 py-2 text-sm text-[var(--ink-dim)]"
         />
         <button
           type="submit"

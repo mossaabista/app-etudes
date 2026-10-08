@@ -83,7 +83,7 @@ export function CardDeck({ cards, initial = 1 }: { cards: DeckCard[]; initial?: 
               aria-label={c.label}
               aria-current={i === active}
               className={`h-1.5 rounded-full transition-all ${
-                i === active ? "w-7 bg-slate-800" : "w-1.5 bg-slate-300 hover:bg-slate-400"
+                i === active ? "w-7 bg-[#f0cd79]" : "w-1.5 bg-[rgba(255,220,148,0.35)] hover:bg-[rgba(255,220,148,0.6)]"
               }`}
             />
           ))}
@@ -100,7 +100,7 @@ export function CardDeck({ cards, initial = 1 }: { cards: DeckCard[]; initial?: 
         </button>
       </div>
 
-      <p className="mt-2 text-center text-xs font-medium text-slate-500">{cards[active]?.label}</p>
+      <p className="mt-2 text-center text-xs font-medium text-[var(--ink-dim)]">{cards[active]?.label}</p>
     </div>
   );
 }
