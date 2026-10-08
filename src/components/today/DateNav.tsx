@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { LiquidLayers } from "@/components/ui/LiquidMetal";
 import { addDays, addMonths, toISODate } from "@/lib/dates";
 
 export type Range = "day" | "week" | "month";
@@ -21,13 +22,15 @@ export function DateNav({ anchor, range, label }: { anchor: Date; range: Range; 
 
   return (
     <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2.5">
         <Link
           href={href(shift(anchor, range, -1), range)}
           aria-label="Précédent"
-          className="liquid-metal focus-ring flex h-11 w-11 items-center justify-center"
+          className="lm focus-ring h-11 w-11 shrink-0"
         >
-          <ChevronLeft size={18} />
+          <LiquidLayers>
+            <ChevronLeft size={18} />
+          </LiquidLayers>
         </Link>
 
         <div className="min-w-0">
@@ -42,26 +45,30 @@ export function DateNav({ anchor, range, label }: { anchor: Date; range: Range; 
         <Link
           href={href(shift(anchor, range, 1), range)}
           aria-label="Suivant"
-          className="liquid-metal focus-ring flex h-11 w-11 items-center justify-center"
+          className="lm focus-ring h-11 w-11 shrink-0"
         >
-          <ChevronRight size={18} />
+          <LiquidLayers>
+            <ChevronRight size={18} />
+          </LiquidLayers>
         </Link>
       </div>
 
-      <div className="flex items-center gap-1.5">
-        {(["day", "week", "month"] as const).map((r) => (
-          <Link
-            key={r}
-            href={href(anchor, r)}
-            className={
-              r === range
-                ? "liquid-metal focus-ring px-5 py-2.5 text-xs font-medium"
-                : "glass-pill glass-prism focus-ring relative px-5 py-2.5 text-xs font-medium text-slate-600"
-            }
-          >
-            <span>{RANGE_LABEL[r]}</span>
-          </Link>
-        ))}
+      <div className="flex items-center gap-2">
+        {(["day", "week", "month"] as const).map((r) =>
+          r === range ? (
+            <span key={r} className="lm focus-ring h-10 px-5 text-xs font-medium">
+              <LiquidLayers>{RANGE_LABEL[r]}</LiquidLayers>
+            </span>
+          ) : (
+            <Link
+              key={r}
+              href={href(anchor, r)}
+              className="glass-pill glass-prism focus-ring relative px-5 py-2.5 text-xs font-medium text-slate-600"
+            >
+              {RANGE_LABEL[r]}
+            </Link>
+          )
+        )}
       </div>
     </div>
   );

@@ -237,7 +237,7 @@ const KIND_COLOR: Record<Kind, string> = {
 function Dot({ item, className = "" }: { item: Item; className?: string }) {
   return (
     <span
-      className={`liquid-dot shrink-0 ${className}`}
+      className={`lm-dot shrink-0 ${className}`}
       style={{ "--c": item.color ?? KIND_COLOR[item.kind] } as React.CSSProperties}
       aria-hidden
     />

@@ -110,98 +110,159 @@ body {
     opacity: 0.75;
   }
 
-  /* Liquid metal: a dark face with slow-moving bands under a thin iridescent rim.
-     The rim is a conic rainbow masked down to a ring — a plain border cannot refract.
-     Both layers are pseudo-elements animating transform only, so they stay on the
-     compositor however many are on screen. */
-  @keyframes liquid-spin {
+  /* Liquid metal — a chrome bead reflecting a two-tone room.
+     What actually reads as metal is the hard light/dark horizon sweeping around the
+     face, not a blur. That is a rotating conic gradient. The rim is near-white chrome;
+     colour appears only as two short dispersion arcs riding the edge, which is why a
+     full rainbow ring looks like plastic and this does not. */
+  @keyframes lm-sweep {
     to { transform: rotate(360deg); }
   }
-  @keyframes liquid-drift {
-    0%   { transform: translate(-7%, -5%) rotate(0deg) scale(1.5); }
-    50%  { transform: translate(7%, 6%) rotate(180deg) scale(1.75); }
-    100% { transform: translate(-7%, -5%) rotate(360deg) scale(1.5); }
+  @keyframes lm-bob {
+    0%   { transform: rotate(38deg) scale(1); }
+    50%  { transform: rotate(14deg) scale(1.06); }
+    100% { transform: rotate(38deg) scale(1); }
   }
 
-  .liquid-metal {
+  .lm {
     position: relative;
+    isolation: isolate;
     overflow: hidden;
     border-radius: 9999px;
-    background: #171b23;
-    color: #f1f5f9;
+    background: #0b0d10;
+    color: #f8fafc;
     box-shadow:
-      0 4px 16px rgba(15, 23, 42, 0.28),
-      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      0 6px 18px rgba(8, 11, 16, 0.34),
+      0 1px 2px rgba(8, 11, 16, 0.4);
   }
-  .liquid-metal > * {
-    position: relative;
-    z-index: 1;
+
+  /* The reflected horizon. Hard stops, no blur — chrome has sharp edges. */
+  .lm-field {
+    position: absolute;
+    inset: -12%;
+    /* The specular wedge stays narrow — roughly 126° to 152° — so the face reads as
+       mostly dark metal with a highlight travelling over it, and whatever sits in the
+       middle keeps its contrast. A wide bright band washed the icon out. */
+    background: conic-gradient(
+      from 0deg,
+      #06070a 0deg, #0a0c10 72deg, #12151a 112deg,
+      #4a5058 126deg, #c2c8cf 133deg, #eef1f4 137deg, #9aa1a8 144deg, #333840 152deg,
+      #0e1116 196deg, #07090c 252deg,
+      #1d2128 302deg, #0a0c10 334deg, #06070a 360deg
+    );
+    animation: lm-sweep 11s linear infinite;
   }
-  .liquid-metal::before {
-    content: "";
+
+  /* Specular dome: the bead is convex, so the top-left stays lit whatever spins below. */
+  .lm-gloss {
     position: absolute;
     inset: 0;
-    background: conic-gradient(from 210deg at 38% 32%, #434c60, #0d1016, #5b6880, #10141b, #2b3242, #434c60);
-    filter: blur(5px);
-    animation: liquid-drift 9s ease-in-out infinite;
+    background:
+      radial-gradient(58% 50% at 30% 22%, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0) 64%),
+      radial-gradient(90% 80% at 50% 115%, rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0) 60%);
   }
-  .liquid-metal::after {
+
+  .lm-rim {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow:
+      inset 0 0 0 1.5px rgba(255, 255, 255, 0.92),
+      inset 0 0 6px rgba(255, 255, 255, 0.28);
+  }
+
+  /* Dispersion: two short arcs rather than a continuous spectrum. */
+  .lm-rim::after {
     content: "";
     position: absolute;
     inset: -1px;
     border-radius: inherit;
-    z-index: 2;
-    background: conic-gradient(from 0deg, #ff5fa2, #ffd166, #7bf1a8, #5ec8ff, #b388ff, #ff5fa2);
-    -webkit-mask: radial-gradient(closest-side, transparent 86%, #000 93%);
-    mask: radial-gradient(closest-side, transparent 86%, #000 93%);
-    animation: liquid-spin 7s linear infinite;
-    opacity: 0.85;
+    background: conic-gradient(
+      from 0deg,
+      transparent 0 4%,
+      #ff2d6f 6%, #ffd400 8.5%, #27f08a 10.5%, #19b6ff 12.5%, #9b5cff 14%,
+      transparent 17% 49%,
+      #ff2d6f 52%, #ffd400 54.5%, #27f08a 56.5%, #19b6ff 58.5%, #9b5cff 60%,
+      transparent 63% 100%
+    );
+    -webkit-mask: radial-gradient(closest-side, transparent 84%, #000 93%);
+    mask: radial-gradient(closest-side, transparent 84%, #000 93%);
+    animation: lm-sweep 11s linear infinite;
+    opacity: 1;
+    mix-blend-mode: screen;
   }
-  .liquid-metal:hover::before { animation-duration: 4s; }
-  .liquid-metal:hover::after { animation-duration: 3s; opacity: 1; }
-  .liquid-metal:active { transform: translateY(1px); }
 
-  /* Same idea at dot scale, tinted by the course colour passed in as --c. */
-  .liquid-dot {
+  /* The floating squircle from the reference, kept behind whatever the control shows. */
+  .lm-bead {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 46%;
+    height: 46%;
+    margin: -23% 0 0 -23%;
+    border-radius: 34%;
+    background: linear-gradient(145deg, #ffffff 0%, #f2f4f7 42%, #c9cfd6 100%);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    animation: lm-bob 7s ease-in-out infinite;
+  }
+
+  .lm-content {
     position: relative;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    /* The highlight sweeps under the content, so the glyph needs a shadow of its own
+       to stay legible when the bright wedge passes behind it. */
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.85)) drop-shadow(0 0 1px rgba(0, 0, 0, 0.6));
+  }
+
+  .lm:hover .lm-field,
+  .lm:hover .lm-rim::after { animation-duration: 4.5s; }
+  .lm:active { transform: translateY(1px); }
+
+  /* Dot scale: same bead, tinted by --c. Too small for dispersion arcs to read, so it
+     gets a single bright rim and a tinted sweep instead. */
+  .lm-dot {
+    position: relative;
+    isolation: isolate;
     overflow: hidden;
     border-radius: 9999px;
-    background: color-mix(in oklab, var(--c, #64748b) 70%, #0b1020);
+    background: color-mix(in oklab, var(--c, #64748b) 55%, #07090c);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.85),
+      0 1px 3px rgba(8, 11, 16, 0.35);
   }
-  .liquid-dot::before {
+  .lm-dot::before {
     content: "";
     position: absolute;
-    inset: 0;
+    inset: -14%;
     background: conic-gradient(
-      from 140deg,
-      color-mix(in oklab, var(--c, #64748b) 60%, white),
-      color-mix(in oklab, var(--c, #64748b) 70%, black),
-      color-mix(in oklab, var(--c, #64748b) 85%, white),
-      color-mix(in oklab, var(--c, #64748b) 60%, black)
+      from 0deg,
+      color-mix(in oklab, var(--c, #64748b) 40%, #05070a) 0deg,
+      color-mix(in oklab, var(--c, #64748b) 72%, #05070a) 90deg,
+      color-mix(in oklab, var(--c, #64748b) 55%, white) 128deg,
+      color-mix(in oklab, var(--c, #64748b) 10%, white) 142deg,
+      color-mix(in oklab, var(--c, #64748b) 80%, #05070a) 190deg,
+      color-mix(in oklab, var(--c, #64748b) 35%, #05070a) 280deg,
+      color-mix(in oklab, var(--c, #64748b) 40%, #05070a) 360deg
     );
-    filter: blur(1.5px);
-    animation: liquid-drift 12s ease-in-out infinite;
+    animation: lm-sweep 13s linear infinite;
   }
-  .liquid-dot::after {
+  .lm-dot::after {
     content: "";
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    background: conic-gradient(from 0deg, #ff5fa2, #ffd166, #7bf1a8, #5ec8ff, #b388ff, #ff5fa2);
-    -webkit-mask: radial-gradient(closest-side, transparent 64%, #000 100%);
-    mask: radial-gradient(closest-side, transparent 64%, #000 100%);
-    animation: liquid-spin 10s linear infinite;
-    opacity: 0.6;
+    background: radial-gradient(60% 55% at 32% 24%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 62%);
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .liquid-metal::before,
-    .liquid-metal::after,
-    .liquid-dot::before,
-    .liquid-dot::after {
-      animation: none;
-    }
+    .lm-field, .lm-rim::after, .lm-bead, .lm-dot::before { animation: none; }
   }
+
 
   .glass-pill-active {
     background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
