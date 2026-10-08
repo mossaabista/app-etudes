@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/server/auth/current-user";
 import { DateNav, type Range } from "@/components/today/DateNav";
 import { AddEvent } from "@/components/today/AddEvent";
+import { CardDeck } from "@/components/today/CardDeck";
 import { DeleteEvent } from "@/components/today/DeleteEvent";
 import {
   APP_TIMEZONE,
@@ -148,35 +149,55 @@ export default async function TodayPage({
 
       <DateNav anchor={anchor} range={range} label={label} />
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Panel title="À rendre" count={deadlines.length}>
-          {deadlines.length === 0 ? (
-            <Empty>Rien à rendre {range === "day" ? "ce jour-là" : "sur cette période"}.</Empty>
-          ) : (
-            deadlines.map((i) => <Row key={i.key} item={i} />)
-          )}
-        </Panel>
-
-        <Panel title="Cours" count={courseItems.length}>
-          {courseItems.length === 0 ? (
-            <Empty>Aucun cours {range === "day" ? "ce jour-là" : "enregistré"}.</Empty>
-          ) : (
-            courseItems.map((i) => <Row key={i.key} item={i} />)
-          )}
-        </Panel>
-
-        <Panel
-          title="Calendrier perso"
-          count={personalItems.length}
-          action={<AddEvent isoDate={toISODate(range === "day" ? anchor : from)} />}
-        >
-          {personalItems.length === 0 ? (
-            <Empty>Rien de personnel. Touche le + pour ajouter.</Empty>
-          ) : (
-            personalItems.map((i) => <Row key={i.key} item={i} />)
-          )}
-        </Panel>
-      </div>
+      {/* Personal on the left, deadlines facing the reader, courses on the right. */}
+      <CardDeck
+        initial={1}
+        cards={[
+          {
+            key: "perso",
+            label: "Calendrier perso",
+            node: (
+              <Panel
+                title="Calendrier perso"
+                count={personalItems.length}
+                action={<AddEvent isoDate={toISODate(range === "day" ? anchor : from)} />}
+              >
+                {personalItems.length === 0 ? (
+                  <Empty>Rien de personnel. Touche le + pour ajouter.</Empty>
+                ) : (
+                  personalItems.map((i) => <Row key={i.key} item={i} />)
+                )}
+              </Panel>
+            ),
+          },
+          {
+            key: "deadlines",
+            label: "À rendre",
+            node: (
+              <Panel title="À rendre" count={deadlines.length}>
+                {deadlines.length === 0 ? (
+                  <Empty>Rien à rendre {range === "day" ? "ce jour-là" : "sur cette période"}.</Empty>
+                ) : (
+                  deadlines.map((i) => <Row key={i.key} item={i} />)
+                )}
+              </Panel>
+            ),
+          },
+          {
+            key: "courses",
+            label: "Cours",
+            node: (
+              <Panel title="Cours" count={courseItems.length}>
+                {courseItems.length === 0 ? (
+                  <Empty>Aucun cours {range === "day" ? "ce jour-là" : "enregistré"}.</Empty>
+                ) : (
+                  courseItems.map((i) => <Row key={i.key} item={i} />)
+                )}
+              </Panel>
+            ),
+          },
+        ]}
+      />
 
       <div className="mt-4">
         <Panel title="La journée" count={timeline.length} wide>
@@ -250,7 +271,7 @@ function Panel({
   title: string; count: number; action?: React.ReactNode; wide?: boolean; children: React.ReactNode;
 }) {
   return (
-    <section className={`glass-card p-5 ${wide ? "" : "flex flex-col"}`}>
+    <section className={`glass-card p-5 ${wide ? "" : "flex h-full flex-col"}`}>
       <header className="mb-3 flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-slate-900">
           {title}
@@ -258,9 +279,9 @@ function Panel({
         </h2>
         {action}
       </header>
-      {/* Over a week or a month the three columns would otherwise grow to wildly
-          different heights and push the timeline off the screen. */}
-      <div className={wide ? "" : "max-h-[30rem] space-y-2 overflow-y-auto pr-1"}>{children}</div>
+      {/* Inside the deck every card is the same height, so the list scrolls within its
+          card rather than stretching it. */}
+      <div className={wide ? "" : "min-h-0 flex-1 space-y-2 overflow-y-auto pr-1"}>{children}</div>
     </section>
   );
 }

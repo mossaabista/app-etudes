@@ -263,6 +263,67 @@ body {
     .lm-field, .lm-rim::after, .lm-bead, .lm-dot::before { animation: none; }
   }
 
+  /* Coverflow deck. The side cards are not shrunk copies — they are the same card
+     turned on its vertical axis and pushed back in Z, so the fan reads as depth
+     rather than as three different sizes. */
+  .deck {
+    position: relative;
+    height: 32rem;
+    perspective: 1700px;
+    perspective-origin: 50% 45%;
+    touch-action: pan-y;
+  }
+  .deck-card {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: min(26rem, 82vw);
+    height: 100%;
+    margin-left: calc(min(26rem, 82vw) / -2);
+    transform-style: preserve-3d;
+    transition: transform 0.55s cubic-bezier(0.22, 0.75, 0.2, 1),
+                opacity 0.45s ease,
+                filter 0.45s ease;
+    will-change: transform;
+  }
+  .deck-card > * { height: 100%; }
+
+  .deck-card[data-pos="center"] {
+    transform: translateX(0) translateZ(0) rotateY(0deg);
+    z-index: 3;
+    opacity: 1;
+    filter: drop-shadow(0 26px 44px rgba(15, 23, 42, 0.22));
+  }
+  /* Translucent panels stacked behind each other turn to soup, so the side cards get a
+     depth-of-field blur. It separates the planes far more convincingly than opacity. */
+  .deck-card[data-pos="left"],
+  .deck-card[data-pos="right"] {
+    z-index: 2;
+    opacity: 0.86;
+    filter: blur(2px) brightness(0.96) saturate(0.88);
+    cursor: pointer;
+  }
+  .deck-card[data-pos="left"] {
+    transform: translateX(-56%) translateZ(-300px) rotateY(36deg);
+  }
+  .deck-card[data-pos="right"] {
+    transform: translateX(56%) translateZ(-300px) rotateY(-36deg);
+  }
+  .deck-card[data-pos="left"]:hover,
+  .deck-card[data-pos="right"]:hover {
+    opacity: 0.96;
+    filter: blur(0.6px) brightness(1);
+  }
+  .deck-card[data-pos="far"] {
+    transform: translateX(0) translateZ(-600px);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .deck-card { transition: none; }
+  }
+
 
   .glass-pill-active {
     background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
