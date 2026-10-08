@@ -255,13 +255,15 @@ const KIND_COLOR: Record<Kind, string> = {
   perso: "#8b5cf6",
 };
 
-function Dot({ item, className = "" }: { item: Item; className?: string }) {
+function TimePill({ item }: { item: Item }) {
   return (
     <span
-      className={`lm-dot shrink-0 ${className}`}
+      className="pill shrink-0"
       style={{ "--c": item.color ?? KIND_COLOR[item.kind] } as React.CSSProperties}
-      aria-hidden
-    />
+    >
+      <span className="pill-time">{item.time}</span>
+      <span className="pill-cap" aria-hidden />
+    </span>
   );
 }
 
@@ -295,14 +297,13 @@ function Empty({ children }: { children: React.ReactNode }) {
 function Row({ item }: { item: Item }) {
   return (
     <div className="tile flex items-start gap-2.5 px-3.5 py-3">
-      <span className="w-10 shrink-0 pt-0.5 text-right font-mono text-[11px] leading-[18px] tabular-nums">
-        <span className="block text-[var(--ink-dim)]">{item.time}</span>
-        {item.end && <span className="block text-[var(--ink-faint)]">{item.end}</span>}
-      </span>
-      <Dot item={item} className="mt-1 h-3.5 w-3.5" />
+      <TimePill item={item} />
       <div className="min-w-0 flex-1">
         <p className="line-clamp-2 text-sm font-medium leading-5 text-[var(--ink)]">{item.title}</p>
-        {item.sub && <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-[var(--ink-dim)]">{item.sub}</p>}
+        <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-[var(--ink-dim)]">
+          {item.sub}
+          {item.end && <span className="text-[var(--ink-faint)]">{item.sub ? " · " : ""}jusqu&apos;à {item.end}</span>}
+        </p>
       </div>
       {item.eventId && <DeleteEvent id={item.eventId} />}
     </div>
@@ -312,11 +313,7 @@ function Row({ item }: { item: Item }) {
 function TimelineRow({ item }: { item: Item }) {
   return (
     <li className="tile flex items-center gap-3 px-3.5 py-2.5">
-      <span className="w-20 shrink-0 font-mono text-xs tabular-nums text-[var(--ink-dim)]">
-        {item.time}
-        {item.end && <span className="text-[var(--ink-faint)]">–{item.end}</span>}
-      </span>
-      <Dot item={item} className="h-3.5 w-3.5" />
+      <TimePill item={item} />
       <span className="min-w-0 flex-1 truncate text-sm text-[var(--ink)]">{item.title}</span>
       {item.sub && <span className="hidden shrink-0 truncate text-xs text-[var(--ink-dim)] sm:block">{item.sub}</span>}
       {item.eventId && <DeleteEvent id={item.eventId} />}

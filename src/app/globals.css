@@ -304,14 +304,22 @@ body {
     isolation: isolate;
     border-radius: 18px;
     background:
-      linear-gradient(168deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.04) 42%, rgba(0, 0, 0, 0.2) 100%),
-      rgba(16, 11, 4, 0.42);
+      linear-gradient(168deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 42%, rgba(0, 0, 0, 0.22) 100%),
+      rgba(16, 11, 4, 0.46);
+    /* The stack of solid, un-blurred offsets below the slab is its extruded front wall.
+       Nothing else in CSS gives a flat element real thickness — a blurred shadow reads
+       as a glow, a border as a line. Darkening down the stack lights the wall. */
     box-shadow:
-      0 10px 20px rgba(14, 8, 1, 0.45),
-      0 2px 4px rgba(14, 8, 1, 0.35),
-      inset 0 1.5px 0 rgba(255, 255, 255, 0.5),
-      inset 0 -1.5px 0 rgba(255, 255, 255, 0.16),
-      inset 0 14px 26px rgba(0, 0, 0, 0.26);
+      0 1px 0 #4a3514,
+      0 2px 0 #43300f,
+      0 3px 0 #3a290c,
+      0 4px 0 #322309,
+      0 5px 0 #2a1d07,
+      0 6px 0 #221806,
+      0 7px 0 #1b1304,
+      0 22px 26px rgba(10, 6, 1, 0.6),
+      inset 0 1.5px 0 rgba(255, 255, 255, 0.58),
+      inset 0 16px 28px rgba(0, 0, 0, 0.3);
     transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.22s ease;
   }
 
@@ -344,14 +352,62 @@ body {
     z-index: 1;
   }
 
+  /* Hover lifts the face while the wall grows under it, so the slab rises off the card
+     rather than merely sliding up. */
   .tile:hover {
-    transform: translateY(-2px);
+    transform: translateY(-3px);
     box-shadow:
-      0 16px 28px rgba(14, 8, 1, 0.52),
-      0 3px 6px rgba(14, 8, 1, 0.4),
-      inset 0 1.5px 0 rgba(255, 255, 255, 0.62),
-      inset 0 -1.5px 0 rgba(255, 255, 255, 0.2),
-      inset 0 14px 26px rgba(0, 0, 0, 0.24);
+      0 1px 0 #55401a, 0 2px 0 #4e3a14, 0 3px 0 #453210, 0 4px 0 #3c2b0c,
+      0 5px 0 #34250a, 0 6px 0 #2c1f08, 0 7px 0 #241a06, 0 8px 0 #1d1405,
+      0 9px 0 #171004, 0 10px 0 #120d03,
+      0 30px 34px rgba(10, 6, 1, 0.66),
+      inset 0 1.5px 0 rgba(255, 255, 255, 0.7),
+      inset 0 16px 28px rgba(0, 0, 0, 0.26);
+  }
+
+  /* Capsule: a dark glass body you read the time inside, capped by a solid slug of the
+     course colour. Extruded like the slabs so the two depths agree. */
+  .pill {
+    position: relative;
+    display: inline-flex;
+    align-items: stretch;
+    height: 1.55rem;
+    border-radius: 9999px;
+    overflow: hidden;
+    background: linear-gradient(180deg, rgba(34, 24, 9, 0.9), rgba(12, 8, 2, 0.95));
+    box-shadow:
+      0 1px 0 #4a3514, 0 2px 0 #3e2c0f, 0 3px 0 #32230b, 0 4px 0 #261a07,
+      0 10px 12px rgba(8, 5, 1, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  }
+  .pill-time {
+    display: flex;
+    align-items: center;
+    padding: 0 0.45rem 0 0.55rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.68rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    color: #f4e7cd;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  }
+  .pill-cap {
+    width: 1.45rem;
+    background:
+      linear-gradient(180deg,
+        color-mix(in oklab, var(--c, #64748b) 65%, white) 0%,
+        var(--c, #64748b) 46%,
+        color-mix(in oklab, var(--c, #64748b) 62%, black) 100%);
+    box-shadow: inset 2px 0 4px rgba(0, 0, 0, 0.35);
+  }
+  /* Gloss across the whole capsule, so both halves share one highlight. */
+  .pill::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.05) 46%, rgba(255, 255, 255, 0) 52%);
+    pointer-events: none;
   }
 
   /* Coverflow deck. The side cards are not shrunk copies — they are the same card
