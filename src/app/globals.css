@@ -295,6 +295,65 @@ body {
     .lm-field, .lm-rim::after, .lm-bead, .lm-dot::before { animation: none; }
   }
 
+  /* Glass slab. What makes it read as a solid object rather than a tinted rectangle is
+     the visible thickness down the left and right edges — light travelling through the
+     material — plus a hard specular line on the top bevel and a shadow underneath.
+     Kept neutral white against the amber ground so it reads as glass, not as more brass. */
+  .tile {
+    position: relative;
+    isolation: isolate;
+    border-radius: 18px;
+    background:
+      linear-gradient(168deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.04) 42%, rgba(0, 0, 0, 0.2) 100%),
+      rgba(16, 11, 4, 0.42);
+    box-shadow:
+      0 10px 20px rgba(14, 8, 1, 0.45),
+      0 2px 4px rgba(14, 8, 1, 0.35),
+      inset 0 1.5px 0 rgba(255, 255, 255, 0.5),
+      inset 0 -1.5px 0 rgba(255, 255, 255, 0.16),
+      inset 0 14px 26px rgba(0, 0, 0, 0.26);
+    transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.22s ease;
+  }
+
+  /* The two side walls of the slab. */
+  .tile::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background:
+      linear-gradient(90deg, rgba(255, 255, 255, 0.42) 0, rgba(255, 255, 255, 0.16) 7px, rgba(255, 255, 255, 0) 20px),
+      linear-gradient(270deg, rgba(255, 255, 255, 0.42) 0, rgba(255, 255, 255, 0.16) 7px, rgba(255, 255, 255, 0) 20px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Sheen across the top face, brightest where the room light falls. */
+  .tile::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(104deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0) 38%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .tile > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .tile:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 16px 28px rgba(14, 8, 1, 0.52),
+      0 3px 6px rgba(14, 8, 1, 0.4),
+      inset 0 1.5px 0 rgba(255, 255, 255, 0.62),
+      inset 0 -1.5px 0 rgba(255, 255, 255, 0.2),
+      inset 0 14px 26px rgba(0, 0, 0, 0.24);
+  }
+
   /* Coverflow deck. The side cards are not shrunk copies — they are the same card
      turned on its vertical axis and pushed back in Z, so the fan reads as depth
      rather than as three different sizes. */

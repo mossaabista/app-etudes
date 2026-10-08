@@ -294,7 +294,7 @@ function Empty({ children }: { children: React.ReactNode }) {
 // two lines rather than truncating — a clipped course code tells the reader nothing.
 function Row({ item }: { item: Item }) {
   return (
-    <div className="flex items-start gap-2.5 rounded-2xl bg-[var(--row)] px-3 py-2.5">
+    <div className="tile flex items-start gap-2.5 px-3.5 py-3">
       <span className="w-10 shrink-0 pt-0.5 text-right font-mono text-[11px] leading-[18px] tabular-nums">
         <span className="block text-[var(--ink-dim)]">{item.time}</span>
         {item.end && <span className="block text-[var(--ink-faint)]">{item.end}</span>}
@@ -311,7 +311,7 @@ function Row({ item }: { item: Item }) {
 
 function TimelineRow({ item }: { item: Item }) {
   return (
-    <li className="flex items-center gap-3 rounded-2xl bg-[var(--row)] px-3 py-2">
+    <li className="tile flex items-center gap-3 px-3.5 py-2.5">
       <span className="w-20 shrink-0 font-mono text-xs tabular-nums text-[var(--ink-dim)]">
         {item.time}
         {item.end && <span className="text-[var(--ink-faint)]">–{item.end}</span>}
