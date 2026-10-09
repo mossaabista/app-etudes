@@ -38,7 +38,16 @@ export interface Choice {
 export type CommandResult =
   | { error: string }
   | { choose: Choice[]; question: string }
-  | { ok: true; message: string; undo: Undo | null; /** A spoken-style answer (a review, a question): shown in full. */ answer?: boolean; navigate?: string | null };
+  | {
+      ok: true;
+      message: string;
+      undo: Undo | null;
+      /** A spoken-style answer (a review, a question): shown in full. */
+      answer?: boolean;
+      navigate?: string | null;
+      /** Some of what was asked could not be done: the message says which. */
+      partial?: boolean;
+    };
 
 const hhmm = (d: Date) =>
   new Intl.DateTimeFormat("en-GB", { timeZone: APP_TIMEZONE, hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
@@ -76,7 +85,7 @@ export async function commandAction(
     const r = await runAssistant(user.id, text, (options?.page ?? "/today").slice(0, 120), history);
     if (r) {
       if (r.undos.length) done();
-      return { ok: true, message: r.message, undo: r.undos.length ? (r.undos.length === 1 ? r.undos[0] : { t: "many", list: r.undos }) : null, answer: r.answer, navigate: r.navigate };
+      return { ok: true, message: r.message, undo: r.undos.length ? (r.undos.length === 1 ? r.undos[0] : { t: "many", list: r.undos }) : null, answer: r.answer, navigate: r.navigate, partial: r.partial };
     }
   }
 
@@ -241,54 +250,65 @@ function done() {
   revalidatePath("/", "layout");
 }
 
-/** Put things back as they were before the last command. Only ever touches the user's own rows. */
-export async function undoCommandAction(undo: Undo) {
+/**
+ * Put things back as they were before the last command. Only ever touches the user's own
+ * rows. `missed` counts the steps that could not be put back (the row is gone, or a course
+ * already holds something), so the user is never told "undone" when it was not.
+ */
+export async function undoCommandAction(undo: Undo): Promise<{ ok: true; missed: number }> {
   const user = await requireUser();
-  const own = { userId: user.id };
+  const missed = await revert(user.id, undo);
+  done();
+  return { ok: true, missed };
+}
+
+async function revert(userId: string, undo: Undo): Promise<number> {
+  const own = { userId };
+  const hit = ({ count }: { count: number }) => (count > 0 ? 0 : 1);
   switch (undo.t) {
     case "delete-course": {
       // Only a course the assistant just created, and only while it is still empty.
       const c = await prisma.course.findFirst({ where: { id: undo.id, ...own }, include: { _count: { select: { assessments: true, tasks: true, schedules: true } } } });
-      if (c && !c._count.assessments && !c._count.tasks && !c._count.schedules) await prisma.course.delete({ where: { id: c.id } });
-      break;
+      if (!c || c._count.assessments || c._count.tasks || c._count.schedules) return 1;
+      await prisma.course.delete({ where: { id: c.id } });
+      return 0;
     }
     case "layout-was":
-      await saveLayout(user.id, undo.data);
-      break;
+      await saveLayout(userId, undo.data);
+      return 0;
     case "entry-delete":
-      await prisma.trackerEntry.deleteMany({ where: { id: undo.id, ...own, NOT: { module: LAYOUT_MODULE } } });
-      break;
+      return hit(await prisma.trackerEntry.deleteMany({ where: { id: undo.id, ...own, NOT: { module: LAYOUT_MODULE } } }));
     case "entry-value":
-      await prisma.trackerEntry.updateMany({ where: { id: undo.id, ...own }, data: { value: undo.value } });
-      break;
+      return hit(await prisma.trackerEntry.updateMany({ where: { id: undo.id, ...own }, data: { value: undo.value } }));
     case "task-status":
-      await prisma.task.updateMany({ where: { id: undo.id, ...own }, data: { status: undo.status } });
-      break;
-    case "many":
-      for (const u of undo.list.slice(0, 50)) if (u.t !== "many") await undoCommandAction(u);
-      break;
+      return hit(await prisma.task.updateMany({ where: { id: undo.id, ...own }, data: { status: undo.status } }));
+    case "many": {
+      let missed = 0;
+      for (const u of undo.list.slice(0, 50)) if (u.t !== "many") missed += await revert(userId, u);
+      return missed;
+    }
     case "delete-event":
-      await prisma.calendarEvent.deleteMany({ where: { id: undo.id, ...own } });
-      break;
+      return hit(await prisma.calendarEvent.deleteMany({ where: { id: undo.id, ...own } }));
     case "delete-task":
-      await prisma.task.deleteMany({ where: { id: undo.id, ...own } });
-      break;
+      return hit(await prisma.task.deleteMany({ where: { id: undo.id, ...own } }));
     case "event-was":
-      await prisma.calendarEvent.updateMany({
-        where: { id: undo.id, ...own },
-        data: { date: fromISODate(undo.date)!, startTime: undo.startTime, endTime: undo.endTime, title: undo.title.slice(0, 200) },
-      });
-      break;
+      return hit(
+        await prisma.calendarEvent.updateMany({
+          where: { id: undo.id, ...own },
+          data: { date: fromISODate(undo.date)!, startTime: undo.startTime, endTime: undo.endTime, title: undo.title.slice(0, 200) },
+        })
+      );
     case "task-was":
-      await prisma.task.updateMany({ where: { id: undo.id, ...own }, data: { dueDate: undo.dueDate ? new Date(undo.dueDate) : null, title: undo.title.slice(0, 200) } });
-      break;
+      return hit(await prisma.task.updateMany({ where: { id: undo.id, ...own }, data: { dueDate: undo.dueDate ? new Date(undo.dueDate) : null, title: undo.title.slice(0, 200) } }));
     case "restore-event": {
       const d = undo.data;
+      const date = fromISODate(d.date);
+      if (!date) return 1;
       const course = d.courseId ? await prisma.course.findFirst({ where: { id: d.courseId, ...own }, select: { id: true } }) : null;
       await prisma.calendarEvent.create({
-        data: { ...own, title: d.title.slice(0, 200), type: d.type.slice(0, 80), date: fromISODate(d.date)!, startTime: d.startTime, endTime: d.endTime, allDay: d.allDay, notes: d.notes, courseId: course?.id ?? null },
+        data: { ...own, title: d.title.slice(0, 200), type: d.type.slice(0, 80), date, startTime: d.startTime, endTime: d.endTime, allDay: d.allDay, notes: d.notes, courseId: course?.id ?? null },
       });
-      break;
+      return 0;
     }
     case "restore-task": {
       const d = undo.data;
@@ -310,9 +330,8 @@ export async function undoCommandAction(undo: Undo) {
           projectId: project?.id ?? null,
         },
       });
-      break;
+      return 0;
     }
   }
-  done();
-  return { ok: true };
+  return 1;
 }

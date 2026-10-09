@@ -202,7 +202,7 @@ export function QuickCapture() {
           setText("");
           return;
         }
-        setToast({ text: res.message, undo: res.undo });
+        setToast({ text: res.message, undo: res.undo, error: !!res.partial });
         setText("");
         setSection(null);
         setOpen(false);
@@ -215,8 +215,12 @@ export function QuickCapture() {
     if (!toast?.undo) return;
     const u = toast.undo;
     start(async () => {
-      await undoCommandAction(u);
-      setToast({ text: "Annulé.", undo: null });
+      const { missed } = await undoCommandAction(u);
+      setToast(
+        missed
+          ? { text: `Annulé en partie : ${missed} élément${missed > 1 ? "s avaient" : " avait"} déjà changé ou disparu.`, undo: null, error: true }
+          : { text: "Annulé.", undo: null }
+      );
     });
   };
 

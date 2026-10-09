@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/server/auth/current-user";
+import { checkRefs } from "@/server/ownership";
 
 export async function createProjectAction(_prev: unknown, formData: FormData) {
   const user = await requireUser();
@@ -14,6 +15,8 @@ export async function createProjectAction(_prev: unknown, formData: FormData) {
   const dueDate = formData.get("dueDate") ? new Date(formData.get("dueDate") as string) : null;
 
   if (!title) return { error: "Title is required." };
+  const refError = await checkRefs(user.id, { courseId });
+  if (refError) return { error: refError };
 
   const project = await prisma.project.create({
     data: { userId: user.id, title, description, courseId: courseId || null, dueDate },
@@ -35,6 +38,8 @@ export async function updateProjectAction(_prev: unknown, formData: FormData) {
   const progress = formData.get("progress") ? parseInt(formData.get("progress") as string) : 0;
 
   if (!title) return { error: "Title is required." };
+  const refError = await checkRefs(user.id, { courseId });
+  if (refError) return { error: refError };
 
   await prisma.project.update({
     where: { id, userId: user.id },

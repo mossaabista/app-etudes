@@ -97,6 +97,7 @@ export async function deleteScheduleAction(scheduleId: string, courseId: string)
   const course = await prisma.course.findFirst({ where: { id: courseId, userId: user.id } });
   if (!course) return;
 
-  await prisma.courseSchedule.delete({ where: { id: scheduleId } });
+  // The slot must hang off the course just checked, not merely exist somewhere.
+  await prisma.courseSchedule.deleteMany({ where: { id: scheduleId, courseId } });
   revalidatePath(`/courses/${courseId}`);
 }

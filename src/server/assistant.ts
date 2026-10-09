@@ -207,6 +207,7 @@ export async function askAssistant(userId: string, sentence: string, page: strin
     "- « fais-moi un plan de révision pour… » → plan_revision (ids des évaluations concernées). « organise/planifie ma journée » → plan_day (date).",
     "- « ouvre / montre-moi … » → navigate (url d'une page : /today, /calendar, /courses, /courses/<id>, /tasks, /tasks/<area>, /tasks/<area>/<section>, /settings, /syllabus).",
     "- Bilan, questions sur l'agenda : aucune action, réponse complète dans reply (cours, remises, tâches ; heure de coucher conseillée pour le lendemain).",
+    "- N'affirme jamais avoir fait quelque chose sans l'action correspondante : le serveur exécute et vérifie chaque action, et remplace ta réponse par un compte rendu si l'une d'elles échoue.",
     "- Vérifie chaque date contre l'agenda jour par jour fourni. reply : une ou deux phrases, naturelles à l'oral, sans liste ni symbole.",
     "",
     ctx.text,

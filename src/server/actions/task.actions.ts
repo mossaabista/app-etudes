@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/server/auth/current-user";
 import { wallTimeToUtc } from "@/lib/dates";
+import { checkRefs } from "@/server/ownership";
 
 function revalidateTasks() {
   // Tasks show on Today, the calendar, every sector and section page and the courses:
@@ -29,6 +30,8 @@ export async function createTaskAction(_prev: unknown, formData: FormData) {
   if (!title) {
     return { error: "Title is required." };
   }
+  const refError = await checkRefs(user.id, { courseId, projectId, assessmentId, parentId });
+  if (refError) return { error: refError };
 
   await prisma.task.create({
     data: {
@@ -60,6 +63,8 @@ export async function updateTaskAction(_prev: unknown, formData: FormData) {
   if (!title) {
     return { error: "Title is required." };
   }
+  const refError = await checkRefs(user.id, { courseId });
+  if (refError) return { error: refError };
 
   await prisma.task.update({
     where: { id, userId: user.id },
@@ -112,6 +117,8 @@ export async function quickTaskAction(input: { title: string; category: string; 
   const user = await requireUser();
   const title = input.title.trim().slice(0, 200);
   if (!title) return { error: "Titre requis." };
+  const refError = await checkRefs(user.id, { courseId: input.courseId });
+  if (refError) return { error: refError };
   const parent = input.parentId ? await prisma.task.findFirst({ where: { id: input.parentId, userId: user.id }, select: { id: true, category: true, dueDate: true } }) : null;
   const due = input.due && /^\d{4}-\d{2}-\d{2}$/.test(input.due) ? input.due : null;
   const [y, m, d] = (due ?? "").split("-").map(Number);

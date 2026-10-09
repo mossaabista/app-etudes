@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/server/auth/current-user";
+import { checkRefs } from "@/server/ownership";
 
 export async function createAssessmentAction(_prev: unknown, formData: FormData) {
   const user = await requireUser();
@@ -18,6 +19,8 @@ export async function createAssessmentAction(_prev: unknown, formData: FormData)
   if (!courseId || !title || !type) {
     return { error: "Course, title, and type are required." };
   }
+  const refError = await checkRefs(user.id, { courseId });
+  if (refError) return { error: refError };
 
   await prisma.assessment.create({
     data: { userId: user.id, courseId, title, type, weight, dueDate, notes },
@@ -44,6 +47,9 @@ export async function updateAssessmentAction(_prev: unknown, formData: FormData)
   if (!title || !type) {
     return { error: "Title and type are required." };
   }
+  if (!courseId) return { error: "Course is required." };
+  const refError = await checkRefs(user.id, { courseId });
+  if (refError) return { error: refError };
 
   await prisma.assessment.update({
     where: { id, userId: user.id },
