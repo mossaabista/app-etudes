@@ -16,6 +16,8 @@ const match = (row: Row, where: Record<string, unknown> = {}): boolean =>
         if (o === "in") return (w as unknown[]).includes(row[k]);
         if (o === "notIn") return !(w as unknown[]).includes(row[k]);
         if (o === "not") return row[k] !== w;
+        // As in SQL, NULL compares to nothing.
+        if (["lt", "lte", "gt", "gte"].includes(o) && (row[k] == null || w == null)) return false;
         if (o === "lt") return x < y;
         if (o === "lte") return x <= y;
         if (o === "gt") return x > y;

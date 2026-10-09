@@ -1,3 +1,4 @@
+import { ListChecks } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/server/auth/current-user";
 import { CardDeck } from "@/components/today/CardDeck";
@@ -92,6 +93,9 @@ export default async function TasksPage() {
           <p className="text-xs text-on-gold">Les domaines de ta vie. Ajoute, retire ou crée les tiens — à la main ou au micro.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <a href="/liste" className="mod-chip focus-ring">
+            <ListChecks size={13} /> Toutes mes tâches
+          </a>
           <WorkspaceCreator />
           <LayoutEditor layout={layout} />
         </div>

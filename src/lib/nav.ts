@@ -52,7 +52,7 @@ export const NAV_MODULES: NavModule[] = [
     under: ["/documents"],
     desc: "Fichiers, résumés et réponses sourcées",
   },
-  { key: "sectors", label: "Secteurs", href: "/tasks", icon: LayoutGrid, core: true, under: ["/tasks", "/projects"], desc: "Les domaines de ta vie" },
+  { key: "sectors", label: "Secteurs", href: "/tasks", icon: LayoutGrid, core: true, under: ["/tasks", "/projects", "/liste"], desc: "Les domaines de ta vie" },
   { key: "settings", label: "Réglages", href: "/settings", icon: Settings, core: true, under: ["/settings"], desc: "Profil, assistant, données" },
 ];
 
