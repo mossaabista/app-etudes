@@ -1,9 +1,9 @@
-import { Sun, CalendarDays, BookOpen, LayoutGrid, Settings, FolderKanban, Dumbbell, type LucideIcon } from "lucide-react";
+import { Sun, CalendarDays, BookOpen, LayoutGrid, Settings, FolderKanban, Dumbbell, AudioLines, type LucideIcon } from "lucide-react";
 import type { NavPrefs, ProfileType } from "@/lib/profile";
 
 /**
- * The navigation, declared once. Four places are always there — Aujourd'hui, Calendrier,
- * Secteurs, Réglages. The others are modules: shown by default to the roles that need them
+ * The navigation, declared once. Five places are always there — Aujourd'hui, Assistant,
+ * Calendrier, Secteurs, Réglages. The others are modules: shown by default to the roles that need them
  * AND to anyone who already has data in them, so changing role never hides your courses
  * or projects. The user's own choices (show / hide) win over both.
  */
@@ -28,6 +28,7 @@ export interface NavModule {
 
 export const NAV_MODULES: NavModule[] = [
   { key: "today", label: "Aujourd'hui", href: "/today", icon: Sun, core: true, under: ["/today"], desc: "Ta journée" },
+  { key: "assistant", label: "Assistant", href: "/assistant", icon: AudioLines, core: true, under: ["/assistant"], desc: "Parler à OROM" },
   { key: "calendar", label: "Calendrier", href: "/calendar", icon: CalendarDays, core: true, under: ["/calendar"], desc: "Semaine et mois" },
   {
     key: "courses",
@@ -72,9 +73,12 @@ export function navKeys(ctx: NavContext): string[] {
 
 export const navByKeys = (keys: string[]) => NAV_MODULES.filter((m) => keys.includes(m.key));
 
-/** Phone tab bar: four entries — today, calendar, the first module, sectors. */
+/**
+ * Phone tab bar: four entries — today, calendar, the first module, sectors. The assistant
+ * is the floating microphone there, and settings sit in the menu.
+ */
 export function mobileNav(keys: string[]) {
-  const items = navByKeys(keys).filter((m) => m.key !== "settings");
+  const items = navByKeys(keys).filter((m) => m.key !== "settings" && m.key !== "assistant");
   if (items.length <= 4) return items;
   const optional = items.filter((m) => !m.core);
   return items.filter((m) => m.core || m === optional[0]);

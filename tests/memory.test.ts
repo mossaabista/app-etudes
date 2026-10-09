@@ -63,3 +63,24 @@ describe("assistant memory", () => {
     expect(db.trackerEntry.rows.some((r) => r.id === "bob-fact")).toBe(true);
   });
 });
+
+describe("conversation", () => {
+  it("records an exchange from the assistant page with its real outcome, and can be erased", async () => {
+    const { conversationAction, clearConversationAction } = await import("@/server/actions/capture.actions");
+    db.trackerEntry = table();
+    await commandAction("appeler maman demain", { record: true });
+    await commandAction("supprime le dentiste de mardi", { record: true });
+    const turns = await conversationAction();
+    expect(turns.map((t) => [t.role, t.outcome])).toEqual([
+      ["user", null],
+      ["assistant", "done"],
+      ["user", null],
+      ["assistant", "failed"],
+    ]);
+    // Not recorded without the flag.
+    await commandAction("appeler papa demain");
+    expect(await conversationAction()).toHaveLength(4);
+    expect(await clearConversationAction()).toEqual({ ok: true, count: 4 });
+    expect(await conversationAction()).toEqual([]);
+  });
+});

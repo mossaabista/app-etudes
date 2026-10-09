@@ -33,7 +33,7 @@ export function NavSettings({ modules }: { modules: NavModuleRow[] }) {
 
   return (
     <div className="space-y-2">
-      <p className="text-xs text-[var(--ink-dim)]">Aujourd&apos;hui, Calendrier, Secteurs et Réglages restent toujours dans le menu. Les modules ci-dessous s&apos;ajoutent selon ton profil et tes données.</p>
+      <p className="text-xs text-[var(--ink-dim)]">Aujourd&apos;hui, Assistant, Calendrier, Secteurs et Réglages restent toujours dans le menu. Les modules ci-dessous s&apos;ajoutent selon ton profil et tes données.</p>
       <ul className="space-y-2">
         {modules.map((m) => (
           <li key={m.key} className="tile flex flex-wrap items-center gap-3 px-4 py-3">

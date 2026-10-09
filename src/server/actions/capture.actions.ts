@@ -15,6 +15,7 @@ import { newOpId, openPending, sealPending } from "@/server/pending";
 import { applyWorkspace } from "@/server/workspaces";
 import { radarText, riskRadar } from "@/server/radar";
 import { addFact, forgetFacts, listFacts } from "@/server/memory";
+import { appendTurns, clearTurns, listTurns, type Outcome } from "@/server/conversation";
 import { detectTemplate, nameFrom } from "@/lib/workspaces";
 import { claim, findOp, isUndoable, markUndone, recentActions, settle, type LoggedAction } from "@/server/agent-log";
 import { saveLayout, LAYOUT_MODULE } from "@/server/layout";
@@ -90,6 +91,8 @@ type CommandOptions = {
   history?: Turn[];
   /** One id per submission, made by the browser: the same submission twice runs once. */
   opId?: string;
+  /** Keep this exchange in the Assistant page's conversation. */
+  record?: boolean;
 };
 
 const OP_ID = /^[\w-]{8,64}$/;
@@ -100,7 +103,37 @@ export async function commandAction(input: string, options?: CommandOptions): Pr
   if (!text) return { error: "Dis ou écris ce que tu veux faire." };
   const opId = typeof options?.opId === "string" && OP_ID.test(options.opId) ? options.opId : null;
   // Answers (history, radar, memory list) leave no trace in the log; changes (« retiens que… ») do.
-  return logged(user.id, opId, assistantEnabled() ? "assistant" : "rules", async () => (await metaCommand(user.id, text)) ?? runCommand(user.id, text, options));
+  const res = await logged(user.id, opId, assistantEnabled() ? "assistant" : "rules", async () => (await metaCommand(user.id, text)) ?? runCommand(user.id, text, options));
+  if (options?.record) await record(user.id, text, res);
+  return res;
+}
+
+/** How a command ended, for the conversation and the voice: never "done" unless it was. */
+async function outcomeOf(res: CommandResult): Promise<Outcome> {
+  if ("error" in res) return "failed";
+  if ("confirm" in res) return "confirm";
+  if ("choose" in res) return "answer";
+  return res.partial ? "partial" : res.answer || !res.undo ? "answer" : "done";
+}
+
+async function record(userId: string, text: string | null, res: CommandResult) {
+  const reply = "error" in res ? res.error : "confirm" in res ? `Avant de le faire, j'ai besoin de ton accord : ${res.confirm.items.join(" ; ")}.` : "choose" in res ? res.question : res.message;
+  try {
+    await appendTurns(userId, [...(text ? [{ role: "user" as const, text }] : []), { role: "assistant" as const, text: reply, outcome: await outcomeOf(res) }]);
+  } catch (e) {
+    console.warn("[orom] conversation non enregistrée :", e instanceof Error ? e.message.split("\n")[0] : e);
+  }
+}
+
+/** The Assistant page's conversation. */
+export async function conversationAction() {
+  const user = await requireUser();
+  return listTurns(user.id);
+}
+
+export async function clearConversationAction() {
+  const user = await requireUser();
+  return { ok: true as const, count: await clearTurns(user.id) };
 }
 
 /**
@@ -398,8 +431,15 @@ async function create(userId: string, text: string, today: string, options?: { a
 }
 
 /** The user said yes to what was proposed: do it now, through the usual checks. */
-export async function confirmCommandAction(token: string): Promise<CommandResult> {
+export async function confirmCommandAction(token: string, options?: { record?: boolean }): Promise<CommandResult> {
   const user = await requireUser();
+  const res = await confirmed(user.id, token);
+  if (options?.record) await record(user.id, null, res);
+  return res;
+}
+
+async function confirmed(userId: string, token: string): Promise<CommandResult> {
+  const user = { id: userId };
   const opened = openPending(user.id, token);
   if ("error" in opened) return { error: opened.error };
   const work = opened.work;
@@ -425,10 +465,13 @@ function done() {
  * rows. `missed` counts the steps that could not be put back (the row is gone, or a course
  * already holds something), so the user is never told "undone" when it was not.
  */
-export async function undoCommandAction(undo: Undo, opId?: string): Promise<{ ok: true; missed: number }> {
+export async function undoCommandAction(undo: Undo, opId?: string, options?: { record?: boolean }): Promise<{ ok: true; missed: number }> {
   const user = await requireUser();
   const missed = await revert(user.id, undo);
   if (opId && OP_ID.test(opId)) await markUndone(user.id, { opId });
+  // The conversation must not keep saying "done" about something that was undone.
+  if (options?.record)
+    await appendTurns(user.id, [{ role: "assistant", text: missed ? `Annulé en partie : ${missed} élément${missed > 1 ? "s avaient" : " avait"} déjà changé.` : "Annulé.", outcome: missed ? "partial" : "cancelled" }]).catch(() => {});
   done();
   return { ok: true, missed };
 }

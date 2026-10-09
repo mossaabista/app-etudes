@@ -10,6 +10,7 @@ import { intentsOf, isDeadline, parseIntent, splitCommands } from "@/lib/command
 import { AREAS, areaByKey } from "@/lib/task-areas";
 import { toISODate } from "@/lib/dates";
 import { expectLanding } from "@/components/layout/LandWatcher";
+import { loadVoicePrefs, saveVoicePrefs, spokenSummary, webSpeechOutput } from "@/lib/voice";
 
 const EXAMPLES = [
   "muscu samedi à 10h pendant 1h",
@@ -48,17 +49,9 @@ const recognitionCtor = (): RecognitionCtor | null => {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 };
 
-/** Read a reply aloud with the device's own French voice: free, offline on iPhone and Mac. */
+/** Read a reply aloud with the device's voice and the user's voice settings; long answers are summarised. */
 function speak(text: string) {
-  if (typeof window === "undefined" || !("speechSynthesis" in window) || !text) return;
-  const synth = window.speechSynthesis;
-  synth.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  const voices = synth.getVoices();
-  u.voice = voices.find((v) => v.lang === "fr-CA") ?? voices.find((v) => v.lang.startsWith("fr")) ?? null;
-  u.lang = u.voice?.lang ?? "fr-CA";
-  u.rate = 1.05;
-  synth.speak(u);
+  webSpeechOutput.speak(spokenSummary(text), loadVoicePrefs());
 }
 
 interface Toast {
@@ -115,9 +108,7 @@ export function QuickCapture() {
   useEffect(() => {
     const t = setTimeout(() => {
       setCanListen(!!recognitionCtor());
-      try {
-        setVoice(localStorage.getItem("aurum-voice") === "on");
-      } catch {}
+      setVoice(loadVoicePrefs().speakTyped);
     }, 0);
     return () => clearTimeout(t);
   }, []);
@@ -142,9 +133,7 @@ export function QuickCapture() {
   }, []);
   const toggleVoice = () =>
     setVoice((v) => {
-      try {
-        localStorage.setItem("aurum-voice", v ? "off" : "on");
-      } catch {}
+      saveVoicePrefs({ ...loadVoicePrefs(), speakTyped: !v });
       if (v) window.speechSynthesis?.cancel();
       return !v;
     });
@@ -273,7 +262,7 @@ export function QuickCapture() {
     setAnswer(null);
     setText("");
     const r = new Ctor();
-    r.lang = "fr-CA";
+    r.lang = loadVoicePrefs().locale;
     r.interimResults = true;
     // Keep listening through pauses between words; stop after ~2 s of silence, or when
     // the mic is tapped again.
@@ -329,6 +318,9 @@ export function QuickCapture() {
 
   const verb =
     intent?.kind === "move" ? "Déplacer" : intent?.kind === "delete" ? "Supprimer" : intent?.kind === "rename" ? "Renommer" : intent?.kind === "summary" ? "Bilan" : null;
+
+  // The Assistant page has its own microphone and input: no second set floating over it.
+  if (pathname === "/assistant") return null;
 
   return (
     <>

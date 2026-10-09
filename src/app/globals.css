@@ -1482,3 +1482,45 @@ input:-webkit-autofill:focus {
     text-shadow: 0 1px 0 rgba(255, 236, 190, 0.35);
   }
 }
+
+/* The OROM orb on the Assistant page: it says what the assistant is doing at a glance,
+   and the words beside it say it again for anyone who cannot see the motion. */
+@layer components {
+  .orom-orb {
+    display: inline-flex;
+    height: 4.5rem;
+    width: 4.5rem;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background: radial-gradient(circle at 35% 30%, rgba(255, 233, 160, 0.35), rgba(30, 18, 4, 0.9) 70%);
+    box-shadow: 0 0 0 1px rgba(255, 220, 148, 0.25), 0 8px 24px rgba(20, 10, 0, 0.45);
+    transition: box-shadow 0.3s ease;
+  }
+  .orom-orb[data-state="listening"],
+  .orom-orb[data-state="transcribing"] {
+    box-shadow: 0 0 0 3px #f0cd79, 0 0 28px rgba(240, 205, 121, 0.55);
+    animation: orom-breathe 1.4s ease-in-out infinite;
+  }
+  .orom-orb[data-state="processing"],
+  .orom-orb[data-state="executing"] {
+    box-shadow: 0 0 0 2px rgba(240, 205, 121, 0.6), 0 0 18px rgba(240, 205, 121, 0.3);
+    animation: orom-spin-glow 1.2s linear infinite;
+  }
+  .orom-orb[data-state="speaking"] {
+    box-shadow: 0 0 0 2px #7fe0b0, 0 0 22px rgba(127, 224, 176, 0.35);
+  }
+  .orom-orb[data-state="error"] {
+    box-shadow: 0 0 0 2px #ffb3a3;
+  }
+  @keyframes orom-breathe {
+    50% { transform: scale(1.06); }
+  }
+  @keyframes orom-spin-glow {
+    50% { box-shadow: 0 0 0 2px rgba(240, 205, 121, 0.2), 0 0 26px rgba(240, 205, 121, 0.55); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .orom-orb { animation: none !important; }
+  }
+}
