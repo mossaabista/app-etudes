@@ -1,10 +1,20 @@
 import { fr } from "@/i18n/messages/fr";
 import { en } from "@/i18n/messages/en";
+import { NAMESPACES } from "@/i18n/ns";
 import type { Locale } from "@/i18n/config";
+import type { Shape } from "@/i18n/ns/define";
 
+type Spaces = typeof NAMESPACES;
+type Core = Shape<typeof fr>;
 /** Same shape in every language: a missing English string is a type error. */
-type Shape<T> = { [K in keyof T]: T[K] extends string ? string : Shape<T[K]> };
-export type Messages = Shape<typeof fr>;
+export type Messages = Core & { [K in keyof Spaces]: Spaces[K] extends { fr: infer F } ? F : never };
 
-const ALL: Record<Locale, Messages> = { fr, en };
-export const messagesFor = (locale: Locale): Messages => ALL[locale] ?? fr;
+function build(locale: Locale, core: Core): Messages {
+  const out: Record<string, unknown> = { ...core };
+  for (const [name, ns] of Object.entries(NAMESPACES)) out[name] = (ns as unknown as Record<Locale, unknown>)[locale];
+  return out as Messages;
+}
+
+const ALL: Record<Locale, Messages> = { fr: build("fr", fr), en: build("en", en) };
+export const messagesFor = (locale: Locale): Messages => ALL[locale] ?? ALL.fr;
+export { fr as frCore };

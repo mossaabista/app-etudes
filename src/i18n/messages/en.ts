@@ -1,4 +1,7 @@
-import type { Messages } from "@/i18n/messages";
+import type { Shape } from "@/i18n/ns/define";
+import type { fr } from "@/i18n/messages/fr";
+
+type Messages = Shape<typeof fr>;
 
 export const en: Messages = {
   common: {
