@@ -73,7 +73,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
               <ChevronLeft size={18} />
             </LiquidLayers>
           </Link>
-          <p className="text-xs font-medium uppercase tracking-wide text-[rgba(255,246,227,0.85)]">Cours</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-on-gold">Cours</p>
           <div className="ml-auto flex gap-2">
             <Link href={`/courses/${id}/edit`} className="mod-chip focus-ring">
               <PencilLine size={13} /> Modifier

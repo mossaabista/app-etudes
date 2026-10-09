@@ -32,9 +32,9 @@ export default async function CoursesPage() {
       <div className="glass-backdrop" aria-hidden />
 
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h1 className="text-lg font-semibold tracking-tight text-[var(--ink)] drop-shadow-[0_1px_2px_rgba(40,22,2,0.5)]">
+        <h1 className="text-lg font-semibold tracking-tight text-on-gold">
           Cours
-          {courses.length > 0 && <span className="ml-2 text-sm font-normal text-[var(--ink-dim)]">{courses.length}</span>}
+          {courses.length > 0 && <span className="ml-2 text-sm font-normal text-on-gold">{courses.length}</span>}
         </h1>
         <Link href="/courses/new" aria-label="Ajouter un cours" className="lm focus-ring h-11 w-11 shrink-0">
           <LiquidLayers>

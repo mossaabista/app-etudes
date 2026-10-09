@@ -1468,3 +1468,17 @@ input:-webkit-autofill:focus {
   }
   .btn-gold:hover { background: linear-gradient(180deg, #fff0bd, #d9a53c); }
 }
+
+/* Text set straight on the gold backdrop (page titles and their subtitles): dark ink with
+   a faint highlight. At least 4.5:1 on the backdrop behind page headers, where light text
+   with a shadow reached about 2.5:1. */
+@layer utilities {
+  /* A secondary button set straight on the gold backdrop needs a dark ground to stay legible. */
+  .mod-chip-dark {
+    background: rgba(30, 18, 4, 0.6);
+  }
+  .text-on-gold {
+    color: #2a1a05;
+    text-shadow: 0 1px 0 rgba(255, 236, 190, 0.35);
+  }
+}

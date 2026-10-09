@@ -67,8 +67,8 @@ export function ModuleShell({
             <RenderImage src={src} className="mod-hero-img" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-2xl font-semibold tracking-tight text-[var(--ink)] drop-shadow-[0_1px_2px_rgba(40,22,2,0.5)] sm:text-3xl">{label}</h1>
-            {intro && <p className="mt-1.5 max-w-xl text-sm leading-6 text-[var(--ink-dim)]">{intro}</p>}
+            <h1 className="text-2xl font-semibold tracking-tight text-on-gold sm:text-3xl">{label}</h1>
+            {intro && <p className="mt-1.5 max-w-xl text-sm leading-6 text-on-gold">{intro}</p>}
           </div>
         </header>
 

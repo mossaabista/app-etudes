@@ -34,9 +34,9 @@ export function DateNav({ anchor, range, label }: { anchor: Date; range: Range; 
         </Link>
 
         <div className="min-w-0">
-          <h1 className="truncate text-lg font-semibold tracking-tight text-[var(--ink)] drop-shadow-[0_1px_2px_rgba(40,22,2,0.5)]">{label}</h1>
+          <h1 className="truncate text-lg font-semibold tracking-tight text-on-gold">{label}</h1>
           {!isToday && (
-            <Link href={href(new Date(), "day")} className="text-xs text-[var(--ink-dim)] hover:text-[var(--ink)]">
+            <Link href={href(new Date(), "day")} className="text-xs text-on-gold underline-offset-2 hover:underline">
               Revenir à aujourd&apos;hui
             </Link>
           )}

@@ -51,7 +51,7 @@ export function LayoutEditor({ layout }: { layout: Layout }) {
           setAreas(layout.areas);
           setOpen(true);
         }}
-        className="mod-chip focus-ring"
+        className="mod-chip mod-chip-dark focus-ring"
       >
         <SlidersHorizontal size={13} /> Personnaliser
       </button>

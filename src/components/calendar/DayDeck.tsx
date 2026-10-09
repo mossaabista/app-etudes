@@ -63,7 +63,7 @@ export function DayDeck({
       <div className="absolute inset-0 bg-[rgba(30,18,4,0.35)] backdrop-blur-sm" aria-hidden />
 
       <div className="relative flex items-center justify-between gap-3 px-4 pb-2 pt-[calc(1rem+env(safe-area-inset-top,0px))] md:px-8 md:pt-6">
-        <h2 className="truncate text-lg font-semibold capitalize tracking-tight text-[var(--ink)] drop-shadow-[0_1px_2px_rgba(40,22,2,0.5)]">
+        <h2 className="truncate text-lg font-semibold capitalize tracking-tight text-on-gold">
           {label(days[active].iso)}
         </h2>
         <button ref={closeRef} type="button" onClick={onClose} aria-label="Fermer et revenir au calendrier" className="lm focus-ring h-11 w-11 shrink-0">

@@ -71,10 +71,10 @@ export function AreaView({
             </LiquidLayers>
           </Link>
           <div className="min-w-0">
-            <h1 className="truncate text-lg font-semibold tracking-tight text-[var(--ink)] drop-shadow-[0_1px_2px_rgba(40,22,2,0.5)]">
+            <h1 className="truncate text-lg font-semibold tracking-tight text-on-gold">
               {area.label}
             </h1>
-            <p className="truncate text-xs text-[var(--ink-dim)]">{area.blurb}</p>
+            <p className="truncate text-xs text-on-gold">{area.blurb}</p>
           </div>
         </div>
 

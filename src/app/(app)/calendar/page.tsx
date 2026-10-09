@@ -189,7 +189,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           </LiquidLayers>
         </Link>
         <div className="min-w-0">
-          <h1 className="truncate text-lg font-semibold tracking-tight text-[var(--ink)] drop-shadow-[0_1px_2px_rgba(40,22,2,0.5)]">
+          <h1 className="truncate text-lg font-semibold tracking-tight text-on-gold">
             {monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}
           </h1>
           {!isCurrentMonth && (

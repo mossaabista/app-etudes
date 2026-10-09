@@ -85,11 +85,11 @@ export default async function TasksPage() {
 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold tracking-tight text-[var(--ink)] drop-shadow-[0_1px_2px_rgba(40,22,2,0.5)]">
+          <h1 className="text-lg font-semibold tracking-tight text-on-gold">
             Secteurs
-            {tasks.length > 0 && <span className="ml-2 text-sm font-normal text-[rgba(255,246,227,0.85)]">{tasks.length} à faire</span>}
+            {tasks.length > 0 && <span className="ml-2 text-sm font-normal text-on-gold">{tasks.length} à faire</span>}
           </h1>
-          <p className="text-xs text-[rgba(255,246,227,0.8)]">Les domaines de ta vie. Ajoute, retire ou crée les tiens — à la main ou au micro.</p>
+          <p className="text-xs text-on-gold">Les domaines de ta vie. Ajoute, retire ou crée les tiens — à la main ou au micro.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <WorkspaceCreator />

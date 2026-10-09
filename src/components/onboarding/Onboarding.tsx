@@ -35,10 +35,10 @@ export function Onboarding({ name, current }: { name: string; current: Profile |
       <div className="area-enter mx-auto max-w-4xl">
         <div className="mb-8 flex flex-col items-center text-center">
           <BrandMark size={48} />
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-[var(--ink)] drop-shadow-[0_1px_2px_rgba(40,22,2,0.5)] sm:text-4xl">
+          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-on-gold sm:text-4xl">
             {step === 1 ? `Bienvenue${name ? `, ${name}` : ""}.` : "Ton écran du jour"}
           </h1>
-          <p className="mt-2 max-w-lg text-sm leading-6 text-[var(--ink-dim)]">
+          <p className="mt-2 max-w-lg text-sm leading-6 text-on-gold">
             {step === 1
               ? `${BRAND.promise} Dis-nous pour qui on le règle.`
               : "Choisis jusqu'à cinq cartes pour l'écran Aujourd'hui. Tu pourras les changer dans les réglages."}
