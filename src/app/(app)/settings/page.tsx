@@ -14,6 +14,8 @@ import { AgentHistory } from "@/components/settings/AgentHistory";
 import { historyRows } from "@/server/agent-log";
 import { NavSettings } from "@/components/settings/NavSettings";
 import { PlanningSettings } from "@/components/settings/PlanningSettings";
+import { MemorySettings } from "@/components/settings/MemorySettings";
+import { listFacts } from "@/server/memory";
 import { getPlanningPrefs } from "@/server/planning-prefs";
 import { OPTIONAL_MODULES, moduleState } from "@/lib/nav";
 import { getLayout } from "@/server/layout";
@@ -23,7 +25,7 @@ import { APP_TIMEZONE } from "@/lib/dates";
 
 export default async function SettingsPage() {
   const user = await requireUser();
-  const [profile, autonomy, actions, courses, projects, layout, planning] = await Promise.all([
+  const [profile, autonomy, actions, courses, projects, layout, planning, facts] = await Promise.all([
     getProfile(user.id),
     getAutonomy(user.id),
     historyRows(user.id),
@@ -31,6 +33,7 @@ export default async function SettingsPage() {
     prisma.project.count({ where: { userId: user.id } }),
     getLayout(user.id),
     getPlanningPrefs(user.id),
+    listFacts(user.id),
   ]);
   const prefs = profile?.nav ?? { shown: [], hidden: [] };
   const navCtx = { roles: profile?.roles ?? ["etudiant" as const], prefs, counts: { courses, projects }, areas: layout.areas.map((a) => a.key) };
@@ -87,6 +90,13 @@ export default async function SettingsPage() {
             <div className="mt-5 border-t border-[rgba(255,220,148,0.1)] pt-4">
               <AutonomySettings current={autonomy} />
             </div>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader title="Mémoire" subtitle="Ce que l'assistant retient de toi, et rien d'autre" />
+          <CardBody>
+            <MemorySettings facts={facts.map((f) => ({ id: f.id, text: f.text }))} />
           </CardBody>
         </Card>
 

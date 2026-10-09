@@ -14,6 +14,7 @@ import { getAutonomy } from "@/server/autonomy";
 import { newOpId, openPending, sealPending } from "@/server/pending";
 import { applyWorkspace } from "@/server/workspaces";
 import { radarText, riskRadar } from "@/server/radar";
+import { addFact, forgetFacts, listFacts } from "@/server/memory";
 import { detectTemplate, nameFrom } from "@/lib/workspaces";
 import { claim, findOp, isUndoable, markUndone, recentActions, settle, type LoggedAction } from "@/server/agent-log";
 import { saveLayout, LAYOUT_MODULE } from "@/server/layout";
@@ -122,6 +123,9 @@ async function logged(userId: string, opId: string | null, source: string, work:
 }
 
 const RISK = /(qu'?est-ce qui|quoi|qu'?est ce qui|what).{0,40}(risque|a risque|en retard|pas (fini|termine)|ne sera pas|at risk|behind|late)|\bradar\b|\ba risque\b/;
+const REMEMBER = /^(stp |s'il te plait )?(retiens|souviens-toi|souviens toi|rappelle-toi|memorise|note bien|remember)( bien)? (que|qu'|de |d'|that )/;
+const FORGET = /^(stp |s'il te plait )?(oublie|forget)( tout)? (que |qu'|ce que tu sais sur |about |that )/;
+const RECALL = /(qu'?est-ce que tu sais (de|sur) moi|que sais-tu (de|sur) moi|ta memoire|tu te souviens de quoi|what do you (know|remember) about me)/;
 const HISTORY = /(qu'?est-ce que tu as|qu'?as-tu|qu'?est-ce qui a|what did you|what have you) (change|fait|modifie|ete change|ete modifie|do|done|changed)|historique (de l'assistant|des actions)/;
 const UNDO_LAST = /^(stp |s'il te plait )?(annule|defais|undo) (ta|la|ma|mon|ton|le) (derniere|dernier|last) ?(action|modification|changement|commande|change)?\b|annule ce que tu (viens de faire|as fait)/;
 const hhmm24 = (d: Date) => hhmm(d).replace(":", " h ");
@@ -135,6 +139,23 @@ async function metaCommand(userId: string, text: string): Promise<CommandResult 
     if (!rows.length) return { ok: true, answer: true, undo: null, message: "Je n'ai encore rien modifié pour toi." };
     const lines = rows.map((r) => `${toISODate(r.createdAt) === toISODate(new Date()) ? "Aujourd'hui" : dayWords(toISODate(r.createdAt))} à ${hhmm24(r.createdAt)} : ${r.summary}${r.status === "undone" ? " (annulé)" : r.status === "partial" ? " (en partie)" : ""}`);
     return { ok: true, answer: true, undo: null, message: `Mes dernières modifications. ${lines.join(" ")}` };
+  }
+  // Memory: only what the user explicitly asks to keep, always visible and deletable.
+  if (REMEMBER.test(f)) {
+    const what = text.replace(/^[^]*?\b(que|qu'|qu’|de|d'|d’|that)\s*/i, "").trim();
+    const r = await addFact(userId, what);
+    if ("error" in r) return { error: r.error };
+    return { ok: true, message: `C'est retenu : « ${r.fact.text} ». Tu peux le voir ou l'effacer dans Réglages → Mémoire.`, undo: { t: "entry-delete", id: r.fact.id } };
+  }
+  if (FORGET.test(f)) {
+    // « oublie ce que tu sais sur le sport » → « le sport » ; « oublie que je… » → « je… ».
+    const about = (/\b(?:sais|sait|know)\s+(?:sur|de|about)\s+(.+)$/i.exec(text)?.[1] ?? text.replace(/^[^]*?\b(que|qu'|qu’|about|that)\s*/i, "")).trim();
+    const gone = await forgetFacts(userId, about);
+    return gone.length ? { ok: true, undo: null, message: `C'est oublié : ${gone.map((g) => `« ${g} »`).join(", ")}.` } : { error: "Je ne retenais rien là-dessus." };
+  }
+  if (RECALL.test(f)) {
+    const facts = await listFacts(userId);
+    return { ok: true, answer: true, undo: null, message: facts.length ? `Voici ce que tu m'as demandé de retenir : ${facts.map((x) => `« ${x.text} »`).join(", ")}.` : "Je ne retiens rien sur toi tant que tu ne me le demandes pas (« retiens que… »)." };
   }
   if (RISK.test(f)) return { ok: true, answer: true, undo: null, message: radarText(await riskRadar(userId)) };
   if (UNDO_LAST.test(f)) {
