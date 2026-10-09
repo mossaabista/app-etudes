@@ -171,3 +171,58 @@ Tests : **111** (`npm test`), dont les tests A, B, C, D, E, F, G, H et I du prom
 - Calendrier externe, e-mail, nouvelles notifications (phase 8). Les intégrations existantes, Brightspace et le digest push, sont inchangées.
 - Collaboration réelle (membres avec accès, partage).
 - Transformer un espace existant en modèle réutilisable.
+
+## 9. OROM — reconstruction (état au 9 octobre 2026)
+
+Le produit s'appelle désormais **OROM** (« Dis-le. OROM s'en occupe. »). Le dépôt OpenJarvis
+fourni ne contenait que ses fichiers de premier niveau (README, pyproject, licence Apache-2.0),
+sans code source : ses idées (registre d'agents typés, compétences exposées comme outils, modes
+d'exécution) ont été reprises en TypeScript, sans import ni marque OpenJarvis.
+
+### Implémenté et vérifié (tests automatisés + navigateur sur base locale jetable)
+
+| Domaine | Ce qui marche |
+|---|---|
+| OROM Core | 11 agents déclaratifs (personnel, productivité, études, travail, projets, équipe, nutrition, sport, développement personnel, documents, automatisations). Routage déterministe vers 3 agents au plus, un seul appel modèle, outils = union de ceux des agents choisis ; toute autre opération est refusée par le serveur. Contexte découpé selon les besoins des agents. |
+| Assistant et voix | Page Assistant : conversation persistée (100 échanges), états vocaux visibles (écoute, transcription, réflexion, exécution, réponse, interrompu, annulé, erreur), mode conversation sur demande, réglages de voix. Même commande serveur pour la voix et le texte. |
+| Documents | PDF / Word / texte, recherche lexicale par passages, réponses citant document et page (références inventées retirées), résumé et actions → tâches. Sans clé IA : les passages eux-mêmes, étiquetés comme tels. |
+| Nutrition | Régime, allergies, aliments refusés ; aucun menu ne contient un aliment exclu (un repas reste vide plutôt). Menu de 7 jours et liste de courses agrégée, ajoutée en une fois, sans doublon, annulable. |
+| Sport | Réservation des séances de la semaine dans le temps libre (cours, rendez-vous, repas, marge), jamais un jour de repos ni un jour déjà entraîné, espacées. Bouton et commande vocale, annulables. |
+| Automatisations | Catalogue d'étapes sûres, validation serveur, déclenchement à la demande ou chaque matin **seulement avec autorisation explicite**, clé d'exécution (pas de double exécution), journal par étape, arrêt au premier échec, annulation d'une exécution, désactivation, suppression avec historique. |
+| Calendrier | Modifier / supprimer un événement depuis la vue du jour, avec Annuler (tous les champs restaurés). |
+| Toutes mes tâches | `/liste` : recherche, filtres (état, échéance, secteur), tri, cocher / supprimer en lot avec Annuler ; confirmation au-delà de 10 suppressions. |
+| Compte | Suppression du compte (mot de passe + « SUPPRIMER », cascade complète, vérifiée sur base réelle). `/api/health`. Réglages › Intégrations : états réels, rien de simulé. |
+| Priorité | « haute priorité », « urgent », « pas urgent »… respectés (règles et assistant). Corrigé au passage : « une » lu « un » + « e » dans les titres. |
+
+### Tests 1 à 12 du cahier des charges
+
+| Test | Preuve | Limite |
+|---|---|---|
+| 1 Résumé du jour | `tests/briefing.test.ts` : bons éléments, bon jour local, rien d'un autre utilisateur, rien d'inventé | — |
+| 2 Tâche prioritaire | `tests/priority.test.ts` (commande complète) + navigateur (`/liste` affiche « priorité haute », date de demain) | — |
+| 3 Déplacer une réunion | `tests/assistant-run.test.ts` : l'événement existant est déplacé, pas dupliqué | Modèle simulé (pas de clé ici) |
+| 4 Syllabus | `tests/syllabus.test.ts` + navigateur (lots précédents) | Extraction IA non jouée en réel |
+| 5 Semaine | `tests/pilot.test.ts`, `assistant-run` (confirmation puis écriture, non-placés nommés) | — |
+| 6 Profils / modules | `tests/profiles-nav.test.ts` + navigateur | — |
+| 7 Multi-agents | `tests/core-agents.test.ts` : choix, contexte limité, outils refusés, idempotence | Modèle simulé |
+| 8 Isolation | `actions-isolation`, `ownership`, `assistant-run`, `documents`, `workflows`, `groceries`, `events`, `task-list`, `account` | — |
+| 9 Voix | `tests/voice.test.ts` (erreurs, réglages, résumé parlé) ; page Assistant au navigateur | Dictée réelle non testée : pas de micro dans le navigateur sans écran |
+| 10 Automatisations | `tests/workflows.test.ts` (11 cas) + navigateur (créer, autorisation exigée, lancer, journal, annuler, désactiver, supprimer) | Déclenchement par le cron Vercel réel non joué |
+| 11 Responsive | 13 écrans × 1280 px et 390 px : HTTP 200, aucun débordement, aucune erreur console | — |
+| 12 Échecs | Écriture qui échoue, étape qui plante, fournisseur absent (IA, push), transaction annulée : messages honnêtes, données intactes (`assistant-run`, `workflows`, `workspaces`, `documents`, `account`) | — |
+
+Total : **184 tests** (`npm test`), lint, types et build verts avant chaque push.
+
+### Toujours non vérifié faute d'environnement
+
+- Appels réels à Claude, notifications push réelles, cron Vercel réel, base Neon (rien n'y a été exécuté).
+- Changer `ASSISTANT_MODEL` vers Opus 5.5 / Sonnet 5.5 : `tool_choice` forcé refusé (400) — à adapter avant.
+
+### Partiel ou manquant
+
+- Fuseau horaire unique (`America/Toronto`).
+- Équipe : membres saisis à la main, pas de vrais comptes partagés (demande un schéma).
+- Tâches et événements récurrents.
+- Limitation de débit en mémoire (par instance).
+- Google Agenda / Outlook / courriel : non disponibles, affichés comme tels.
+- Parseur à règles : quelques mots-clés de section devinent mal (« réserver la salle » → Sport).
