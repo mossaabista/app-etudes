@@ -7,6 +7,7 @@ import { acceptPlanAction, acceptWeekAction, proposePlanAction, proposeWeekActio
 import type { DayPlan, Unplaced, WeekPlan } from "@/server/pilot";
 import { DEFAULT_PLANNING, WEEKDAY_FR, hm, type PlanningPrefs } from "@/lib/planning-prefs";
 
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const hours = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${String(m % 60).padStart(2, "0")}` : ""}` : `${m} min`);
 
 /**
@@ -130,8 +131,8 @@ export function PilotPanel({ day, planned, prefs = DEFAULT_PLANNING }: { day: st
         <div className="mt-4 space-y-3">
           {week.days.map((d) => (
             <div key={d.day}>
-              <p className="mb-1 text-xs font-semibold capitalize text-[var(--ink-dim)]">
-                {dayLabel(d.day)} · {d.rest ? "jour de repos" : d.blocks.length ? `${d.blocks.length} bloc${d.blocks.length > 1 ? "s" : ""} · ${hours(d.free)} de libre` : "rien à placer"}
+              <p className="mb-1 text-xs font-semibold text-[var(--ink-dim)]">
+                {cap(dayLabel(d.day))} · {d.rest ? "jour de repos" : d.blocks.length ? `${d.blocks.length} bloc${d.blocks.length > 1 ? "s" : ""} · ${hours(d.free)} de libre` : "rien à placer"}
               </p>
               {d.blocks.length > 0 && (
                 <ul className="space-y-1">
