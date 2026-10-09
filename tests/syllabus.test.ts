@@ -118,6 +118,15 @@ describe("docxText", () => {
     }
   });
 
+  it("names no page for a document without pages", () => {
+    const t = docxText(docx(xml))!;
+    const [r] = reviewAssessments({ items: parseSyllabus(t, today).assessments, pages: [t], paged: false, existing: [], today });
+    expect(r.source).toMatchObject({ page: null, excerpt: expect.stringContaining("Devoir 1") });
+    // Found in the text: not "doubtful" (it is only "to check" because 3 October is past).
+    expect(r.confidence).toBe("medium");
+    expect(r.flags).toEqual(["Date déjà passée."]);
+  });
+
   it("returns null for something that is not a docx", () => {
     expect(docxText(Buffer.from("not a zip at all"))).toBeNull();
   });

@@ -29,6 +29,8 @@ export interface ReviewInput {
   /** What the chosen course already has. */
   existing: { title: string; date: string | null }[];
   today: string;
+  /** Whether the document has real pages (a PDF does, a Word document does not). */
+  paged?: boolean;
 }
 
 export const fold = (s: string) =>
@@ -67,7 +69,7 @@ function locate(excerpt: string, pages: string[]): number | null {
 
 const frDate = (iso: string) => new Intl.DateTimeFormat("fr-CA", { timeZone: "UTC", day: "numeric", month: "long", year: "numeric" }).format(new Date(`${iso}T12:00:00Z`));
 
-export function reviewAssessments({ items, pages, existing, today }: ReviewInput): ReviewedAssessment[] {
+export function reviewAssessments({ items, pages, existing, today, paged = true }: ReviewInput): ReviewedAssessment[] {
   const byTitle = new Map<string, (string | null)[]>();
   for (const e of existing) byTitle.set(titleKey(e.title), [...(byTitle.get(titleKey(e.title)) ?? []), e.date]);
 
@@ -77,8 +79,9 @@ export function reviewAssessments({ items, pages, existing, today }: ReviewInput
     let medium = false;
 
     const excerpt = a.line?.trim() ?? "";
-    const page = excerpt ? locate(excerpt, pages) : null;
-    const found = !!excerpt && (page != null || pages.some((p) => fold(p).includes(fold(excerpt).slice(0, 80))));
+    const at = excerpt ? locate(excerpt, pages) : null;
+    const found = at != null;
+    const page = paged ? at : null;
     if (!excerpt || !found) {
       flags.push("Je ne retrouve pas cette ligne dans le document : vérifie qu'elle y figure.");
       low = true;

@@ -20,6 +20,8 @@ export type AnalyzedSyllabus = {
   /** The document's text, page by page: what each date is traced back to. */
   pageTexts: string[];
   excerpt: string;
+  /** Whether pageTexts are real pages (PDF, scan) rather than one block of text (Word, photo). */
+  paged: boolean;
   /** How it was read, in words, and anything the student should know about it. */
   readBy: string;
   warnings: string[];
@@ -93,7 +95,7 @@ export async function analyzeSyllabusAction(form: FormData): Promise<{ error: st
     const total = parsed.assessments.reduce((n, a) => n + (a.weight ?? 0), 0);
     if (parsed.assessments.length && total && Math.abs(total - 100) > 1) warnings.push(`Les pondérations trouvées font ${total} % au lieu de 100 % : il en manque ou il y en a en trop.`);
 
-    return { fileName: file.name, parsed, pages: pageTexts.length, pageTexts: pageTexts.map((p) => p.slice(0, 20000)).slice(0, 60), excerpt: pageTexts.join("\n").slice(0, 12000), readBy, warnings };
+    return { fileName: file.name, parsed, paged: ext === "pdf", pages: pageTexts.length, pageTexts: pageTexts.map((p) => p.slice(0, 20000)).slice(0, 60), excerpt: pageTexts.join("\n").slice(0, 12000), readBy, warnings };
   } catch {
     return { error: "Impossible de lire ce fichier." };
   }

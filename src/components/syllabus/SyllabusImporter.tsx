@@ -35,6 +35,7 @@ interface Draft {
   error?: string;
   excerpt: string;
   pageTexts: string[];
+  paged: boolean;
   readBy: string;
   warnings: string[];
   topics: string[];
@@ -72,6 +73,7 @@ export function SyllabusImporter({ courses }: { courses: Course[] }) {
         status: "reading" as const,
         excerpt: "",
         pageTexts: [],
+        paged: true,
         readBy: "",
         warnings: [],
         topics: [],
@@ -97,21 +99,22 @@ export function SyllabusImporter({ courses }: { courses: Course[] }) {
         status: "ready",
         excerpt: res.excerpt,
         pageTexts: res.pageTexts,
+        paged: res.paged,
         readBy: res.readBy,
         warnings: res.warnings,
         topics: p.topics ?? [],
         courseId: match?.id ?? "",
         course: { code: p.code ?? "", name: p.name ?? "", professor: p.professor ?? "", email: p.email ?? "", term: p.term ?? "" },
-        rows: review(p.assessments, res.pageTexts, match?.id ?? ""),
+        rows: review(p.assessments, res.pageTexts, match?.id ?? "", res.paged),
         // Anything uncertain opens the review straight away.
-        open: res.warnings.length > 0 || review(p.assessments, res.pageTexts, match?.id ?? "").some((r) => r.confidence !== "high"),
+        open: res.warnings.length > 0 || review(p.assessments, res.pageTexts, match?.id ?? "", res.paged).some((r) => r.confidence !== "high"),
         slots: p.schedule.map((s) => ({ ...s, on: true })),
       });
     }
   };
 
-  function review(items: FoundAssessment[], pageTexts: string[], courseId: string) {
-    return reviewAssessments({ items, pages: pageTexts, existing: courses.find((c) => c.id === courseId)?.assessments ?? [], today: toISODate(new Date()) });
+  function review(items: FoundAssessment[], pageTexts: string[], courseId: string, paged: boolean) {
+    return reviewAssessments({ items, pages: pageTexts, paged, existing: courses.find((c) => c.id === courseId)?.assessments ?? [], today: toISODate(new Date()) });
   }
 
   const importOne = async (d: Draft) => {
@@ -191,7 +194,7 @@ export function SyllabusImporter({ courses }: { courses: Course[] }) {
           key={d.id}
           d={d}
           courses={courses}
-          rereview={(courseId) => patch(d.id, (x) => ({ courseId, rows: review(x.rows, x.pageTexts, courseId) }))}
+          rereview={(courseId) => patch(d.id, (x) => ({ courseId, rows: review(x.rows, x.pageTexts, courseId, x.paged) }))}
           patch={(p) => patch(d.id, p)} onImport={() => void importOne(d)} onRemove={() => setDrafts((ds) => ds.filter((x) => x.id !== d.id))} />
       ))}
     </div>
