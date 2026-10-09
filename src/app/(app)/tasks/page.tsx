@@ -8,6 +8,7 @@ import { InboxPanel, type CategoryGroup } from "@/components/tasks/InboxPanel";
 import { getLayout } from "@/server/layout";
 import { imageSrc } from "@/lib/layout";
 import { LayoutEditor } from "@/components/tasks/LayoutEditor";
+import { WorkspaceCreator } from "@/components/tasks/WorkspaceCreator";
 import { BalanceWheel, type BalanceArea } from "@/components/tasks/BalanceWheel";
 import { startOfWeek } from "@/lib/dates";
 
@@ -90,7 +91,10 @@ export default async function TasksPage() {
           </h1>
           <p className="text-xs text-[rgba(255,246,227,0.8)]">Les domaines de ta vie. Ajoute, retire ou crée les tiens — à la main ou au micro.</p>
         </div>
-        <LayoutEditor layout={layout} />
+        <div className="flex flex-wrap items-center gap-2">
+          <WorkspaceCreator />
+          <LayoutEditor layout={layout} />
+        </div>
       </div>
 
       {AREAS.length >= 3 && <BalanceWheel areas={balance} />}
