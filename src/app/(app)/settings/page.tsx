@@ -8,11 +8,13 @@ import { LogoutButton } from "@/components/settings/LogoutButton";
 import { PushNotifications } from "@/components/settings/PushNotifications";
 import { ProfileSettings } from "@/components/settings/ProfileSettings";
 import { AssistantSettings } from "@/components/settings/AssistantSettings";
+import { AutonomySettings } from "@/components/settings/AutonomySettings";
+import { getAutonomy } from "@/server/autonomy";
 import { BRAND } from "@/lib/brand";
 
 export default async function SettingsPage() {
   const user = await requireUser();
-  const profile = await getProfile(user.id);
+  const [profile, autonomy] = await Promise.all([getProfile(user.id), getAutonomy(user.id)]);
   const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
 
   return (
@@ -43,6 +45,9 @@ export default async function SettingsPage() {
           <CardHeader title="Assistant" subtitle="Le micro et le + doré, sur toutes les pages" />
           <CardBody>
             <AssistantSettings enabled={!!process.env.ANTHROPIC_API_KEY} />
+            <div className="mt-5 border-t border-[rgba(255,220,148,0.1)] pt-4">
+              <AutonomySettings current={autonomy} />
+            </div>
           </CardBody>
         </Card>
 
