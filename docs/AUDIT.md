@@ -135,3 +135,39 @@ Pour revenir en arrière : `DROP TABLE "AgentAction";` (seul le journal est perd
 - Exécution contre une vraie base Neon.
 - Rendu du panneau de confirmation et de l'historique dans un navigateur.
 - Réponse réelle de Claude : le modèle est simulé dans les tests.
+
+## 8. Phases 3 à 7 — état au matin
+
+Chaque étape a été commitée et poussée séparément, avec lint, types, tests et build verts avant chaque push. Les flux ont aussi été joués dans un vrai navigateur (Chromium piloté par Playwright), contre une base Postgres **locale et jetable**, jamais la base Neon (voir `docs/DEV_LOCAL.md`).
+
+### Implémenté et testé (tests automatisés + navigateur)
+
+| Phase | Ce qui marche |
+|---|---|
+| 2 (révisée) | Ce que l'utilisateur demande explicitement s'exécute tout de suite, suppressions comprises, avec Annuler. Confirmation seulement au-delà de 10 suppressions, de 10 changements, pour un plan de toute la semaine ou de toutes les évaluations, ou pour une opération irréversible. |
+| 3 — Espaces | « Crée un espace pour mon semestre / mon projet X / mon activité de freelance / mon entraînement ». Modèles versionnés (`src/lib/workspaces.ts`, v1) qui réutilisent les vrais cours, projets et sections, sans rien inventer. Écriture en une transaction, relecture avant le compte rendu, annulation complète. Aussi depuis Secteurs → « Créer un espace », avec aperçu. |
+| 4 — Syllabus | PDF, Word (.docx), PDF scannés et photos (ces deux derniers via l'IA si la clé existe, sinon message clair). Pour chaque évaluation : page et ligne sources, confiance en toutes lettres, année déduite, date passée, pondération inconnue, doublon avec l'existant. Phrases malveillantes signalées et ignorées. Source enregistrée dans les notes. Ré-import sans doublon. |
+| 5 — Profils | 6 profils (+ Freelance, Personnel), plusieurs rôles avec un rôle actif. Navigation déclarative (`src/lib/nav.ts`) : les modules s'affichent selon les rôles **et** les données existantes, donc changer de rôle ne cache jamais les cours ou projets. Choix afficher / masquer persistés, avec la raison affichée dans Réglages. |
+| 6 — Planification | Plan de semaine (Pilote → Semaine, ou « planifie ma semaine »). Ce qui n'a pas trouvé de place est nommé, avec la raison. Préférences réglables : début et fin de journée, concentration maximale, pauses, marge, jours de repos. Radar de risque sur Aujourd'hui et dans l'assistant. |
+| 7 — Accessibilité | Texte posé sur l'or : environ 2,5:1 → 4,7 à 7,5:1. Listes lisibles sur téléphone (390 px, aucun débordement). Focus clavier piégé dans les fenêtres et rendu à la fermeture ; anneau de focus sur les pastilles du carrousel. Toutes les erreurs du micro ont un message. |
+| Mémoire | « Retiens que… », « qu'est-ce que tu sais sur moi ? », « oublie… », et Réglages → Mémoire. Rien n'est mémorisé sans demande explicite ; les éléments retenus sont transmis au modèle comme des préférences, pas comme des ordres. |
+
+Tests : **111** (`npm test`), dont les tests A, B, C, D, E, F, G, H et I du prompt.
+
+### Implémenté mais non testé faute d'environnement
+
+- **Appels réels à Claude** : assistant, extraction de syllabus, lecture de photos et de PDF scannés. Pas de clé API ici ; les tests simulent la réponse du modèle.
+- **Risque si `ASSISTANT_MODEL` change** : le code force l'appel d'outil (`tool_choice` de type `tool`). Haiku 4.5, utilisé par défaut, l'accepte ; les modèles Opus 5.5 / Sonnet 5.5 le refusent (erreur 400). Il faudrait adapter ces appels avant de changer de modèle.
+- **La migration `AgentAction` contre Neon** : son SQL a été validé sur Postgres 16 local (deux exécutions sans erreur, et après exécution la base correspond exactement au schéma Prisma).
+
+### Partiellement implémenté
+
+- **Fuseau horaire** : toujours `America/Toronto` pour tout le monde (`src/lib/dates.ts`). Le rendre propre à chaque utilisateur touche toutes les dates de l'app.
+- **Anglais** : compris par l'assistant IA ; le parseur à règles (sans clé) reste francophone.
+- **Verrouillage d'un créneau** : le Pilote ne déplace jamais rien, mais l'assistant peut déplacer un événement qu'on lui nomme ; il n'existe pas de verrou « intouchable ».
+
+### Pas encore implémenté
+
+- Calendrier externe, e-mail, nouvelles notifications (phase 8). Les intégrations existantes, Brightspace et le digest push, sont inchangées.
+- Collaboration réelle (membres avec accès, partage).
+- Transformer un espace existant en modèle réutilisable.
