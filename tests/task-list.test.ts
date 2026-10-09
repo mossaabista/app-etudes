@@ -27,7 +27,8 @@ beforeEach(() => {
   db.project = table();
 });
 
-const find = async (params: Record<string, string>) => sortTasks(await db.task.findMany({ where: taskWhere("alice", parseTaskQuery(params), today) }), parseTaskQuery(params).sort).map((t) => t.title);
+const find = async (params: Record<string, string>) =>
+  sortTasks((await db.task.findMany({ where: taskWhere("alice", parseTaskQuery(params), today) })) as unknown as { title: string; dueDate: Date | null; priority: string; createdAt: Date }[], parseTaskQuery(params).sort).map((t) => t.title);
 
 describe("task list filters", () => {
   it("reads only known values from the address bar", () => {
