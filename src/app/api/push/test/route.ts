@@ -13,7 +13,7 @@ export async function POST() {
   // On an empty day there is no digest, so fall back to a placeholder rather than
   // leaving the user unsure whether anything was delivered.
   const digest = (await buildDailyDigest(userId)) ?? {
-    title: "OROM",
+    title: "Aurum",
     body: "Rien de prévu aujourd'hui. Les notifications fonctionnent.",
     url: "/today",
   };

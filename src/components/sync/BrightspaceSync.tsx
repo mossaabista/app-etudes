@@ -1,17 +1,10 @@
 "use client";
 
 import { useActionState } from "react";
-import { Card, CardHeader, CardBody } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { Field, Input } from "@/components/ui/Form";
-import { Badge, type BadgeTone } from "@/components/ui/Badge";
-import {
-  saveFeedUrl,
-  previewSync,
-  applySync,
-  removeFeed,
-  type SyncState,
-} from "@/server/actions/sync.actions";
+import { CalendarCheck2, CheckCircle2, Link2, Loader2, Mail, Unplug } from "lucide-react";
+import { useI18n } from "@/i18n/client";
+import { fmt, INTL } from "@/i18n/config";
+import { saveFeedUrl, previewSync, applySync, removeFeed, type SyncState } from "@/server/actions/sync.actions";
 import type { SyncAction, SyncItem } from "@/server/brightspace/sync";
 
 export interface SourceInfo {
@@ -21,21 +14,19 @@ export interface SourceInfo {
   lastMessage: string | null;
 }
 
-const ACTION_LABEL: Record<SyncAction, string> = {
-  create: "Nouveau",
-  update: "Modifié",
-  unchanged: "Inchangé",
-  skip: "Ignoré",
+const TONE: Record<SyncAction, string> = {
+  create: "text-[#86d6a4] border-[rgba(134,214,164,0.35)]",
+  update: "text-[#f0cd79] border-[rgba(240,205,121,0.35)]",
+  unchanged: "text-[var(--ink-faint)] border-[rgba(255,220,148,0.14)]",
+  skip: "text-[var(--ink-faint)] border-[rgba(255,220,148,0.14)]",
 };
 
-const ACTION_TONE: Record<SyncAction, BadgeTone> = {
-  create: "green",
-  update: "amber",
-  unchanged: "neutral",
-  skip: "neutral",
-};
+const field = "glass-pill focus-ring mt-1.5 block w-full px-4 py-2.5 text-sm text-[var(--ink)]";
 
+/** Brightspace and the calendars still to come, in words a student understands. */
 export function BrightspaceSync({ source, autoSync }: { source: SourceInfo | null; autoSync: boolean }) {
+  const { t, locale } = useI18n();
+  const c = t.connections;
   const [saveState, save, saving] = useActionState<SyncState, FormData>(saveFeedUrl, null);
   const [previewState, preview, previewing] = useActionState<SyncState, FormData>(previewSync, null);
   const [applyState, apply, applying] = useActionState<SyncState, FormData>(applySync, null);
@@ -44,161 +35,157 @@ export function BrightspaceSync({ source, autoSync }: { source: SourceInfo | nul
   const error = saveState?.error ?? previewState?.error ?? applyState?.error;
   const success = saveState?.success ?? applyState?.success;
   const canApply = Boolean(plan && !plan.applied && plan.counts.create + plan.counts.update > 0);
+  const when = (iso: string) => new Date(iso).toLocaleString(INTL[locale], { dateStyle: "medium", timeStyle: "short" });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {error && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+        <p role="alert" className="rounded-xl bg-[rgba(220,60,40,0.18)] px-4 py-3 text-sm text-[#ffd9cf]">
+          {error}
+        </p>
       )}
       {success && (
-        <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</p>
+        <p role="status" className="flex items-center gap-2 rounded-xl bg-[rgba(60,160,100,0.16)] px-4 py-3 text-sm text-[#cdf3da]">
+          <CheckCircle2 size={15} /> {success}
+        </p>
       )}
 
-      <Card>
-        <CardHeader
-          title="Flux de calendrier Brightspace"
-          subtitle={source ? "Connecté" : "Pas encore connecté"}
-        />
-        <CardBody>
-          {source ? (
-            <div className="space-y-4">
-              <div className="rounded-md bg-slate-50 px-3 py-2">
-                <p className="font-mono text-xs break-all text-slate-600">{source.maskedUrl}</p>
-                <p className="mt-1 text-xs text-slate-500">
-                  {source.lastSyncedAt
-                    ? `Dernière synchro : ${formatDate(source.lastSyncedAt)}`
-                    : "Jamais synchronisé"}
-                  {source.lastStatus === "error" && source.lastMessage && (
-                    <span className="text-red-600"> — {source.lastMessage}</span>
-                  )}
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  {autoSync
-                    ? "Synchronisation automatique chaque nuit vers 2 h (heure d'Ottawa)."
-                    : "Synchronisation automatique inactive : la variable CRON_SECRET n'est pas définie dans cet environnement."}
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <form action={preview}>
-                  <Button type="submit" variant="secondary" disabled={previewing || applying}>
-                    {previewing ? "Lecture du flux…" : "Aperçu"}
-                  </Button>
-                </form>
-                {canApply && (
-                  <form action={apply}>
-                    <Button type="submit" disabled={applying}>
-                      {applying ? "Application…" : `Appliquer (${plan!.counts.create + plan!.counts.update})`}
-                    </Button>
-                  </form>
-                )}
-                <form action={removeFeed} className="ml-auto">
-                  <Button type="submit" variant="ghost" size="sm">
-                    Retirer le lien
-                  </Button>
-                </form>
-              </div>
+      <section className="glass-card p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-1 basis-60 items-start gap-3">
+            <span className="pilot-orb h-11 w-11 shrink-0" aria-hidden>
+              <CalendarCheck2 size={18} />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-[var(--ink)]">{c.brightspace}</h2>
+              <p className="text-xs leading-5 text-[var(--ink-dim)]">{c.brightspaceWhy}</p>
             </div>
-          ) : (
-            <form action={save} className="space-y-4">
-              <Field label="URL du flux iCal" htmlFor="feedUrl">
-                <Input
-                  id="feedUrl"
-                  name="feedUrl"
-                  type="url"
-                  required
-                  placeholder="https://uottawa.brightspace.com/d2l/le/calendar/feed/user/feed.ics?token=…"
-                />
-              </Field>
-              <Button type="submit" disabled={saving}>
-                {saving ? "Enregistrement…" : "Connecter"}
-              </Button>
-            </form>
-          )}
-        </CardBody>
-      </Card>
+          </div>
+          <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[0.7rem] font-semibold ${source ? (source.lastStatus === "error" ? "border-[rgba(255,179,163,0.4)] text-[#ffb3a3]" : "border-[rgba(134,214,164,0.35)] text-[#86d6a4]") : "border-[rgba(255,220,148,0.14)] text-[var(--ink-faint)]"}`}>
+            {source ? c.connected : c.notConnected}
+          </span>
+        </div>
+
+        {source ? (
+          <div className="mt-4 space-y-3">
+            <div className="tile px-4 py-3 text-xs leading-5 text-[var(--ink-dim)]">
+              <p className="flex items-center gap-1.5 text-[var(--ink)]">
+                <Link2 size={13} /> {c.linkSaved}
+              </p>
+              <p>{source.lastSyncedAt ? fmt(c.lastSync, { when: when(source.lastSyncedAt) }) : c.neverSynced}</p>
+              {source.lastStatus === "error" && <p className="text-[#ffb3a3]">{c.unreachable}</p>}
+              <p>{autoSync ? c.autoOn : c.autoOff}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <form action={preview}>
+                <button type="submit" disabled={previewing || applying} className="mod-chip focus-ring">
+                  {previewing && <Loader2 size={13} className="animate-spin" />} {previewing ? c.previewing : c.preview}
+                </button>
+              </form>
+              {canApply && (
+                <form action={apply}>
+                  <button type="submit" disabled={applying} className="mod-chip mod-chip-gold focus-ring">
+                    {applying && <Loader2 size={13} className="animate-spin" />} {applying ? c.applying : fmt(c.apply, { n: plan!.counts.create + plan!.counts.update })}
+                  </button>
+                </form>
+              )}
+              <form action={removeFeed} className="ml-auto">
+                <button type="submit" className="mod-chip focus-ring text-[var(--ink-faint)]">
+                  <Unplug size={13} /> {c.remove}
+                </button>
+              </form>
+            </div>
+          </div>
+        ) : (
+          <form action={save} className="mt-4 space-y-3">
+            <label className="block text-xs font-medium text-[var(--ink-dim)]">
+              {c.linkLabel}
+              <input name="feedUrl" type="url" required inputMode="url" autoComplete="off" placeholder="https://…brightspace.com/…" className={field} />
+            </label>
+            <button type="submit" disabled={saving} className="mod-chip mod-chip-gold focus-ring">
+              {saving && <Loader2 size={13} className="animate-spin" />} {saving ? c.connecting : c.connect}
+            </button>
+          </form>
+        )}
+      </section>
 
       {plan && (
-        <Card>
-          <CardHeader
-            title={plan.applied ? "Synchronisation appliquée" : "Aperçu — rien n'a encore été écrit"}
-            subtitle={`${plan.totalEvents} événement(s) dans le flux`}
-            action={
-              <div className="flex gap-1.5">
-                {(["create", "update", "unchanged", "skip"] as const)
-                  .filter((a) => plan.counts[a] > 0)
-                  .map((a) => (
-                    <Badge key={a} tone={ACTION_TONE[a]}>
-                      {plan.counts[a]} {ACTION_LABEL[a].toLowerCase()}
-                    </Badge>
-                  ))}
-              </div>
-            }
-          />
-          <CardBody className="p-0">
-            {plan.items.length === 0 ? (
-              <p className="p-5 text-sm text-slate-500">Le flux ne contient aucun événement.</p>
-            ) : (
-              <ul className="divide-y divide-slate-100">
-                {plan.items.map((item) => (
-                  <PlanRow key={item.uid} item={item} />
-                ))}
-              </ul>
-            )}
-          </CardBody>
-        </Card>
+        <section className="glass-card p-5">
+          <h2 className="text-sm font-semibold text-[var(--ink)]">{plan.applied ? c.appliedTitle : c.previewTitle}</h2>
+          <p className="text-xs text-[var(--ink-dim)]">{fmt(c.inFeed, { n: plan.totalEvents })}</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {(["create", "update", "unchanged", "skip"] as const)
+              .filter((a) => plan.counts[a] > 0)
+              .map((a) => (
+                <span key={a} className={`rounded-full border px-2 py-0.5 text-[0.7rem] font-semibold ${TONE[a]}`}>
+                  {plan.counts[a]} {c.actions[a]}
+                </span>
+              ))}
+          </div>
+          {plan.items.length === 0 ? (
+            <p className="mt-3 text-sm text-[var(--ink-dim)]">{c.empty}</p>
+          ) : (
+            <ul className="mt-3 divide-y divide-[rgba(255,220,148,0.08)]">
+              {plan.items.map((item) => (
+                <PlanRow key={item.uid} item={item} label={c.actions[item.action]} when={when} />
+              ))}
+            </ul>
+          )}
+        </section>
       )}
 
-      <Card>
-        <CardHeader title="Où trouver ce lien dans Brightspace" />
-        <CardBody>
-          <ol className="list-decimal space-y-1.5 pl-5 text-sm text-slate-600">
-            <li>Ouvre Brightspace, puis l&apos;outil <strong>Calendrier</strong>.</li>
-            <li>
-              Clique sur <strong>S&apos;abonner</strong> (en haut à droite). Si le bouton est absent, va dans{" "}
-              <strong>Paramètres</strong> et active <em>Activer l&apos;abonnement au calendrier</em>.
-            </li>
-            <li>
-              Choisis <strong>Tous les calendriers</strong> pour couvrir tous tes cours d&apos;un coup.
-            </li>
-            <li>Copie l&apos;URL affichée et colle-la ci-dessus.</li>
+      {!source && (
+        <section className="glass-card p-5">
+          <h2 className="text-sm font-semibold text-[var(--ink)]">{c.howTitle}</h2>
+          <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-sm leading-6 text-[var(--ink-dim)]">
+            <li>{c.how1}</li>
+            <li>{c.how2}</li>
+            <li>{c.how3}</li>
+            <li>{c.how4}</li>
           </ol>
-          <p className="mt-4 text-xs text-slate-500">
-            Ce lien contient un jeton personnel — il est stocké côté serveur et n&apos;est jamais réaffiché en entier.
-            Le flux ne donne que les dates. Les pondérations, infos de labo et coordonnées des profs viennent des plans
-            de cours.
-          </p>
-        </CardBody>
-      </Card>
+          <p className="mt-3 text-xs leading-5 text-[var(--ink-faint)]">{c.privacy}</p>
+        </section>
+      )}
+
+      <section className="glass-card p-5">
+        <ul className="space-y-3">
+          {[
+            { name: c.soonGoogle, icon: CalendarCheck2 },
+            { name: c.soonOutlook, icon: CalendarCheck2 },
+            { name: c.soonEmail, icon: Mail },
+          ].map(({ name, icon: Icon }) => (
+            <li key={name} className="flex items-center gap-3">
+              <Icon size={16} className="shrink-0 text-[var(--ink-faint)]" aria-hidden />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-[var(--ink)]">{name}</p>
+                <p className="text-xs text-[var(--ink-faint)]">{c.soonNote}</p>
+              </div>
+              <span className="shrink-0 rounded-full border border-[rgba(255,220,148,0.14)] px-2 py-0.5 text-[0.7rem] font-semibold text-[var(--ink-faint)]">{t.common.soon}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }
 
-function PlanRow({ item }: { item: SyncItem }) {
+function PlanRow({ item, label, when }: { item: SyncItem; label: string; when: (iso: string) => string }) {
   const muted = item.action === "skip" || item.action === "unchanged";
-
   return (
-    <li className={`flex items-start gap-3 px-5 py-3 ${muted ? "opacity-60" : ""}`}>
-      <div className="w-20 shrink-0 pt-0.5">
-        <Badge tone={ACTION_TONE[item.action]}>{ACTION_LABEL[item.action]}</Badge>
-      </div>
+    <li className={`flex items-start gap-3 py-3 ${muted ? "opacity-60" : ""}`}>
+      <span className={`mt-0.5 w-24 shrink-0 rounded-full border px-2 py-0.5 text-center text-[0.7rem] font-semibold ${TONE[item.action]}`}>{label}</span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-slate-900">{item.title}</p>
-        <p className="mt-0.5 text-xs text-slate-500">
-          {item.courseCode ?? "—"} · {item.type}
-          {item.dueDate && ` · ${formatDate(item.dueDate)}`}
+        <p className="text-sm font-medium text-[var(--ink)]">{item.title}</p>
+        <p className="mt-0.5 text-xs text-[var(--ink-dim)]">
+          {[item.courseCode, item.dueDate ? when(item.dueDate) : null].filter(Boolean).join(" · ")}
         </p>
-        {item.reason && <p className="mt-1 text-xs text-amber-700">{item.reason}</p>}
+        {item.reason && <p className="mt-1 text-xs text-[#f0cd79]">{item.reason}</p>}
         {item.changes?.map((change) => (
-          <p key={change} className="mt-1 text-xs text-slate-600">
+          <p key={change} className="mt-1 text-xs text-[var(--ink-dim)]">
             {change}
           </p>
         ))}
       </div>
     </li>
   );
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString("fr-CA", { dateStyle: "medium", timeStyle: "short" });
 }

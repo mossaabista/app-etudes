@@ -93,7 +93,7 @@ function Builder({ initial, onDone, onCancel }: { initial: Draft; onDone: (msg: 
             <p className="mt-2 text-xs leading-5 text-[var(--ink-faint)]">Lancée une fois par jour choisi, tôt le matin (vers 7 h), par le serveur : pas besoin que l&apos;app soit ouverte.</p>
             <label className="mt-2 flex items-start gap-2 text-xs leading-5 text-[var(--ink)]">
               <input type="checkbox" checked={d.authorize} onChange={(e) => setD({ ...d, authorize: e.target.checked })} className="mt-0.5" />
-              J&apos;autorise OROM à exécuter ces étapes automatiquement, sans me demander, les jours choisis. Chaque exécution est journalisée et peut être annulée.
+              J&apos;autorise Jarvis à exécuter ces étapes automatiquement, sans me demander, les jours choisis. Chaque exécution est journalisée et peut être annulée.
             </label>
           </>
         )}

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { APP_TIMEZONE, addDays, dayName, fromISODate, toISODate } from "@/lib/dates";
+import { currentZone, addDays, dayName, fromISODate, toISODate } from "@/lib/dates";
 import { IMAGES, LIBRARY_SUBS } from "@/lib/layout";
 import { getLayout } from "@/server/layout";
 import { getProfile } from "@/server/profile";
@@ -74,8 +74,8 @@ const MODEL = process.env.ASSISTANT_MODEL || "claude-haiku-4-5-20251001";
 
 export const assistantEnabled = () => !!process.env.ANTHROPIC_API_KEY;
 
-const hhmm = (d: Date) => new Intl.DateTimeFormat("en-GB", { timeZone: APP_TIMEZONE, hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
-const fmtDay = (d: Date) => new Intl.DateTimeFormat("fr-CA", { timeZone: APP_TIMEZONE, weekday: "long", day: "numeric", month: "long" }).format(d);
+const hhmm = (d: Date) => new Intl.DateTimeFormat("en-GB", { timeZone: currentZone(), hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
+const fmtDay = (d: Date) => new Intl.DateTimeFormat("fr-CA", { timeZone: currentZone(), weekday: "long", day: "numeric", month: "long" }).format(d);
 
 const PAGE_NAMES: [RegExp, string][] = [
   [/^\/today/, "Aujourd'hui"],
@@ -315,8 +315,8 @@ export async function askAssistant(userId: string, sentence: string, page: strin
       : "DOCUMENTS : aucun extrait de ses documents ne correspond à la demande.";
   const now = new Date();
   const system = [
-    "Tu es OROM, l'assistant personnel de l'utilisateur, intégré à toute l'application : il te parle, tu fais, puis tu confirmes en une phrase.",
-    `Nous sommes le ${fmtDay(now)} ${toISODate(now)}, il est ${hhmm(now)} (fuseau ${APP_TIMEZONE}).`,
+    "Tu es Jarvis, l'assistant personnel de l'utilisateur, intégré à toute l'application : il te parle, tu fais, puis tu confirmes en une phrase.",
+    `Nous sommes le ${fmtDay(now)} ${toISODate(now)}, il est ${hhmm(now)} (fuseau ${currentZone()}).`,
     "Règles :",
     ...CORE_RULES.map((r) => `- ${r}`),
     ...agents.flatMap((a) => [`${a.name} (${a.domain}) :`, ...a.instructions.map((r) => `- ${r}`)]),

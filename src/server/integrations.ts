@@ -43,7 +43,7 @@ export async function integrationStatus(userId: string): Promise<Integration[]> 
   );
   list.push(
     { key: "google", name: "Google Agenda, Outlook", state: "not_configured", detail: "Pas encore disponible : aucune connexion n'est proposée ni simulée." },
-    { key: "email", name: "Courriel", state: "not_configured", detail: "Pas disponible : OROM n'envoie et ne lit aucun courriel." }
+    { key: "email", name: "Courriel", state: "not_configured", detail: "Pas disponible : Aurum n'envoie et ne lit aucun courriel." }
   );
   return list;
 }

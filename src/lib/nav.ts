@@ -28,7 +28,7 @@ export interface NavModule {
 
 export const NAV_MODULES: NavModule[] = [
   { key: "today", label: "Aujourd'hui", href: "/today", icon: Sun, core: true, under: ["/today"], desc: "Ta journée" },
-  { key: "assistant", label: "Assistant", href: "/assistant", icon: AudioLines, core: true, under: ["/assistant"], desc: "Parler à OROM" },
+  { key: "assistant", label: "Jarvis", href: "/assistant", icon: AudioLines, core: true, under: ["/assistant"], desc: "Parler à Jarvis" },
   { key: "calendar", label: "Calendrier", href: "/calendar", icon: CalendarDays, core: true, under: ["/calendar"], desc: "Semaine et mois" },
   {
     key: "courses",
@@ -102,3 +102,6 @@ export function activeKey(keys: string[], pathname: string): string | null {
       if ((pathname === h || pathname.startsWith(h + "/")) && (!best || h.length > best.len)) best = { key: m.key, len: h.length };
   return best?.key ?? null;
 }
+
+/** An entry's label in the user's language (the French label is the fallback). */
+export const navLabel = (m: NavModule, labels: Record<string, string>) => labels[m.key] ?? m.label;

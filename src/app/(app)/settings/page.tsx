@@ -24,7 +24,7 @@ import { BRAND } from "@/lib/brand";
 import { integrationStatus } from "@/server/integrations";
 import { Integrations } from "@/components/settings/Integrations";
 import { DeleteAccount } from "@/components/settings/DeleteAccount";
-import { APP_TIMEZONE } from "@/lib/dates";
+import { currentZone } from "@/lib/dates";
 
 export default async function SettingsPage() {
   const user = await requireUser();
@@ -46,7 +46,7 @@ export default async function SettingsPage() {
     const st = moduleState(m, navCtx);
     return { key: m.key, label: m.label, desc: m.desc, ...st, forced: prefs.shown.includes(m.key) || prefs.hidden.includes(m.key), blocked: !!m.needsArea && !navCtx.areas.includes(m.needsArea) };
   });
-  const when = new Intl.DateTimeFormat("fr-CA", { timeZone: APP_TIMEZONE, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const when = new Intl.DateTimeFormat("fr-CA", { timeZone: currentZone(), weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   const history = actions?.map(({ createdAt, ...a }) => ({ ...a, when: when.format(createdAt) })) ?? null;
   const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
 
@@ -165,7 +165,7 @@ export default async function SettingsPage() {
             <BrandMark size={40} />
             <div>
               <p className="text-sm font-semibold tracking-[0.2em] text-[var(--ink)]">{BRAND.name.toUpperCase()}</p>
-              <p className="text-xs text-[var(--ink-dim)]">{BRAND.tagline} · Version 1.0</p>
+              <p className="text-xs text-[var(--ink-dim)]">{BRAND.tagline.fr} · Version 1.0</p>
             </div>
           </CardBody>
         </Card>

@@ -40,7 +40,7 @@ export function Onboarding({ name, current }: { name: string; current: Profile |
           </h1>
           <p className="mt-2 max-w-lg text-sm leading-6 text-on-gold">
             {step === 1
-              ? `${BRAND.promise} Dis-nous pour qui on le règle.`
+              ? `${BRAND.promise.fr} Dis-nous pour qui on le règle.`
               : "Choisis jusqu'à cinq cartes pour l'écran Aujourd'hui. Tu pourras les changer dans les réglages."}
           </p>
         </div>

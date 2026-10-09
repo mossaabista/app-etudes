@@ -4,7 +4,7 @@ import { pushIsConfigured } from "@/server/notifications/push";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { WorkflowsWorkspace } from "@/components/workflows/WorkflowsWorkspace";
 
-export const metadata = { title: "Automatisations · OROM" };
+export const metadata = { title: "Automatisations" };
 
 export default async function WorkflowsPage() {
   const user = await requireUser();

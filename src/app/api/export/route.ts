@@ -24,7 +24,7 @@ export async function GET() {
     prisma.trackerEntry.findMany({ where: { userId } }),
   ]);
 
-  const body = JSON.stringify({ exportedAt: new Date().toISOString(), app: "OROM", user, courses, assessments, tasks, projects, events, labs, syllabi, entries }, null, 2);
+  const body = JSON.stringify({ exportedAt: new Date().toISOString(), app: "Aurum", user, courses, assessments, tasks, projects, events, labs, syllabi, entries }, null, 2);
   const day = new Date().toISOString().slice(0, 10);
   return new NextResponse(body, {
     headers: {

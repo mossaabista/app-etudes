@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { APP_TIMEZONE, addDays, dayName, fromISODate, toISODate } from "@/lib/dates";
+import { currentZone, addDays, dayName, fromISODate, toISODate } from "@/lib/dates";
 import { getPlanningPrefs } from "@/server/planning-prefs";
 
 /**
@@ -35,7 +35,7 @@ export interface WorkoutSlot {
 }
 
 export const SPORT_TYPE = "Area:sante:sport";
-export const WORKOUT_NOTE = "Séance planifiée par OROM";
+export const WORKOUT_NOTE = "Séance planifiée par Jarvis";
 
 const MEALS: [number, number][] = [
   [12 * 60, 13 * 60],
@@ -105,7 +105,7 @@ export function sanitizeWorkoutOpts(o: Partial<WorkoutOpts>): WorkoutOpts {
   };
 }
 
-const wallNow = () => toMin(new Intl.DateTimeFormat("en-GB", { timeZone: APP_TIMEZONE, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date()));
+const wallNow = () => toMin(new Intl.DateTimeFormat("en-GB", { timeZone: currentZone(), hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date()));
 
 /** The seven days from `from`, as the slot picker sees them. */
 export async function workoutWeek(userId: string, from: string): Promise<{ days: WorkoutDay[]; limits: { dayStart: number; dayEnd: number }; existing: number }> {

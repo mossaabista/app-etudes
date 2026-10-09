@@ -1,5 +1,6 @@
 "use client";
 
+import { currentZone } from "@/lib/dates";
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { Check, ChevronLeft, Plus, X } from "lucide-react";
@@ -18,7 +19,7 @@ export interface AreaTask {
 }
 
 const dueLabel = (iso: string) =>
-  new Intl.DateTimeFormat("fr-CA", { timeZone: "America/Toronto", weekday: "short", day: "numeric", month: "short" }).format(new Date(iso));
+  new Intl.DateTimeFormat("fr-CA", { timeZone: currentZone(), weekday: "short", day: "numeric", month: "short" }).format(new Date(iso));
 
 export function AreaView({
   area: spec,

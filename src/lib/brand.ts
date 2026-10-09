@@ -1,6 +1,11 @@
-/** The product's name and line, in one place so a rename is one edit. */
+/** The product's names and line, in one place so a rename is one edit. */
 export const BRAND = {
-  name: "OROM",
-  tagline: "Dis-le. OROM s'en occupe.",
-  promise: "L'assistant qui transforme ce que tu dis en organisation concrète — et vérifie que c'est vraiment fait.",
-};
+  name: "Aurum",
+  /** The one assistant the user talks to. */
+  assistant: "Jarvis",
+  tagline: { fr: "Le temps est d'or.", en: "Time is golden." },
+  promise: {
+    fr: "Ton assistant personnel : tu lui parles, il organise tes études, ton travail, ton sport et ta vie — et il vérifie que c'est vraiment fait.",
+    en: "Your personal assistant: talk to it, and it organises your studies, work, training and life — and checks it's really done.",
+  },
+} as const;

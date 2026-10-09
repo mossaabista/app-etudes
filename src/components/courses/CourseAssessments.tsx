@@ -1,5 +1,6 @@
 "use client";
 
+import { currentZone } from "@/lib/dates";
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Check, PencilLine } from "lucide-react";
@@ -20,8 +21,8 @@ const TYPE_COLOR: Record<string, string> = { Final: "#f07a6a", Exam: "#f07a6a", 
 const when = (iso: string) => {
   const d = new Date(iso);
   const days = Math.round((new Date(d.toDateString()).getTime() - new Date(new Date().toDateString()).getTime()) / 86400000);
-  const date = new Intl.DateTimeFormat("fr-CA", { timeZone: "America/Toronto", weekday: "short", day: "numeric", month: "short" }).format(d);
-  const time = new Intl.DateTimeFormat("fr-CA", { timeZone: "America/Toronto", hour: "2-digit", minute: "2-digit" }).format(d);
+  const date = new Intl.DateTimeFormat("fr-CA", { timeZone: currentZone(), weekday: "short", day: "numeric", month: "short" }).format(d);
+  const time = new Intl.DateTimeFormat("fr-CA", { timeZone: currentZone(), hour: "2-digit", minute: "2-digit" }).format(d);
   return { label: `${date} · ${time}`, days };
 };
 

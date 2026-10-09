@@ -18,7 +18,7 @@ const OUTCOME: Record<Outcome, { label: string; tone: string }> = {
 };
 
 /**
- * The OROM assistant page: one conversation, by voice or text, with what each request
+ * The Jarvis assistant page: one conversation, by voice or text, with what each request
  * really did, previews to confirm, and undo. Listening is only ever on while the
  * microphone button says so.
  */
@@ -52,7 +52,7 @@ export function AssistantConsole({ initial, suggestions }: { initial: Turn[]; su
           <BrandMark size={44} />
         </span>
         <div className="min-w-0 flex-1 basis-48">
-          <h1 className="text-lg font-semibold text-[var(--ink)]">OROM</h1>
+          <h1 className="text-lg font-semibold text-[var(--ink)]">Jarvis</h1>
           <p role="status" aria-live="polite" className="text-sm text-[var(--ink-dim)]">
             {VOICE_LABEL[o.state]}
             {live && " Le micro est allumé."}
@@ -114,8 +114,8 @@ export function AssistantConsole({ initial, suggestions }: { initial: Turn[]; su
         <input
           value={o.draft}
           onChange={(e) => o.setDraft(e.target.value)}
-          placeholder={live ? "Parle…" : "Écris ou dicte ta demande à OROM"}
-          aria-label="Ta demande à OROM"
+          placeholder={live ? "Parle…" : "Écris ou dicte ta demande à Jarvis"}
+          aria-label="Ta demande à Jarvis"
           className="min-w-0 flex-1 bg-transparent px-2 py-2 text-base text-[var(--ink)] outline-none placeholder:text-[var(--ink-faint)]"
         />
         {(live || busy || o.state === "speaking") && (
@@ -124,7 +124,7 @@ export function AssistantConsole({ initial, suggestions }: { initial: Turn[]; su
           </button>
         )}
         {canListen && !live && (
-          <button type="button" onClick={o.listen} disabled={busy} aria-label="Parler à OROM" className="qc-mic-inline focus-ring">
+          <button type="button" onClick={o.listen} disabled={busy} aria-label="Parler à Jarvis" className="qc-mic-inline focus-ring">
             {mic === "denied" ? <MicOff size={18} /> : <Mic size={18} />}
           </button>
         )}
@@ -165,7 +165,7 @@ function TurnRow({ t, onUndo, onConfirm, onDecline, busy }: { t: Turn; onUndo: (
   return (
     <li className="max-w-[92%] rounded-2xl rounded-bl-md bg-[rgba(20,12,3,0.45)] px-4 py-3">
       <p className="text-sm leading-6 text-[var(--ink)]">
-        <span className="sr-only">OROM : </span>
+        <span className="sr-only">Jarvis : </span>
         {t.text}
       </p>
       {(o || t.undo) && (

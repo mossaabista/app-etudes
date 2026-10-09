@@ -1,17 +1,19 @@
 "use client";
 
+import { useI18n } from "@/i18n/client";
 import { Menu, X } from "lucide-react";
 import { BrandMark } from "@/components/layout/BrandMark";
 import { BRAND } from "@/lib/brand";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { activeKey, navByKeys } from "@/lib/nav";
+import { navLabel, activeKey, navByKeys } from "@/lib/nav";
 import { RoleSwitcher } from "@/components/layout/RoleSwitcher";
 import type { ProfileType } from "@/lib/profile";
 
 export function Topbar({ nav, role, roles }: { nav: string[]; role: ProfileType; roles: ProfileType[] }) {
   const pathname = usePathname();
+  const { t } = useI18n();
   const current = activeKey(nav, pathname);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -24,7 +26,7 @@ export function Topbar({ nav, role, roles }: { nav: string[]; role: ProfileType;
         </Link>
         <button
           onClick={() => setMenuOpen(!menuOpen)}
-          aria-label={menuOpen ? "Fermer le menu" : "Ouvrir le menu"}
+          aria-label={menuOpen ? t.nav.closeMenu : t.nav.openMenu}
           className="rounded-md p-1.5 text-[var(--ink-dim)] hover:bg-[rgba(255,220,148,0.08)]"
         >
           {menuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -55,7 +57,7 @@ export function Topbar({ nav, role, roles }: { nav: string[]; role: ProfileType;
                   }`}
                 >
                   <Icon size={16} strokeWidth={2} />
-                  {item.label}
+                  {navLabel(item, t.nav)}
                 </Link>
               );
             })}

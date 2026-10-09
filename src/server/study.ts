@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { APP_TIMEZONE, addDays, dayName, fromISODate, toISODate } from "@/lib/dates";
+import { currentZone, addDays, dayName, fromISODate, toISODate } from "@/lib/dates";
 import { PILOT_NOTE } from "@/server/pilot";
 import { getPlanningPrefs } from "@/server/planning-prefs";
 
@@ -49,7 +49,7 @@ const DAILY_CAP = 4 * 60;
 
 const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
 const fmt = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-const hhmm = (d: Date) => new Intl.DateTimeFormat("en-GB", { timeZone: APP_TIMEZONE, hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
+const hhmm = (d: Date) => new Intl.DateTimeFormat("en-GB", { timeZone: currentZone(), hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
 
 const BASE: Record<string, number> = { Final: 480, Exam: 420, Midterm: 360, Quiz: 120, Presentation: 240, Project: 360, Report: 240, Lab: 180, Assignment: 180 };
 const EXAM = new Set(["Final", "Exam", "Midterm", "Quiz"]);

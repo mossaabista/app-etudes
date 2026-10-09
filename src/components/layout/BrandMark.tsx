@@ -1,8 +1,7 @@
 import { useId } from "react";
 
 /**
- * The OROM mark: a gold ring around a small gold core, on a dark disc — an "O" that reads
- * as an eye that listens. Each instance
+ * The Aurum mark: a gold "A" cut as a chevron over a bar, on a dark disc. Each instance
  * gets its own gradient id: the sidebar's copy is display:none on phones, and a gradient
  * defined inside a hidden SVG paints nothing for the visible ones that point at it.
  */
@@ -18,8 +17,8 @@ export function BrandMark({ size = 26 }: { size?: number }) {
         </linearGradient>
       </defs>
       <circle cx="16" cy="16" r="15" fill="#140d04" stroke={`url(#${gold})`} strokeWidth="1.4" />
-      <circle cx="16" cy="16" r="7.4" fill="none" stroke={`url(#${gold})`} strokeWidth="2.6" />
-      <circle cx="16" cy="16" r="2.3" fill={`url(#${gold})`} />
+      <path d="M9.5 23 L16 8.5 L22.5 23" fill="none" stroke={`url(#${gold})`} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12.2 18.2 H19.8" stroke={`url(#${gold})`} strokeWidth="2.2" strokeLinecap="round" />
     </svg>
   );
 }

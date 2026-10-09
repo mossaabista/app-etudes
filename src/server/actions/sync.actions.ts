@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/server/auth/current-user";
+import { getMessages } from "@/i18n/server";
 import { normalizeFeedUrl, runSync, type SyncPlan } from "@/server/brightspace/sync";
 
 export type SyncState = {
@@ -13,8 +14,9 @@ export type SyncState = {
 
 export async function saveFeedUrl(_prev: SyncState, formData: FormData): Promise<SyncState> {
   const user = await requireUser();
+  const t = await getMessages();
   const result = normalizeFeedUrl(String(formData.get("feedUrl") ?? ""));
-  if ("error" in result) return { error: result.error };
+  if ("error" in result) return { error: t.connections.badLink };
 
   await prisma.syncSource.upsert({
     where: { userId_provider: { userId: user.id, provider: "brightspace" } },
@@ -23,7 +25,7 @@ export async function saveFeedUrl(_prev: SyncState, formData: FormData): Promise
   });
 
   revalidatePath("/sync");
-  return { success: "Flux enregistré. Lance un aperçu pour voir ce que Brightspace propose." };
+  return { success: t.connections.linkSaved };
 }
 
 export async function removeFeed(): Promise<void> {
@@ -38,7 +40,8 @@ export async function previewSync(_prev: SyncState, _formData: FormData): Promis
     const plan = await runSync(user.id, { apply: false });
     return { plan };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Échec de la synchronisation." };
+    console.warn("[sync] échec :", error instanceof Error ? error.message.split("\n")[0] : "inconnu");
+    return { error: (await getMessages()).connections.unreachable };
   }
 }
 
@@ -49,9 +52,10 @@ export async function applySync(_prev: SyncState, _formData: FormData): Promise<
     for (const path of ["/sync", "/today", "/calendar", "/assessments"]) revalidatePath(path);
     return {
       plan,
-      success: `${plan.counts.create} échéance(s) ajoutée(s), ${plan.counts.update} mise(s) à jour.`,
+      success: (await getMessages()).connections.appliedTitle,
     };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Échec de la synchronisation." };
+    console.warn("[sync] échec :", error instanceof Error ? error.message.split("\n")[0] : "inconnu");
+    return { error: (await getMessages()).connections.unreachable };
   }
 }

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { APP_TIMEZONE, addDays, dayName, fromISODate, toISODate } from "@/lib/dates";
+import { currentZone, addDays, dayName, fromISODate, toISODate } from "@/lib/dates";
 import { areaOfTag } from "@/lib/task-areas";
 import { getPlanningPrefs } from "@/server/planning-prefs";
 import { hm, type PlanningPrefs } from "@/lib/planning-prefs";
@@ -58,7 +58,7 @@ const fmt = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${Str
 const frTime = (m: number) => `${Math.floor(m / 60)} h${m % 60 ? ` ${String(m % 60).padStart(2, "0")}` : ""}`;
 const PRIORITY: Record<string, number> = { Critical: 4, High: 3, Medium: 2, Low: 1 };
 
-const wallMinutes = (d: Date) => toMin(new Intl.DateTimeFormat("en-GB", { timeZone: APP_TIMEZONE, hour: "2-digit", minute: "2-digit", hour12: false }).format(d));
+const wallMinutes = (d: Date) => toMin(new Intl.DateTimeFormat("en-GB", { timeZone: currentZone(), hour: "2-digit", minute: "2-digit", hour12: false }).format(d));
 const nowMinutes = () => wallMinutes(new Date());
 
 /** Study each kind of assessment needs in total, and how many days ahead it starts. */
@@ -159,7 +159,7 @@ export async function planDay(userId: string, day: string, opts?: { prefs?: Plan
     const t = frTime(wallMinutes(d));
     if (n === 0) return `${day === todayIso ? "aujourd'hui" : "le jour même"} à ${t}`;
     if (n === 1) return `demain à ${t}`;
-    return `${new Intl.DateTimeFormat("fr-CA", { timeZone: APP_TIMEZONE, weekday: "long", day: "numeric" }).format(d)} à ${t}`;
+    return `${new Intl.DateTimeFormat("fr-CA", { timeZone: currentZone(), weekday: "long", day: "numeric" }).format(d)} à ${t}`;
   };
   // Already on the day's calendar under the same name: not proposed twice.
   const planned = new Set(events.map((e) => e.title.toLowerCase()));

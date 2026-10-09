@@ -1,5 +1,6 @@
 "use client";
 
+import { useI18n } from "@/i18n/client";
 import { useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { LiquidLayers } from "@/components/ui/LiquidMetal";
@@ -25,6 +26,7 @@ export function CardDeck({
   active?: number;
   onActiveChange?: (index: number) => void;
 }) {
+  const { t } = useI18n();
   const [own, setOwn] = useState(initial);
   const active = controlled ?? own;
   const setActive = (index: number) => {
@@ -95,7 +97,7 @@ export function CardDeck({
       <div className="mt-5 flex items-center justify-center gap-3">
         <button
           onClick={() => go(-1)}
-          aria-label="Carte précédente"
+          aria-label={t.today.prevCard}
           className="lm focus-ring h-11 w-11 shrink-0"
         >
           <LiquidLayers>
@@ -119,7 +121,7 @@ export function CardDeck({
 
         <button
           onClick={() => go(1)}
-          aria-label="Carte suivante"
+          aria-label={t.today.nextCard}
           className="lm focus-ring h-11 w-11 shrink-0"
         >
           <LiquidLayers>

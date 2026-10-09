@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/server/auth/current-user";
-import { APP_TIMEZONE, addDays, fromISODate, toISODate, wallTimeToUtc } from "@/lib/dates";
+import { currentZone, addDays, fromISODate, toISODate, wallTimeToUtc } from "@/lib/dates";
 import { parseCapture } from "@/lib/capture";
 import { addMinutes, describeSource, intentsOf, isDeadline, minutesBetween, parseIntent, politeless, score, splitCommands, type Intent } from "@/lib/command";
 import { fold } from "@/lib/capture";
@@ -64,7 +64,7 @@ export type CommandResult =
     };
 
 const hhmm = (d: Date) =>
-  new Intl.DateTimeFormat("en-GB", { timeZone: APP_TIMEZONE, hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
+  new Intl.DateTimeFormat("en-GB", { timeZone: currentZone(), hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
 
 /** A task due at 23:59 has a day, not a time. */
 const taskTime = (d: Date | null) => (d && hhmm(d) !== "23:59" ? hhmm(d) : null);

@@ -31,7 +31,7 @@ function dayLabel(day: string, today: string) {
 
 /**
  * The quick-capture input playing itself: a sentence is typed, the real parser reads it,
- * and the chips show what OROM understood — section, day, time and duration.
+ * and the chips show what Aurum understood — section, day, time and duration.
  */
 export function CaptureDemo() {
   const [text, setText] = useState("");

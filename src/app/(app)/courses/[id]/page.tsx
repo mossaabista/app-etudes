@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ChevronLeft, Clock, FileText, FlaskConical, GraduationCap, Mail, MapPin, PencilLine, Target, Upload } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/server/auth/current-user";
-import { APP_TIMEZONE, toISODate } from "@/lib/dates";
+import { currentZone, toISODate } from "@/lib/dates";
 import { label } from "@/lib/labels";
 import { LiquidLayers } from "@/components/ui/LiquidMetal";
 import { DeleteCourseButton } from "@/components/courses/DeleteCourseButton";
@@ -51,8 +51,8 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
   const days = next ? Math.round((new Date(`${toISODate(next.dueDate!)}T12:00:00Z`).getTime() - new Date(`${toISODate(now)}T12:00:00Z`).getTime()) / 86400000) : null;
 
   // The next class: this week's pattern laid on the calendar from now.
-  const nowDay = new Intl.DateTimeFormat("en-US", { timeZone: APP_TIMEZONE, weekday: "long" }).format(now);
-  const nowTime = new Intl.DateTimeFormat("en-GB", { timeZone: APP_TIMEZONE, hour: "2-digit", minute: "2-digit", hour12: false }).format(now);
+  const nowDay = new Intl.DateTimeFormat("en-US", { timeZone: currentZone(), weekday: "long" }).format(now);
+  const nowTime = new Intl.DateTimeFormat("en-GB", { timeZone: currentZone(), hour: "2-digit", minute: "2-digit", hour12: false }).format(now);
   const nextClass = course.schedules
     .map((s) => {
       let d = (WEEK.indexOf(s.day) - WEEK.indexOf(nowDay) + 7) % 7;
@@ -61,7 +61,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
     })
     .sort((a, b) => a.d - b.d || a.s.startTime.localeCompare(b.s.startTime))[0];
 
-  const fmtDue = (d: Date) => new Intl.DateTimeFormat("fr-CA", { timeZone: APP_TIMEZONE, weekday: "long", day: "numeric", month: "long" }).format(d);
+  const fmtDue = (d: Date) => new Intl.DateTimeFormat("fr-CA", { timeZone: currentZone(), weekday: "long", day: "numeric", month: "long" }).format(d);
 
   return (
     <>
@@ -198,7 +198,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
                     <li key={t.id} className={`flex items-start gap-2.5 ${t.status === "Done" ? "opacity-55" : ""}`}>
                       <TaskCheck id={t.id} done={t.status === "Done"} label={t.title} />
                       <span className={`min-w-0 flex-1 text-sm text-[var(--ink)] ${t.status === "Done" ? "line-through" : ""}`}>{t.title}</span>
-                      {t.dueDate && <span className="shrink-0 text-xs text-[var(--ink-dim)]">{new Intl.DateTimeFormat("fr-CA", { timeZone: APP_TIMEZONE, day: "numeric", month: "short" }).format(t.dueDate)}</span>}
+                      {t.dueDate && <span className="shrink-0 text-xs text-[var(--ink-dim)]">{new Intl.DateTimeFormat("fr-CA", { timeZone: currentZone(), day: "numeric", month: "short" }).format(t.dueDate)}</span>}
                     </li>
                   ))}
                 </ul>

@@ -1,11 +1,13 @@
 "use client";
 
+import { useI18n } from "@/i18n/client";
 import { useRef, useState, useTransition } from "react";
 import { Plus, X } from "lucide-react";
 import { createEvent } from "@/server/actions/event.actions";
 
 /** `isoDate` is the day currently shown, so a new event lands where the user is looking. */
 export function AddEvent({ isoDate }: { isoDate: string }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -31,7 +33,7 @@ export function AddEvent({ isoDate }: { isoDate: string }) {
       <button
         onClick={() => setOpen(true)}
         className="glass-pill glass-prism focus-ring relative flex h-9 w-9 items-center justify-center text-[var(--ink-dim)]"
-        aria-label="Ajouter un événement"
+        aria-label={t.today.addEvent}
       >
         <Plus size={17} />
       </button>
@@ -47,14 +49,14 @@ export function AddEvent({ isoDate }: { isoDate: string }) {
           name="title"
           required
           autoFocus
-          placeholder="Sport, prière, sortie…"
+          placeholder={t.today.eventPlaceholder}
           className="glass-pill focus-ring min-w-0 flex-1 px-4 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--ink-faint)]"
         />
         <button
           type="button"
           onClick={() => { setOpen(false); setError(null); }}
           className="glass-pill focus-ring flex h-9 w-9 shrink-0 items-center justify-center text-[var(--ink-dim)]"
-          aria-label="Annuler"
+          aria-label={t.common.cancel}
         >
           <X size={16} />
         </button>
@@ -64,14 +66,14 @@ export function AddEvent({ isoDate }: { isoDate: string }) {
         <input
           name="startTime"
           type="time"
-          aria-label="Heure de début"
+          aria-label={t.today.start}
           className="glass-pill focus-ring px-3 py-2 text-sm text-[var(--ink-dim)]"
         />
         <span className="text-xs text-[var(--ink-faint)]">→</span>
         <input
           name="endTime"
           type="time"
-          aria-label="Heure de fin"
+          aria-label={t.today.end}
           className="glass-pill focus-ring px-3 py-2 text-sm text-[var(--ink-dim)]"
         />
         <button
@@ -79,11 +81,11 @@ export function AddEvent({ isoDate }: { isoDate: string }) {
           disabled={pending}
           className="glass-pill glass-pill-active glass-prism focus-ring relative ml-auto px-4 py-2 text-xs font-medium disabled:opacity-60"
         >
-          {pending ? "…" : "Ajouter"}
+          {pending ? "…" : t.today.add}
         </button>
       </div>
 
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-[#ffb3a3]">{error}</p>}
     </form>
   );
 }

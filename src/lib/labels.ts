@@ -37,3 +37,34 @@ export const LABELS: Record<string, string> = {
 };
 
 export const label = (value: string) => LABELS[value] ?? value;
+
+/** English labels for the same stored values. */
+export const LABELS_EN: Record<string, string> = {
+  Assignment: "Assignment",
+  Quiz: "Quiz",
+  Midterm: "Midterm",
+  Final: "Final exam",
+  Exam: "Exam",
+  Lab: "Lab",
+  Project: "Project",
+  Presentation: "Presentation",
+  Report: "Report",
+  Lecture: "Lecture",
+  Tutorial: "Tutorial",
+  ToDo: "To do",
+  InProgress: "In progress",
+  Done: "Done",
+  Deferred: "Deferred",
+  Upcoming: "Upcoming",
+  Completed: "Completed",
+  Submitted: "Submitted",
+  Overdue: "Overdue",
+  NotStarted: "Not started",
+  Low: "Low",
+  Medium: "Medium",
+  High: "High",
+  Critical: "Critical",
+};
+
+/** A stored value in the reader's language. */
+export const labelIn = (value: string, locale: "fr" | "en") => (locale === "en" ? LABELS_EN[value] : LABELS[value]) ?? value;

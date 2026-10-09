@@ -8,6 +8,9 @@ import { getProfile } from "@/server/profile";
 import { getLayout } from "@/server/layout";
 import { navKeys } from "@/lib/nav";
 import { prisma } from "@/lib/db";
+import { getSettings } from "@/server/settings";
+import { DEFAULT_TIME_ZONE } from "@/lib/settings";
+import { ZoneSync } from "@/components/layout/ZoneSync";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -20,8 +23,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     : [0, 0, null, 0];
   const nav = navKeys({ roles, prefs: profile?.nav ?? { shown: [], hidden: [] }, counts: { courses, projects, documents }, areas: layout?.areas.map((a) => a.key) ?? [] });
 
+  const settings = user ? await getSettings(user.id) : null;
   return (
     <div className="flex h-dvh">
+      <ZoneSync tz={settings?.timeZone ?? DEFAULT_TIME_ZONE} />
       <div className="glass-backdrop" aria-hidden />
       <Sidebar userName={user?.name} nav={nav} role={role} roles={roles} />
       <div className="flex flex-1 flex-col overflow-hidden">

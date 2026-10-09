@@ -21,7 +21,7 @@ export function AssistantSettings({ enabled }: { enabled: boolean }) {
         <span className={`h-2.5 w-2.5 rounded-full ${enabled ? "bg-[#7fe0b0] shadow-[0_0_8px_#7fe0b0]" : "bg-[#9d8455]"}`} aria-hidden />
         <p className="min-w-0 flex-1 text-sm text-[var(--ink)]">
           {enabled
-            ? "Assistant intelligent actif : OROM comprend les phrases libres et fait travailler ses agents spécialisés (études, planification, projets, sport, nutrition…)."
+            ? "Assistant intelligent actif : Jarvis comprend les phrases libres et fait travailler ses agents spécialisés (études, planification, projets, sport, nutrition…)."
             : "Mode simple : clé d'IA non configurée sur ce serveur. Les commandes courantes (ajouter, déplacer, supprimer, planifier, espaces, mémoire, radar) restent comprises sans IA."}
         </p>
       </div>

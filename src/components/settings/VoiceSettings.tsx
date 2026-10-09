@@ -11,7 +11,7 @@ const MIC: Record<string, string> = {
   unknown: "Le navigateur te demandera l'accès au micro au moment de dicter.",
 };
 
-/** How OROM listens and speaks on this device. Saved on this device only. */
+/** How Jarvis listens and speaks on this device. Saved on this device only. */
 export function VoiceSettings() {
   const [p, setP] = useState<VoicePrefs>(DEFAULT_VOICE);
   const [voices, setVoices] = useState<{ name: string; lang: string }[]>([]);
@@ -48,7 +48,7 @@ export function VoiceSettings() {
       <p className="flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-dim)]">
         <Mic size={13} className="text-[#f0cd79]" /> Voix — réglée sur cet appareil
       </p>
-      {!support.input && <p className="text-xs text-[#ffd9a8]">Ce navigateur ne propose pas la dictée : tu peux toujours écrire à OROM.</p>}
+      {!support.input && <p className="text-xs text-[#ffd9a8]">Ce navigateur ne propose pas la dictée : tu peux toujours écrire à Jarvis.</p>}
       {!support.output && <p className="text-xs text-[#ffd9a8]">Ce navigateur ne sait pas lire les réponses à voix haute : elles restent affichées.</p>}
       <p className="text-xs text-[var(--ink-dim)]">{MIC[mic] ?? MIC.unknown}</p>
       <div className="grid gap-3 sm:grid-cols-3">
@@ -82,7 +82,7 @@ export function VoiceSettings() {
         <span className="min-w-0 flex-1">
           <span className="block text-sm text-[var(--ink)]">Mode conversation</span>
           <span className="block text-xs text-[var(--ink-dim)]">
-            Après une réponse parlée, OROM réécoute tout seul, tant que la page Assistant est ouverte. Le micro reste visiblement allumé ; « Échap » ou le bouton carré l&apos;arrête. Un navigateur ne peut pas écouter en arrière-plan : pas de « Hey OROM » page fermée.
+            Après une réponse parlée, Jarvis réécoute tout seul, tant que la page Assistant est ouverte. Le micro reste visiblement allumé ; « Échap » ou le bouton carré l&apos;arrête. Un navigateur ne peut pas écouter en arrière-plan : pas de « Hey Jarvis » page fermée.
           </span>
         </span>
         <input type="checkbox" checked={p.conversation} onChange={() => set({ conversation: !p.conversation })} className="h-5 w-5 accent-[#e8bf63]" />
@@ -90,12 +90,12 @@ export function VoiceSettings() {
       <label className="tile flex cursor-pointer items-center gap-3 px-4 py-3">
         <span className="min-w-0 flex-1">
           <span className="block text-sm text-[var(--ink)]">Répondre à voix haute quand j&apos;écris</span>
-          <span className="block text-xs text-[var(--ink-dim)]">Quand tu parles, OROM répond toujours à voix haute (un résumé court, le détail reste à l&apos;écran).</span>
+          <span className="block text-xs text-[var(--ink-dim)]">Quand tu parles, Jarvis répond toujours à voix haute (un résumé court, le détail reste à l&apos;écran).</span>
         </span>
         <input type="checkbox" checked={p.speakTyped} onChange={() => set({ speakTyped: !p.speakTyped })} className="h-5 w-5 accent-[#e8bf63]" />
       </label>
       {support.output && (
-        <button type="button" onClick={() => webSpeechOutput.speak("Bonjour, je suis OROM. Dis-moi ce que tu veux accomplir.", p)} className="mod-chip focus-ring">
+        <button type="button" onClick={() => webSpeechOutput.speak("Bonjour, je suis Jarvis. Dis-moi ce que tu veux accomplir.", p)} className="mod-chip focus-ring">
           <Volume2 size={13} /> Tester la voix
         </button>
       )}

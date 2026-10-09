@@ -1,10 +1,10 @@
 import { prisma } from "@/lib/db";
-import { APP_TIMEZONE, addDays, dayName, fromISODate, toISODate } from "@/lib/dates";
+import { currentZone, addDays, dayName, fromISODate, toISODate } from "@/lib/dates";
 import { parseCapture } from "@/lib/capture";
 import { label } from "@/lib/labels";
 import { PILOT_NOTE } from "@/server/pilot";
 
-const hhmm = (d: Date) => new Intl.DateTimeFormat("en-GB", { timeZone: APP_TIMEZONE, hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
+const hhmm = (d: Date) => new Intl.DateTimeFormat("en-GB", { timeZone: currentZone(), hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
 const fr = (t: string) => t.replace(/^0/, "").replace(":00", " h").replace(":", " h ");
 const dayWords = (iso: string) =>
   new Intl.DateTimeFormat("fr-CA", { timeZone: "UTC", weekday: "long", day: "numeric", month: "long" }).format(new Date(`${iso}T12:00:00Z`));

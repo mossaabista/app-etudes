@@ -10,14 +10,14 @@ import { getProfile } from "@/server/profile";
 import { PROFILES, type ProfileType } from "@/lib/profile";
 import { PILOT_NOTE } from "@/server/pilot";
 import { label as frLabel } from "@/lib/labels";
-import { APP_TIMEZONE, addDays, addMonths, dayName, fromISODate, startOfMonth, toISODate } from "@/lib/dates";
+import { currentZone, addDays, addMonths, dayName, fromISODate, startOfMonth, toISODate } from "@/lib/dates";
 
 // Sunday first, as in the printed échéancier.
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 
 const hhmm = (d: Date) =>
-  new Intl.DateTimeFormat("en-GB", { timeZone: APP_TIMEZONE, hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
+  new Intl.DateTimeFormat("en-GB", { timeZone: currentZone(), hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
 
 function assessmentCategory(type: string): CalCategory {
   switch (type) {
@@ -175,7 +175,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     }
   }
 
-  const monthLabel = new Intl.DateTimeFormat("fr-CA", { timeZone: APP_TIMEZONE, month: "long", year: "numeric" }).format(first);
+  const monthLabel = new Intl.DateTimeFormat("fr-CA", { timeZone: currentZone(), month: "long", year: "numeric" }).format(first);
   const href = (d: Date) => `/calendar?m=${toISODate(d).slice(0, 7)}`;
   const isCurrentMonth = todayIso.startsWith(monthPrefix);
 

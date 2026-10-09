@@ -6,7 +6,7 @@ import { parseTaskQuery, sortTasks, taskWhere } from "@/lib/task-list";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { TaskList, type ListTask } from "@/components/tasks/TaskList";
 
-export const metadata = { title: "Toutes mes tâches · OROM" };
+export const metadata = { title: "Toutes mes tâches" };
 
 const LIMIT = 200;
 

@@ -1,8 +1,9 @@
 "use client";
 
+import { useI18n } from "@/i18n/client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { activeKey, navByKeys } from "@/lib/nav";
+import { navLabel, activeKey, navByKeys } from "@/lib/nav";
 import { BrandMark } from "@/components/layout/BrandMark";
 import { RoleSwitcher } from "@/components/layout/RoleSwitcher";
 import { BRAND } from "@/lib/brand";
@@ -10,6 +11,7 @@ import type { ProfileType } from "@/lib/profile";
 
 export function Sidebar({ userName, nav, role, roles }: { userName?: string; nav: string[]; role: ProfileType; roles: ProfileType[] }) {
   const pathname = usePathname();
+  const { t } = useI18n();
   const active = activeKey(nav, pathname);
 
   return (
@@ -25,7 +27,7 @@ export function Sidebar({ userName, nav, role, roles }: { userName?: string; nav
           <RoleSwitcher role={role} roles={roles} />
         </div>
       )}
-      <nav aria-label="Navigation principale" className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
+      <nav aria-label={t.nav.main} className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
         {navByKeys(nav).map((item) => {
           const on = item.key === active;
           const Icon = item.icon;
@@ -39,7 +41,7 @@ export function Sidebar({ userName, nav, role, roles }: { userName?: string; nav
               }`}
             >
               <Icon size={16} strokeWidth={2} />
-              {item.label}
+              {navLabel(item, t.nav)}
             </Link>
           );
         })}

@@ -4,7 +4,7 @@ import { listTurns } from "@/server/conversation";
 import { AssistantConsole } from "@/components/assistant/AssistantConsole";
 import type { ProfileType } from "@/lib/profile";
 
-export const metadata = { title: "Assistant · OROM" };
+export const metadata = { title: "Assistant" };
 
 /** Things worth asking first, for each role. Every one of them runs for real. */
 const SUGGESTIONS: Record<ProfileType, string[]> = {

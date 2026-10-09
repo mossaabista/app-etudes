@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "OROM",
+    name: "Aurum",
     // Shown under the home-screen icon, where iOS truncates around 12 characters.
-    short_name: "OROM",
+    short_name: "Aurum",
     description: "L'agenda qui range ta vie à ta place.",
     lang: "fr-CA",
     // Opening straight on Today skips a redirect on every cold launch.

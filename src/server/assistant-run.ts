@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { APP_TIMEZONE, fromISODate, toISODate, wallTimeToUtc } from "@/lib/dates";
+import { currentZone, fromISODate, toISODate, wallTimeToUtc } from "@/lib/dates";
 import { addMinutes, minutesBetween } from "@/lib/command";
 import { guessAisle } from "@/lib/grocery";
 import { LIBRARY, LIBRARY_SUBS, PALETTE, sanitizeLayout, slug, type AreaSpec, type Layout, type SubSpec } from "@/lib/layout";
@@ -27,7 +27,7 @@ const atWall = (day: string, time: string) => {
   const [hh, mm] = time.split(":").map(Number);
   return wallTimeToUtc([y, m, d, hh, mm, 0]);
 };
-const hhmm = (d: Date) => new Intl.DateTimeFormat("en-GB", { timeZone: APP_TIMEZONE, hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
+const hhmm = (d: Date) => new Intl.DateTimeFormat("en-GB", { timeZone: currentZone(), hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
 
 /** How an action reads in a sentence, to say which one could not be done. */
 const VERBS: Record<AssistantAction["op"], string> = {

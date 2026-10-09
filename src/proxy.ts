@@ -5,25 +5,48 @@ const PUBLIC_PATHS = ["/login", "/register"];
 /** Open to everyone, signed in or not: the marketing page. */
 const MARKETING_PATHS = ["/bienvenue"];
 
-function verifyTokenSimple(token: string): boolean {
+const COOKIE = "etudes_session";
+const hex = (buf: ArrayBuffer) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+
+/**
+ * The same check as the server's (signature and expiry), not just the token's shape: a
+ * cookie signed with an old secret or tampered with would otherwise send the browser
+ * back and forth between /login and the app forever.
+ */
+async function validToken(token: string): Promise<boolean> {
   const parts = token.split(".");
   if (parts.length !== 3) return false;
-  const expiresAt = Number(parts[1]);
-  if (Number.isNaN(expiresAt) || Date.now() > expiresAt) return false;
-  return true;
+  const [userId, expiresAt, signature] = parts;
+  if (!Number.isFinite(Number(expiresAt)) || Date.now() > Number(expiresAt)) return false;
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) return false;
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const expected = hex(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${userId}.${expiresAt}`)));
+  if (expected.length !== signature.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ signature.charCodeAt(i);
+  return diff === 0;
 }
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const token = request.cookies.get("etudes_session")?.value;
-  const hasSession = token ? verifyTokenSimple(token) : false;
+  const token = request.cookies.get(COOKIE)?.value;
+  const hasSession = token ? await validToken(token) : false;
 
   if (MARKETING_PATHS.includes(pathname)) return NextResponse.next();
 
   if (!hasSession && !PUBLIC_PATHS.includes(pathname)) {
     // A visitor landing on the bare domain sees what the app is before being asked to sign in.
-    return NextResponse.redirect(new URL(pathname === "/" ? "/bienvenue" : "/login", request.url));
+    const res = NextResponse.redirect(new URL(pathname === "/" ? "/bienvenue" : "/login", request.url));
+    // A stale cookie goes away, so the sign-in page is shown instead of bouncing.
+    if (token) res.cookies.delete(COOKIE);
+    return res;
+  }
+  if (!hasSession && token) {
+    const res = NextResponse.next();
+    res.cookies.delete(COOKIE);
+    return res;
   }
 
   if (hasSession && PUBLIC_PATHS.includes(pathname)) {

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { APP_TIMEZONE, addDays, dayName, fromISODate, toISODate } from "@/lib/dates";
+import { currentZone, addDays, dayName, fromISODate, toISODate } from "@/lib/dates";
 import { PILOT_NOTE } from "@/server/pilot";
 
 /**
@@ -20,12 +20,14 @@ export interface RadarAlert {
 
 const HORIZON = 14;
 const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
-const hhmm = (d: Date) => new Intl.DateTimeFormat("en-GB", { timeZone: APP_TIMEZONE, hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
+const hhmm = (d: Date) => new Intl.DateTimeFormat("en-GB", { timeZone: currentZone(), hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
 const dayFr = (iso: string) => new Intl.DateTimeFormat("fr-CA", { timeZone: "UTC", weekday: "long", day: "numeric", month: "long" }).format(new Date(`${iso}T12:00:00Z`));
 const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 const EXAMS = new Set(["Exam", "Final", "Midterm", "Quiz"]);
 
-export async function riskRadar(userId: string, now = new Date()): Promise<RadarAlert[]> {
+export async function riskRadar(userId: string, now = new Date(), locale: "fr" | "en" = "fr"): Promise<RadarAlert[]> {
+  const en = locale === "en";
+  const dayName_ = (iso: string) => (en ? new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", weekday: "long", month: "long", day: "numeric" }).format(new Date(`${iso}T12:00:00Z`)) : dayFr(iso));
   const today = fromISODate(toISODate(now))!;
   const end = addDays(today, HORIZON);
   const [overdue, assessments, undated, events, schedules] = await Promise.all([
@@ -50,9 +52,11 @@ export async function riskRadar(userId: string, now = new Date()): Promise<Radar
       kind: "overdue",
       level: days >= 2 ? "high" : "medium",
       title: t.title,
-      detail: days === 0 ? `Échéance passée aujourd'hui à ${hhmm(t.dueDate!).replace(":", " h ")}.` : `En retard depuis ${days} jour${days > 1 ? "s" : ""} (échéance : ${dayFr(toISODate(t.dueDate!))}).`,
+      detail: en
+        ? days === 0 ? `Was due today at ${hhmm(t.dueDate!)}.` : `${days} day${days > 1 ? "s" : ""} late (due ${dayName_(toISODate(t.dueDate!))}).`
+        : days === 0 ? `Échéance passée aujourd'hui à ${hhmm(t.dueDate!).replace(":", " h ")}.` : `En retard depuis ${days} jour${days > 1 ? "s" : ""} (échéance : ${dayFr(toISODate(t.dueDate!))}).`,
       href: area && sub ? `/tasks/${area}/${sub}` : "/tasks",
-      action: "Replanifier ou cocher",
+      action: en ? "Reschedule or check off" : "Replanifier ou cocher",
     });
   }
 
@@ -68,9 +72,11 @@ export async function riskRadar(userId: string, now = new Date()): Promise<Radar
       kind: "no-time",
       level: days <= 2 || (a.weight ?? 0) >= 20 ? "high" : "medium",
       title: `${a.course.code} · ${a.title}`,
-      detail: `${EXAMS.has(a.type) ? "À passer" : "À rendre"} ${days === 0 ? "aujourd'hui" : days === 1 ? "demain" : dayFr(toISODate(a.dueDate!))}${a.weight != null ? ` (${a.weight} %)` : ""}, et aucun temps de travail n'est prévu au calendrier.`,
+      detail: en
+        ? `${EXAMS.has(a.type) ? "Exam" : "Due"} ${days === 0 ? "today" : days === 1 ? "tomorrow" : dayName_(toISODate(a.dueDate!))}${a.weight != null ? ` (${a.weight}%)` : ""}, and no study time is on your calendar.`
+        : `${EXAMS.has(a.type) ? "À passer" : "À rendre"} ${days === 0 ? "aujourd'hui" : days === 1 ? "demain" : dayFr(toISODate(a.dueDate!))}${a.weight != null ? ` (${a.weight} %)` : ""}, et aucun temps de travail n'est prévu au calendrier.`,
       href: `/courses/${a.courseId}`,
-      action: "Planifier les révisions",
+      action: en ? "Plan study time" : "Planifier les révisions",
     });
   }
 
@@ -79,25 +85,25 @@ export async function riskRadar(userId: string, now = new Date()): Promise<Radar
   for (let d = today; d < end; d = addDays(d, 1)) {
     const iso = toISODate(d);
     const items = [
-      ...events.filter((e) => toISODate(e.date) === iso && e.notes !== PILOT_NOTE).map((e) => ({ label: `« ${e.title} »`, a: toMin(e.startTime!), b: e.endTime ? toMin(e.endTime) : toMin(e.startTime!) + 60 })),
-      ...schedules.filter((s) => s.day === dayName(d)).map((s) => ({ label: `le cours ${s.course.code}`, a: toMin(s.startTime), b: toMin(s.endTime) })),
+      ...events.filter((e) => toISODate(e.date) === iso && e.notes !== PILOT_NOTE).map((e) => ({ label: en ? `“${e.title}”` : `« ${e.title} »`, course: false, a: toMin(e.startTime!), b: e.endTime ? toMin(e.endTime) : toMin(e.startTime!) + 60 })),
+      ...schedules.filter((s) => s.day === dayName(d)).map((s) => ({ label: en ? `the ${s.course.code} class` : `le cours ${s.course.code}`, course: true, a: toMin(s.startTime), b: toMin(s.endTime) })),
     ];
     for (let i = 0; i < items.length; i++)
       for (let j = i + 1; j < items.length; j++) {
         const x = items[i];
         const y = items[j];
         if (!(x.a < y.b && y.a < x.b)) continue;
-        if (x.label.startsWith("le cours") && y.label.startsWith("le cours")) continue;
+        if (x.course && y.course) continue;
         const k = `${iso}|${[x.label, y.label].sort().join("|")}`;
         if (seen.has(k)) continue;
         seen.add(k);
         alerts.push({
           kind: "conflict",
           level: "high",
-          title: `Conflit ${dayFr(iso)}`,
-          detail: `${x.label.charAt(0).toUpperCase()}${x.label.slice(1)} et ${y.label} se chevauchent (${String(Math.floor(Math.max(x.a, y.a) / 60)).padStart(2, "0")} h ${String(Math.max(x.a, y.a) % 60).padStart(2, "0")}).`,
+          title: en ? `Conflict on ${dayName_(iso)}` : `Conflit ${dayFr(iso)}`,
+          detail: `${x.label.charAt(0).toUpperCase()}${x.label.slice(1)} ${en ? "and" : "et"} ${y.label} ${en ? "overlap" : "se chevauchent"} (${String(Math.floor(Math.max(x.a, y.a) / 60)).padStart(2, "0")}${en ? ":" : " h "}${String(Math.max(x.a, y.a) % 60).padStart(2, "0")}).`,
           href: `/calendar`,
-          action: "Déplacer l'un des deux",
+          action: en ? "Move one of them" : "Déplacer l'un des deux",
         });
       }
   }
@@ -107,11 +113,15 @@ export async function riskRadar(userId: string, now = new Date()): Promise<Radar
   for (const a of assessments) perDay.set(toISODate(a.dueDate!), [...(perDay.get(toISODate(a.dueDate!)) ?? []), `${a.course.code} ${a.title}`]);
   for (const [iso, list] of perDay)
     if (list.length >= 3)
-      alerts.push({ kind: "overload", level: "high", title: `Journée chargée ${dayFr(iso)}`, detail: `${list.length} évaluations le même jour : ${list.join(", ")}.`, href: "/calendar", action: "Avancer le travail des jours d'avant" });
+      alerts.push(
+        en
+          ? { kind: "overload", level: "high", title: `Heavy day: ${dayName_(iso)}`, detail: `${list.length} assessments on the same day: ${list.join(", ")}.`, href: "/calendar", action: "Get ahead on the days before" }
+          : { kind: "overload", level: "high", title: `Journée chargée ${dayFr(iso)}`, detail: `${list.length} évaluations le même jour : ${list.join(", ")}.`, href: "/calendar", action: "Avancer le travail des jours d'avant" }
+      );
 
   // 5. Assessments with no date: they cannot be planned.
   for (const a of undated)
-    alerts.push({ kind: "undated", level: "medium", title: `${a.course.code} · ${a.title}`, detail: "Pas de date connue : elle ne peut pas être planifiée ni rappelée.", href: `/courses/${a.courseId}`, action: "Ajouter la date" });
+    alerts.push({ kind: "undated", level: "medium", title: `${a.course.code} · ${a.title}`, detail: en ? "No known date: it can't be planned or reminded." : "Pas de date connue : elle ne peut pas être planifiée ni rappelée.", href: `/courses/${a.courseId}`, action: en ? "Add the date" : "Ajouter la date" });
 
   const rank = (x: RadarAlert) => (x.level === "high" ? 0 : 1) * 10 + ["conflict", "overdue", "no-time", "overload", "undated"].indexOf(x.kind);
   return alerts.sort((a, b) => rank(a) - rank(b));
