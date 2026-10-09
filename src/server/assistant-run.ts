@@ -7,6 +7,8 @@ import { askAssistant, assistantContext, type AssistantAction, type Turn } from 
 import { assessRisk, type Risk } from "@/lib/risk";
 import { getAutonomy } from "@/server/autonomy";
 import { newOpId, sealPending } from "@/server/pending";
+import { applyWorkspace } from "@/server/workspaces";
+import { templateOf, type TemplateId } from "@/lib/workspaces";
 import { getLayout, saveLayout } from "@/server/layout";
 import { PILOT_NOTE, planDay } from "@/server/pilot";
 import { STUDY_PREFIX, planStudy } from "@/server/study";
@@ -42,6 +44,7 @@ const VERBS: Record<AssistantAction["op"], string> = {
   plan_revision: "planifier les révisions",
   plan_day: "planifier la journée",
   navigate: "ouvrir la page",
+  create_workspace: "créer l'espace",
 };
 
 export const describeAction = (a: AssistantAction, labels?: Map<string, string>) => {
@@ -381,6 +384,24 @@ export async function executePlan(userId: string, actions: AssistantAction[], re
           // An empty plan is an answer, not a failure: there was nothing to place.
           did.push(p.blocks.length ? `${p.blocks.length} bloc${p.blocks.length > 1 ? "s" : ""} planifié${p.blocks.length > 1 ? "s" : ""} ${dayWords(day)}.` : `Rien à planifier ${dayWords(day)}.`);
           ok = true;
+          break;
+        }
+        case "create_workspace": {
+          const t = templateOf(a.template ?? "");
+          if (!t) break;
+          const w = await applyWorkspace(userId, t.id as TemplateId, a.name ?? a.title ?? "");
+          if ("error" in w) {
+            // "Already in place" is an answer, not a failure.
+            if (/déjà en place/.test(w.error)) {
+              did.push(w.error);
+              ok = true;
+            }
+            break;
+          }
+          undos.push(...w.undos);
+          did.push(w.message);
+          navigate = w.href;
+          ok = !w.partial;
           break;
         }
         case "navigate": {

@@ -12,6 +12,8 @@ import { runAssistant, runConfirmedPlan, type Confirmation } from "@/server/assi
 import { assessRisk } from "@/lib/risk";
 import { getAutonomy } from "@/server/autonomy";
 import { newOpId, openPending, sealPending } from "@/server/pending";
+import { applyWorkspace } from "@/server/workspaces";
+import { detectTemplate, nameFrom } from "@/lib/workspaces";
 import { claim, findOp, isUndoable, markUndone, recentActions, settle, type LoggedAction } from "@/server/agent-log";
 import { saveLayout, LAYOUT_MODULE } from "@/server/layout";
 import type { Layout } from "@/lib/layout";
@@ -26,6 +28,7 @@ export type Undo =
   | { t: "task-was"; id: string; dueDate: string | null; title: string }
   | { t: "restore-event"; data: { title: string; type: string; date: string; startTime: string | null; endTime: string | null; allDay: boolean; notes: string | null; courseId: string | null } }
   | { t: "many"; list: Undo[] }
+  | { t: "delete-project"; id: string }
   | { t: "task-status"; id: string; status: string }
   | { t: "delete-course"; id: string }
   | { t: "layout-was"; data: Layout }
@@ -162,6 +165,19 @@ export async function undoLoggedAction(id: string): Promise<CommandResult> {
   return undoLogged(user.id, row);
 }
 
+const WORKSPACE = /^(stp |s'il te plait )?(cree|creer|prepare|preparer|organise|organiser|monte|mets en place)[- ]?(moi|-moi)? (un |mon |l'|ma )?(espace|activite|semestre|entrainement)\b/;
+
+/** "Crée-moi un espace pour…": built from a template and the user's real data. */
+async function workspaceCommand(userId: string, text: string): Promise<CommandResult | null> {
+  if (!WORKSPACE.test(fold(text).replace(/[’]/g, "'"))) return null;
+  const template = detectTemplate(text);
+  if (!template) return { error: "Quel genre d'espace ? Par exemple : un projet (« crée un espace pour mon projet Site web »), ton semestre, ton activité de freelance ou ton entraînement." };
+  const r = await applyWorkspace(userId, template, nameFrom(text));
+  if ("error" in r) return { error: r.error };
+  done();
+  return { ok: true, message: r.message, undo: r.undos.length === 1 ? r.undos[0] : { t: "many", list: r.undos }, navigate: r.href, partial: r.partial };
+}
+
 async function runCommand(userId: string, text: string, options?: CommandOptions): Promise<CommandResult> {
   const user = { id: userId };
   const today = toISODate(new Date());
@@ -176,6 +192,9 @@ async function runCommand(userId: string, text: string, options?: CommandOptions
       return { ok: true, message: r.message, undo: r.undos.length ? (r.undos.length === 1 ? r.undos[0] : { t: "many", list: r.undos }) : null, answer: r.answer, navigate: r.navigate, partial: r.partial };
     }
   }
+
+  const workspace = await workspaceCommand(user.id, text);
+  if (workspace) return workspace;
 
   // Several orders in one sentence run one after the other; one confirmation, one undo.
   const parts = splitCommands(text);
@@ -394,6 +413,13 @@ async function revert(userId: string, undo: Undo): Promise<number> {
   const own = { userId };
   const hit = ({ count }: { count: number }) => (count > 0 ? 0 : 1);
   switch (undo.t) {
+    case "delete-project": {
+      // Only a project a workspace just created, and only once nothing else is filed in it.
+      const p = await prisma.project.findFirst({ where: { id: undo.id, ...own }, select: { id: true } });
+      if (!p || (await prisma.task.count({ where: { projectId: p.id } }))) return 1;
+      await prisma.project.delete({ where: { id: p.id } });
+      return 0;
+    }
     case "delete-course": {
       // Only a course the assistant just created, and only while it is still empty.
       const c = await prisma.course.findFirst({ where: { id: undo.id, ...own }, include: { _count: { select: { assessments: true, tasks: true, schedules: true } } } });

@@ -115,6 +115,29 @@ describe("runAssistant", () => {
   });
 });
 
+describe("create_workspace", () => {
+  beforeEach(() => {
+    db.project = table();
+    (db as Record<string, unknown>).$transaction = async (fn: (tx: unknown) => unknown) => fn(db);
+  });
+
+  it("builds the workspace on the server and opens it", async () => {
+    plan("Ton espace est prêt.", { op: "create_workspace", template: "projet", name: "Mémoire" });
+    const r = await runAssistant("alice", "prépare un espace pour mon mémoire", "/today", []);
+    expect(r.partial).toBe(false);
+    expect(db.project.rows[0]).toMatchObject({ userId: "alice", title: "Mémoire" });
+    expect(r.navigate).toBe(`/tasks/projets/${db.project.rows[0].id}`);
+    expect(r.undos.length).toBeGreaterThan(1);
+  });
+
+  it("reports an unknown template as not done", async () => {
+    plan("C'est prêt.", { op: "create_workspace", template: "chateau" });
+    const r = await runAssistant("alice", "…", "/today", []);
+    expect(r.partial).toBe(true);
+    expect(db.project.rows).toHaveLength(0);
+  });
+});
+
 describe("receipt", () => {
   it("passes an answer through", () => {
     expect(receipt("Tu as deux cours demain.", 0, [], [])).toEqual({ message: "Tu as deux cours demain.", answer: true, partial: false });
