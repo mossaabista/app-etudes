@@ -19,7 +19,7 @@ export interface AssistantAction {
     | "create_event" | "create_task" | "move" | "delete" | "rename" | "complete"
     | "create_course"
     | "add_area" | "remove_area" | "rename_area" | "add_section" | "remove_section" | "rename_section"
-    | "log" | "plan_revision" | "plan_day" | "navigate" | "create_workspace";
+    | "log" | "plan_revision" | "plan_day" | "plan_week" | "navigate" | "create_workspace";
   id?: string;
   title?: string;
   date?: string | null;
@@ -158,7 +158,7 @@ const TOOL = {
           properties: {
             op: {
               type: "string",
-              enum: ["create_event", "create_task", "move", "delete", "rename", "complete", "create_course", "add_area", "remove_area", "rename_area", "add_section", "remove_section", "rename_section", "log", "plan_revision", "plan_day", "navigate", "create_workspace"],
+              enum: ["create_event", "create_task", "move", "delete", "rename", "complete", "create_course", "add_area", "remove_area", "rename_area", "add_section", "remove_section", "rename_section", "log", "plan_revision", "plan_day", "plan_week", "navigate", "create_workspace"],
             },
             id: { type: "string", description: "id exact e:… ou t:… de l'agenda" },
             title: { type: "string" },
@@ -212,7 +212,7 @@ export async function askAssistant(userId: string, sentence: string, page: strin
     "- Secteurs : ajouter un secteur ou une section → add_area / add_section. Si la bibliothèque a la section, utilise library. Sinon crée une section SUR MESURE avec label, image (la plus proche dans IMAGES), intro et blocks. " + BLOCKS_HELP,
     "- « je suis sportif, garde seulement santé » → remove_area pour les autres (rien n'est supprimé, juste masqué) ; « retire Esprit » → remove_area.",
     "- Noter quelque chose qui s'est passé → log : « j'ai couru 30 min » (workout), « j'ai bu 2 verres » (water), « j'ai mangé… » (meal, kcal estimé), « je pèse 72 kg » (weight), « j'ai dormi 7 h » (sleep), « j'ai dépensé 12 $ en resto » (expense, title = libellé), « ajoute lait et œufs aux courses » (grocery, items).",
-    "- « fais-moi un plan de révision pour… » → plan_revision (ids des évaluations concernées). « organise/planifie ma journée » → plan_day (date).",
+    "- « fais-moi un plan de révision pour… » → plan_revision (ids des évaluations concernées). « organise/planifie ma journée » → plan_day (date). « planifie ma semaine » → plan_week (date = premier jour, aujourd'hui par défaut) : il ne déplace jamais cours, rendez-vous ni échéances.",
     "- « crée-moi un espace pour… », « organise mon semestre / mon activité de freelance / mon entraînement », « prépare un espace pour mon projet X » → UN SEUL create_workspace avec template (projet, semestre, freelance, entrainement) et, pour projet, name = nom du projet. Le serveur construit la structure à partir des vraies données : n'ajoute pas toi-même de secteurs, sections ou tâches pour cette demande, et n'invente ni cours, ni client, ni date. Ensuite « ajoute une section… », « enlève… » modifient l'espace avec add_section / remove_section.",
     "- « ouvre / montre-moi … » → navigate (url d'une page : /today, /calendar, /courses, /courses/<id>, /tasks, /tasks/<area>, /tasks/<area>/<section>, /settings, /syllabus).",
     "- Bilan, questions sur l'agenda : aucune action, réponse complète dans reply (cours, remises, tâches ; heure de coucher conseillée pour le lendemain).",

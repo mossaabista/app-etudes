@@ -10,7 +10,7 @@ import { newOpId, sealPending } from "@/server/pending";
 import { applyWorkspace } from "@/server/workspaces";
 import { templateOf, type TemplateId } from "@/lib/workspaces";
 import { getLayout, saveLayout } from "@/server/layout";
-import { PILOT_NOTE, planDay } from "@/server/pilot";
+import { PILOT_NOTE, planDay, planWeek } from "@/server/pilot";
 import { STUDY_PREFIX, planStudy } from "@/server/study";
 import type { Undo } from "@/server/actions/capture.actions";
 
@@ -43,6 +43,7 @@ const VERBS: Record<AssistantAction["op"], string> = {
   log: "noter",
   plan_revision: "planifier les révisions",
   plan_day: "planifier la journée",
+  plan_week: "planifier la semaine",
   navigate: "ouvrir la page",
   create_workspace: "créer l'espace",
 };
@@ -383,6 +384,23 @@ export async function executePlan(userId: string, actions: AssistantAction[], re
           }
           // An empty plan is an answer, not a failure: there was nothing to place.
           did.push(p.blocks.length ? `${p.blocks.length} bloc${p.blocks.length > 1 ? "s" : ""} planifié${p.blocks.length > 1 ? "s" : ""} ${dayWords(day)}.` : `Rien à planifier ${dayWords(day)}.`);
+          ok = true;
+          break;
+        }
+        case "plan_week": {
+          const from = a.date && DATE.test(a.date) && a.date >= today ? a.date : today;
+          const w = await planWeek(userId, from);
+          let added = 0;
+          for (const d of w.days)
+            for (const b of d.blocks) {
+              const e = await prisma.calendarEvent.create({ data: { userId, title: b.title.slice(0, 200), type: b.tag.startsWith("Area:") ? b.tag : "Area:travail:taches", date: fromISODate(d.day)!, startTime: b.start, endTime: b.end, allDay: false, notes: PILOT_NOTE } });
+              undos.push({ t: "delete-event", id: e.id });
+              added++;
+            }
+          did.push(
+            `${added} bloc${added > 1 ? "s" : ""} planifié${added > 1 ? "s" : ""} sur la semaine, autour de ${w.fixed} engagement${w.fixed > 1 ? "s" : ""} fixe${w.fixed > 1 ? "s" : ""} qui ne bougent pas.` +
+              (w.unplaced.length ? ` Sans place : ${w.unplaced.slice(0, 4).map((u) => `${u.title} (${u.reason})`).join(" ; ")}.` : "")
+          );
           ok = true;
           break;
         }

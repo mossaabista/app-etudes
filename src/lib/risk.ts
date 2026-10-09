@@ -29,13 +29,13 @@ export const MODES: { mode: AutonomyMode; label: string; desc: string }[] = [
   {
     mode: "equilibre",
     label: "Direct",
-    desc: `Je fais tout de suite ce que tu demandes — ajouter, modifier, supprimer — avec un bouton Annuler. Je te demande seulement avant plus de ${BATCH_SIZE} changements d'un coup ou un plan sur toutes tes évaluations.`,
+    desc: `Je fais tout de suite ce que tu demandes — ajouter, modifier, supprimer — avec un bouton Annuler. Je te demande seulement avant plus de ${BATCH_SIZE} changements d'un coup, un plan de toute la semaine ou de toutes tes évaluations.`,
   },
   { mode: "autonome", label: "Autonome", desc: "Comme Direct, et je fais aussi sans demander les gros lots que tu autorises ci-dessous." },
 ];
 
 export const GRANTS: { grant: Grant; label: string }[] = [
-  { grant: "plans", label: "Planifier les révisions de toutes mes évaluations" },
+  { grant: "plans", label: "Planifier ma semaine ou les révisions de toutes mes évaluations" },
   { grant: "batches", label: `Faire plus de ${BATCH_SIZE} changements d'un coup` },
 ];
 
@@ -76,6 +76,7 @@ export function assessRisk(actions: RiskInput[], autonomy: Autonomy = DEFAULT_AU
 
   const needed: { grant: Grant; reason: string }[] = [];
   if (actions.some(isLargePlan)) needed.push({ grant: "plans", reason: "Ça planifie des révisions pour toutes tes évaluations à venir." });
+  if (actions.some((a) => a.op === "plan_week")) needed.push({ grant: "plans", reason: "Ça remplit ta semaine entière de blocs de travail." });
   if (writes.length > BATCH_SIZE) needed.push({ grant: "batches", reason: `Ça fait ${writes.length} changements d'un coup.` });
 
   const risk: Risk = needed.length ? "medium" : writes.length ? "low" : "none";

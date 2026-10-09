@@ -32,6 +32,8 @@ describe("assessRisk", () => {
     const v = assessRisk([{ op: "plan_revision" }], direct);
     expect(v).toMatchObject({ risk: "medium", confirm: true });
     expect(v.reasons[0]).toMatch(/toutes tes évaluations/);
+    expect(assessRisk(ops("plan_week"), direct)).toMatchObject({ risk: "medium", confirm: true });
+    expect(assessRisk(ops("plan_week"), auto("plans")).confirm).toBe(false);
   });
 
   it("asks before any change in prudent mode", () => {

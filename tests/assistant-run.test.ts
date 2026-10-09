@@ -13,7 +13,15 @@ vi.mock("@/server/assistant", () => ({
 }));
 vi.mock("@/server/autonomy", () => ({ getAutonomy: async () => autonomy.value }));
 vi.mock("@/server/layout", () => ({ getLayout: async () => ({ areas: [] }), saveLayout: async () => {} }));
-vi.mock("@/server/pilot", () => ({ PILOT_NOTE: "Planifié par le Pilote", planDay: async () => ({ blocks: [] }) }));
+vi.mock("@/server/pilot", () => ({
+  PILOT_NOTE: "Planifié par le Pilote",
+  planDay: async () => ({ blocks: [] }),
+  planWeek: async () => ({
+    fixed: 3,
+    unplaced: [{ title: "Rapport", why: "", reason: "pas de créneau libre de 2 h avant 17 h" }],
+    days: [{ day: "2026-10-12", free: 300, rest: false, blocks: [{ title: "Réviser · Quiz", start: "09:00", end: "10:00", tag: "Area:travail:taches", color: "#fff", why: "" }] }],
+  }),
+}));
 vi.mock("@/server/study", () => ({ STUDY_PREFIX: "Révision — ", planStudy: async () => ({ error: "none" }) }));
 
 import { receipt, runAssistant as ask_, runConfirmedPlan, type AssistantResult } from "@/server/assistant-run";
@@ -112,6 +120,20 @@ describe("runAssistant", () => {
     expect(r.undos).toHaveLength(0);
     expect(r.answer).toBe(true);
     expect(r.message).toBe("Tout effacé.");
+  });
+});
+
+describe("plan_week", () => {
+  it("asks first by default, then writes the week and says what did not fit", async () => {
+    plan("Ta semaine est planifiée.", { op: "plan_week" });
+    const r = await ask_("alice", "planifie ma semaine", "/today", []);
+    if (!r || !("confirm" in r)) throw new Error("expected a confirmation");
+    expect(db.calendarEvent.rows.filter((e) => e.userId === "alice")).toHaveLength(0);
+    const opened = openPending("alice", r.confirm.token);
+    if (!("work" in opened) || opened.work.kind !== "plan") throw new Error("expected a plan");
+    const done = await runConfirmedPlan("alice", { ...opened.work, reply: "" });
+    expect(db.calendarEvent.rows.filter((e) => e.userId === "alice" && e.notes === "Planifié par le Pilote")).toHaveLength(1);
+    expect(done.message).toMatch(/1 bloc planifié sur la semaine, autour de 3 engagements fixes.*Sans place : Rapport \(pas de créneau libre de 2 h avant 17 h\)/);
   });
 });
 
