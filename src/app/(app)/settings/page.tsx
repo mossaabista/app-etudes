@@ -13,6 +13,8 @@ import { getAutonomy } from "@/server/autonomy";
 import { AgentHistory } from "@/components/settings/AgentHistory";
 import { historyRows } from "@/server/agent-log";
 import { NavSettings } from "@/components/settings/NavSettings";
+import { PlanningSettings } from "@/components/settings/PlanningSettings";
+import { getPlanningPrefs } from "@/server/planning-prefs";
 import { OPTIONAL_MODULES, moduleState } from "@/lib/nav";
 import { getLayout } from "@/server/layout";
 import { prisma } from "@/lib/db";
@@ -21,13 +23,14 @@ import { APP_TIMEZONE } from "@/lib/dates";
 
 export default async function SettingsPage() {
   const user = await requireUser();
-  const [profile, autonomy, actions, courses, projects, layout] = await Promise.all([
+  const [profile, autonomy, actions, courses, projects, layout, planning] = await Promise.all([
     getProfile(user.id),
     getAutonomy(user.id),
     historyRows(user.id),
     prisma.course.count({ where: { userId: user.id } }),
     prisma.project.count({ where: { userId: user.id } }),
     getLayout(user.id),
+    getPlanningPrefs(user.id),
   ]);
   const prefs = profile?.nav ?? { shown: [], hidden: [] };
   const navCtx = { roles: profile?.roles ?? ["etudiant" as const], prefs, counts: { courses, projects }, areas: layout.areas.map((a) => a.key) };
@@ -67,6 +70,13 @@ export default async function SettingsPage() {
           <CardHeader title="Menu" subtitle="Les modules de ta navigation" />
           <CardBody>
             <NavSettings modules={modules} />
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader title="Planification" subtitle="Les limites du Pilote et des plans de révision" />
+          <CardBody>
+            <PlanningSettings current={planning} />
           </CardBody>
         </Card>
 

@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/db";
 import { APP_TIMEZONE, addDays, dayName, fromISODate, toISODate } from "@/lib/dates";
 import { areaOfTag } from "@/lib/task-areas";
+import { getPlanningPrefs } from "@/server/planning-prefs";
+import { hm, type PlanningPrefs } from "@/lib/planning-prefs";
 
 /** A block the Pilot proposes to put on the calendar. */
 export interface PlanBlock {
@@ -10,17 +12,38 @@ export interface PlanBlock {
   tag: string;
   color: string;
   why: string;
+  /** A task block, as opposed to a share of study. */
+  task?: boolean;
 }
 
 export const PILOT_NOTE = "Planifié par le Pilote";
 
-const DAY_START = 8 * 60;
-const DAY_END = 22 * 60;
-const BUFFER = 10;
-const MAX_STREAK = 90;
-const BREAK = 15;
-/** Beyond this much planned work a day stops being realistic. */
-const FOCUS_CAP = 6 * 60;
+/** Something that wanted a slot and did not get one, and why. */
+export interface Unplaced {
+  title: string;
+  why: string;
+  reason: string;
+}
+
+export interface DayPlan {
+  blocks: PlanBlock[];
+  left: number;
+  free: number;
+  unplaced: Unplaced[];
+  /** A rest day: nothing is planned on it. */
+  rest?: boolean;
+}
+
+/** A block planned in memory (earlier in the same week plan), not yet on the calendar. */
+export interface VirtualBlock {
+  date: string;
+  title: string;
+  start: string;
+  end: string;
+  /** Set for a task block: the task is not proposed again on a later day. */
+  task?: boolean;
+}
+
 /** Meals stay free unless something is already booked there. */
 const MEALS: [number, number][] = [
   [12 * 60, 13 * 60],
@@ -63,6 +86,8 @@ interface Candidate {
   earliest: number;
   score: number;
   focus: boolean;
+  /** A task (placed once), as opposed to a share of study for an assessment. */
+  task: boolean;
   tag: string;
   color: string;
   why: string;
@@ -78,13 +103,18 @@ interface Candidate {
  *  - a 15-minute break after 90 minutes of work in a row, and no more than six hours of
  *    focused work in a day.
  */
-export async function planDay(userId: string, day: string): Promise<{ blocks: PlanBlock[]; left: number; free: number }> {
+export async function planDay(userId: string, day: string, opts?: { prefs?: PlanningPrefs; virtual?: VirtualBlock[] }): Promise<DayPlan> {
   const todayIso = toISODate(new Date());
-  if (day < todayIso) return { blocks: [], left: 0, free: 0 };
+  if (day < todayIso) return { blocks: [], left: 0, free: 0, unplaced: [] };
+  const prefs = opts?.prefs ?? (await getPlanningPrefs(userId));
+  const { dayStart: DAY_START, dayEnd: DAY_END, buffer: BUFFER, streak: MAX_STREAK, breakMin: BREAK, focusCap: FOCUS_CAP } = prefs;
   const date = fromISODate(day)!;
+  if (prefs.restDays.includes(dayName(date))) return { blocks: [], left: 0, free: 0, unplaced: [], rest: true };
+  const virtual = opts?.virtual ?? [];
+  const virtualToday = virtual.filter((v) => v.date === day);
   const next = addDays(date, 1);
   const horizon = addDays(date, 14);
-  const [schedules, events, earlier, tasks, assessments, labs] = await Promise.all([
+  const [schedules, realEvents, realEarlier, tasks, assessments, labs] = await Promise.all([
     prisma.courseSchedule.findMany({ where: { course: { userId }, day: dayName(date) } }),
     prisma.calendarEvent.findMany({ where: { userId, date: { gte: date, lt: next } } }),
     // Study the Pilot already booked on the days before counts towards what is needed.
@@ -102,6 +132,11 @@ export async function planDay(userId: string, day: string): Promise<{ blocks: Pl
       select: { id: true, title: true, dueDate: true, deliverable: true, course: { select: { code: true, color: true } } },
     }),
   ]);
+
+  // What this week plan already placed counts as booked (that day) and as studied (before).
+  const events = [...realEvents, ...virtualToday.map((v) => ({ title: v.title, startTime: v.start, endTime: v.end }))];
+  const earlier = [...realEarlier, ...virtual.filter((v) => v.date < day).map((v) => ({ title: v.title, startTime: v.start, endTime: v.end }))];
+  const placedTasks = new Set(virtual.filter((v) => v.task && v.date < day).map((v) => v.title.toLowerCase()));
 
   // Busy time, padded, meals protected, then the gaps between it.
   const booked: [number, number][] = [
@@ -163,6 +198,7 @@ export async function planDay(userId: string, day: string): Promise<{ blocks: Pl
       earliest: DAY_START,
       score: 60 + ((d.weight ?? 10) * (prep.exam ? 1.4 : 1)) / (left + 1) + (dueToday ? 40 : 0),
       focus: true,
+      task: false,
       tag: "Area:travail:taches",
       color: d.color,
       why: `${d.code} · ${prep.label} ${when(d.due)}${d.weight != null ? ` · ${String(d.weight).replace(".", ",")} %` : ""} · reste ~${frTime(remaining)} à préparer`,
@@ -170,7 +206,7 @@ export async function planDay(userId: string, day: string): Promise<{ blocks: Pl
   }
 
   for (const t of tasks) {
-    if (planned.has(t.title.toLowerCase())) continue;
+    if (planned.has(t.title.toLowerCase()) || placedTasks.has(t.title.toLowerCase())) continue;
     const area = t.category?.split(":")[0] ?? null;
     const life = area != null && LIFE.has(area);
     const left = t.dueDate ? daysUntil(t.dueDate) : null;
@@ -190,6 +226,7 @@ export async function planDay(userId: string, day: string): Promise<{ blocks: Pl
       earliest: life ? 16 * 60 : DAY_START,
       score: life ? 20 : (left == null ? 25 : left < 0 ? 100 : 70 - left * 6) + (PRIORITY[t.priority] ?? 2) * 6,
       focus: !life,
+      task: true,
       tag,
       color: t.course?.color ?? section?.area.color ?? "#3b82f6",
       why: [
@@ -204,18 +241,24 @@ export async function planDay(userId: string, day: string): Promise<{ blocks: Pl
   candidates.sort((a, b) => b.score - a.score);
 
   const blocks: PlanBlock[] = [];
+  const unplaced: Unplaced[] = [];
   let streak = 0;
   let lastEnd = -1;
   let focused = 0;
   for (const c of candidates) {
-    if (c.focus && focused + c.minutes > FOCUS_CAP) continue;
+    if (c.focus && focused + c.minutes > FOCUS_CAP) {
+      unplaced.push({ title: c.title, why: c.why, reason: `ta limite de ${hm(FOCUS_CAP)} de travail concentré est atteinte` });
+      continue;
+    }
+    let placed = false;
     for (const g of gaps) {
       const follows = g[0] <= lastEnd + 5;
       let start = Math.max(g[0], c.earliest);
       if (follows && start === g[0] && streak + c.minutes > MAX_STREAK) start += BREAK;
       const end = start + c.minutes;
       if (end > g[1] || end > c.latest) continue;
-      blocks.push({ title: c.title, start: fmt(start), end: fmt(end), tag: c.tag, color: c.color, why: c.why });
+      blocks.push({ title: c.title, start: fmt(start), end: fmt(end), tag: c.tag, color: c.color, why: c.why, ...(c.task ? { task: true } : {}) });
+      placed = true;
       streak = follows && start === g[0] ? streak + c.minutes : c.minutes;
       lastEnd = end;
       if (c.focus) focused += c.minutes;
@@ -225,7 +268,53 @@ export async function planDay(userId: string, day: string): Promise<{ blocks: Pl
       gaps.sort((x, y) => x[0] - y[0]);
       break;
     }
+    if (!placed)
+      unplaced.push({
+        title: c.title,
+        why: c.why,
+        reason: c.latest < DAY_END ? `pas de créneau libre de ${hm(c.minutes)} avant ${hm(c.latest)}` : `pas de créneau libre de ${hm(c.minutes)} ce jour-là`,
+      });
   }
   blocks.sort((a, b) => a.start.localeCompare(b.start));
-  return { blocks, left: candidates.length - blocks.length, free };
+  return { blocks, left: unplaced.length, free, unplaced };
+}
+
+export interface WeekPlan {
+  days: { day: string; blocks: PlanBlock[]; free: number; rest: boolean }[];
+  /** What found no slot anywhere this week, and the last reason it was refused. */
+  unplaced: Unplaced[];
+  /** Fixed commitments, never moved: how many classes and appointments the plan works around. */
+  fixed: number;
+}
+
+/**
+ * Plan seven days at once, without double-counting: what one day takes (study time, a
+ * task) is taken into account by the next. Only adds blocks in free time; classes,
+ * appointments and deadlines are never moved.
+ */
+export async function planWeek(userId: string, from: string): Promise<WeekPlan> {
+  const prefs = await getPlanningPrefs(userId);
+  const start = fromISODate(from)!;
+  const virtual: VirtualBlock[] = [];
+  const days: WeekPlan["days"] = [];
+  const lastRefusal = new Map<string, Unplaced>();
+  const placedOnce = new Set<string>();
+  for (let i = 0; i < 7; i++) {
+    const day = toISODate(addDays(start, i));
+    const p = await planDay(userId, day, { prefs, virtual });
+    days.push({ day, blocks: p.blocks, free: p.free, rest: !!p.rest });
+    for (const b of p.blocks) {
+      virtual.push({ date: day, title: b.title, start: b.start, end: b.end, task: b.task });
+      placedOnce.add(b.title);
+    }
+    for (const u of p.unplaced) lastRefusal.set(u.title, u);
+  }
+  const end = addDays(start, 7);
+  const [schedules, events] = await Promise.all([
+    prisma.courseSchedule.findMany({ where: { course: { userId } }, select: { day: true } }),
+    prisma.calendarEvent.count({ where: { userId, date: { gte: start, lt: end }, startTime: { not: null }, NOT: { notes: PILOT_NOTE } } }),
+  ]);
+  const weekdays = days.map((d) => dayName(fromISODate(d.day)!));
+  const fixed = schedules.filter((s) => weekdays.includes(s.day)).length + events;
+  return { days, unplaced: [...lastRefusal.values()].filter((u) => !placedOnce.has(u.title)), fixed };
 }

@@ -7,6 +7,7 @@ type Row = Record<string, unknown> & { id: string };
 const match = (row: Row, where: Record<string, unknown> = {}): boolean =>
   Object.entries(where).every(([k, v]) => {
     if (k === "NOT") return !match(row, v as Record<string, unknown>);
+    if (k === "OR") return (v as Record<string, unknown>[]).some((w) => match(row, w));
     if (v && typeof v === "object" && !(v instanceof Date)) {
       const op = v as Record<string, unknown>;
       const x = row[k] as number | Date;
@@ -20,6 +21,8 @@ const match = (row: Row, where: Record<string, unknown> = {}): boolean =>
         if (o === "gt") return x > y;
         if (o === "gte") return x >= y;
         if (o === "startsWith") return String(row[k] ?? "").startsWith(String(w));
+        // A filter on a relation ({ course: { userId } }): match the nested row.
+        if (row[k] && typeof row[k] === "object" && !(row[k] instanceof Date)) return match(row[k] as Row, { [o]: w });
         throw new Error(`fake-db: unsupported filter ${o}`);
       });
     }

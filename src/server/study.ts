@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { APP_TIMEZONE, addDays, dayName, fromISODate, toISODate } from "@/lib/dates";
 import { PILOT_NOTE } from "@/server/pilot";
+import { getPlanningPrefs } from "@/server/planning-prefs";
 
 /**
  * Revision plans. For one assessment (or every one coming up), find the real free time
@@ -39,9 +40,6 @@ export interface StudyPlan {
   totalMinutes: number;
 }
 
-const DAY_START = 8 * 60;
-const DAY_END = 22 * 60;
-const BUFFER = 10;
 const MEALS: [number, number][] = [
   [12 * 60, 13 * 60],
   [18 * 60 + 30, 19 * 60 + 30],
@@ -56,8 +54,9 @@ const hhmm = (d: Date) => new Intl.DateTimeFormat("en-GB", { timeZone: APP_TIMEZ
 const BASE: Record<string, number> = { Final: 480, Exam: 420, Midterm: 360, Quiz: 120, Presentation: 240, Project: 360, Report: 240, Lab: 180, Assignment: 180 };
 const EXAM = new Set(["Final", "Exam", "Midterm", "Quiz"]);
 
-/** Free windows per day, from now until the last due date. */
+/** Free windows per day, from now until the last due date, within the user's planning limits. */
 async function freeSlots(userId: string, until: Date) {
+  const { dayStart: DAY_START, dayEnd: DAY_END, buffer: BUFFER, restDays } = await getPlanningPrefs(userId);
   const today = toISODate(new Date());
   const start = fromISODate(today)!;
   const [schedules, events] = await Promise.all([
@@ -68,6 +67,10 @@ async function freeSlots(userId: string, until: Date) {
   const days: { date: string; slots: [number, number][]; booked: number }[] = [];
   for (let d = start; d <= until; d = addDays(d, 1)) {
     const iso = toISODate(d);
+    if (restDays.includes(dayName(d))) {
+      days.push({ date: iso, slots: [], booked: 0 });
+      continue;
+    }
     const busy: [number, number][] = [
       ...schedules.filter((s) => s.day === dayName(d)).map((s) => [toMin(s.startTime), toMin(s.endTime)] as [number, number]),
       ...events.filter((e) => toISODate(e.date) === iso && e.startTime).map((e) => [toMin(e.startTime!), toMin(e.endTime ?? fmt(toMin(e.startTime!) + 60))] as [number, number]),

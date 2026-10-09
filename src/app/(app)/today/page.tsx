@@ -8,6 +8,7 @@ import { CardDeck } from "@/components/today/CardDeck";
 import { DeleteEvent } from "@/components/today/DeleteEvent";
 import { TaskCheck } from "@/components/today/TaskCheck";
 import { PilotPanel } from "@/components/today/PilotPanel";
+import { getPlanningPrefs } from "@/server/planning-prefs";
 import { PILOT_NOTE } from "@/server/pilot";
 import { areaOfTag } from "@/lib/task-areas";
 import { CARDS, type TodayCard } from "@/lib/profile";
@@ -71,7 +72,7 @@ export default async function TodayPage({
   searchParams: Promise<{ d?: string; r?: string; cartes?: string }>;
 }) {
   const user = await requireUser();
-  const profile = await getProfile(user.id);
+  const [profile, planningPrefs] = await Promise.all([getProfile(user.id), getPlanningPrefs(user.id)]);
   // A brand-new account sets itself up first.
   if (!profile) redirect("/onboarding");
   const params = await searchParams;
@@ -394,7 +395,7 @@ export default async function TodayPage({
 
       {range === "day" && (
         <div className="mx-auto mb-5 max-w-3xl">
-          <PilotPanel day={isoAnchor} planned={pilotBlocks} />
+          <PilotPanel day={isoAnchor} planned={pilotBlocks} prefs={planningPrefs} />
         </div>
       )}
 
