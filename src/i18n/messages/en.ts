@@ -201,6 +201,11 @@ export const en: Messages = {
     help4: "A {pause}-min break after {streak} in a row, and at most {cap} of focused work per day (Settings → Planning).",
     help5: "Nothing is added until you accept, and “Undo” only removes these blocks.",
   },
+  ai: {
+    off: "Jarvis isn't available on this account yet: smart features will come back as soon as it's enabled.",
+    noAnswer: "Jarvis couldn't answer this time. Try again in a moment.",
+    unknown: "Unknown request.",
+  },
   empty: {
     tasks: "No tasks here. Ask Jarvis to add one.",
     day: "Nothing planned that day.",

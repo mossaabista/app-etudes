@@ -197,6 +197,11 @@ export const fr = {
     help4: "Une pause de {pause} min après {streak} d'affilée, et au plus {cap} de travail concentré par jour (Réglages → Planification).",
     help5: "Rien n'est ajouté avant que tu valides, et « Défaire » retire uniquement ces blocs.",
   },
+  ai: {
+    off: "Jarvis n'est pas encore disponible sur ce compte : les fonctions intelligentes reviendront dès qu'il sera activé.",
+    noAnswer: "Jarvis n'a pas pu répondre cette fois. Réessaie dans un instant.",
+    unknown: "Demande inconnue.",
+  },
   empty: {
     tasks: "Aucune tâche ici. Dis à Jarvis d'en ajouter une.",
     day: "Rien de prévu ce jour-là.",

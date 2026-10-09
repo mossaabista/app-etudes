@@ -1,5 +1,7 @@
 "use server";
 
+import { callStructured, claudeEnabled, type ToolSpec } from "@/server/claude";
+import { getMessages } from "@/i18n/server";
 import { requireUser } from "@/server/auth/current-user";
 
 /**
@@ -80,30 +82,19 @@ const SCHEMAS: Record<Helper["kind"], { description: string; schema: object; sys
 
 export async function aiHelperAction(input: Helper): Promise<{ error: string } | { result: Record<string, unknown> }> {
   await requireUser();
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) return { error: "L'assistant n'est pas activé (clé API manquante)." };
+  const t = await getMessages();
+  if (!claudeEnabled()) return { error: t.ai.off };
   const spec = SCHEMAS[input.kind];
-  if (!spec) return { error: "Demande inconnue." };
+  if (!spec) return { error: t.ai.unknown };
   const { kind, ...data } = input;
-  const content = JSON.stringify(data).slice(0, 6000);
-  try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({
-        model: process.env.ASSISTANT_MODEL || "claude-haiku-4-5-20251001",
-        max_tokens: kind === "program" ? 2500 : 800,
-        system: spec.system,
-        tools: [{ name: "out", description: spec.description, input_schema: spec.schema }],
-        tool_choice: { type: "tool", name: "out" },
-        messages: [{ role: "user", content }],
-      }),
-      signal: AbortSignal.timeout(30000),
-    });
-    if (!res.ok) return { error: "L'assistant ne répond pas." };
-    const out = ((await res.json()) as { content: { type: string; input?: Record<string, unknown> }[] }).content.find((c) => c.type === "tool_use")?.input;
-    return out ? { result: out } : { error: "Pas de réponse." };
-  } catch {
-    return { error: "L'assistant ne répond pas." };
-  }
+  const out = await callStructured<Record<string, unknown>>({
+    tier: "fast",
+    feature: `helper:${kind}`,
+    system: { stable: spec.system },
+    messages: [{ role: "user", content: JSON.stringify(data).slice(0, 6000) }],
+    tool: { name: "out", description: spec.description, input_schema: spec.schema as ToolSpec["input_schema"] },
+    maxTokens: (kind === "program" ? 2500 : 800) + 2000,
+    timeoutMs: 45000,
+  });
+  return out ? { result: out } : { error: t.ai.noAnswer };
 }

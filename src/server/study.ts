@@ -1,3 +1,4 @@
+import { callStructured, type ToolSpec } from "@/server/claude";
 import { prisma } from "@/lib/db";
 import { currentZone, addDays, dayName, fromISODate, toISODate } from "@/lib/dates";
 import { PILOT_NOTE } from "@/server/pilot";
@@ -262,19 +263,10 @@ async function planWithClaude(
   try {
     // Plans are rarer and harder than commands: the stronger model first, the fast one if
     // it is unavailable.
-    const call = (model: string) =>
-      fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY!, "anthropic-version": "2023-06-01" },
-        body: JSON.stringify({ model, max_tokens: 3000, system, tools: [tool], tool_choice: { type: "tool", name: "plan" }, messages: [{ role: "user", content: lines.join("\n") }] }),
-        signal: AbortSignal.timeout(60000),
-      });
-    let res = await call(process.env.STUDY_MODEL || "claude-sonnet-5-5");
-    if (!res.ok) res = await call(process.env.ASSISTANT_MODEL || "claude-haiku-4-5-20251001");
-    if (!res.ok) return null;
-    const data = (await res.json()) as { content: { type: string; input?: { chapters?: StudyPlan["chapters"]; sessions?: StudySession[]; advice?: string } }[]; usage?: { input_tokens: number; output_tokens: number } };
-    if (data.usage) console.info(`[révision] ${data.usage.input_tokens} tokens lus + ${data.usage.output_tokens} écrits`);
-    const out = data.content.find((c) => c.type === "tool_use")?.input;
+    type Out = { chapters?: StudyPlan["chapters"]; sessions?: StudySession[]; advice?: string };
+    const ask = (tier: "smart" | "fast") =>
+      callStructured<Out>({ tier, feature: "révision", system: { stable: system }, messages: [{ role: "user", content: lines.join("\n") }], tool: tool as ToolSpec, maxTokens: 12000, effort: "medium", timeoutMs: 90000 });
+    const out = (await ask("smart")) ?? (await ask("fast"));
     if (!out) return null;
     const ids = new Set(targets.map((t) => t.id));
     const sessions = (out.sessions ?? [])
