@@ -25,6 +25,29 @@ model User {
   syncSources SyncSource[]
   pushSubs    PushSubscription[]
   entries     TrackerEntry[]
+  agentActions AgentAction[]
+}
+
+// What the assistant changed, one row per request it carried out: answers "what did you
+// change?", lets the last change be undone from the server, and makes a repeated request
+// (same opId) run once. Kept small on purpose: the message shown and what reverts it, never
+// the raw sentence. Only the latest rows per user are kept (see server/agent-log.ts).
+// Created by scripts/migrate-agent-log.mjs.
+model AgentAction {
+  id        String    @id @default(cuid())
+  userId    String
+  opId      String
+  source    String // assistant, rules, confirmed
+  status    String // done, partial, failed, undone
+  summary   String
+  undo      Json?
+  createdAt DateTime  @default(now())
+  undoneAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, opId])
+  @@index([userId, createdAt])
 }
 
 // One row per thing a section page records: a workout, a glass of water, a night's
