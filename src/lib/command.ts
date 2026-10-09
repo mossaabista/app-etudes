@@ -20,7 +20,7 @@ export type Intent =
  */
 export function politeless(input: string) {
   return input
-    .replace(/^\s*(?:(?:salut|bonjour|bonsoir|coucou|hey|hello|ok|okay|dis|jarvis|aurum|alors|bon|euh)\b[\s,!.]*)+/i, "")
+    .replace(/^\s*(?:(?:salut|bonjour|bonsoir|coucou|hey|hello|ok|okay|dis|jarvis|aurum|orom|alors|bon|euh)\b[\s,!.]*)+/i, "")
     .replace(/^\s*(?:est-ce\s+que\s+|est\s+ce\s+que\s+)?(?:tu\s+peux|peux-tu|peux\s+tu|pourrais-tu|tu\s+pourrais|tu\s+veux\s+bien|j'aimerais\s+que\s+tu|je\s+veux\s+que\s+tu|il\s+faudrait)\s+/i, "")
     .replace(/^\s*(?:s'il\s+te\s+pla[iî]t|stp|svp)[\s,]*/i, "")
     .replace(/[\s,]*(?:s'il\s+te\s+pla[iî]t|stp|svp|merci(?:\s+beaucoup)?)[\s.!?]*$/i, "")

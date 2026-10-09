@@ -8,7 +8,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <div className="glass-backdrop" aria-hidden />
       <div className="area-enter w-full max-w-sm">
         <div className="mb-8 text-center">
-          <Link href="/bienvenue" className="mx-auto mb-4 flex w-fit justify-center" aria-label="Découvrir Aurum">
+          <Link href="/bienvenue" className="mx-auto mb-4 flex w-fit justify-center" aria-label="Découvrir OROM">
             <BrandMark size={56} />
           </Link>
           <h1 className="text-2xl font-semibold tracking-[0.12em] text-on-gold">{BRAND.name.toUpperCase()}</h1>
@@ -17,7 +17,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         {children}
         <p className="mt-6 text-center text-xs">
           <Link href="/bienvenue" className="text-on-gold underline-offset-4 hover:underline">
-            Découvrir Aurum →
+            Découvrir OROM →
           </Link>
         </p>
       </div>

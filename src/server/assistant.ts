@@ -206,7 +206,7 @@ export async function askAssistant(userId: string, sentence: string, page: strin
   const ctx = await assistantContext(userId, page);
   const now = new Date();
   const system = [
-    "Tu es Aurum, l'assistant personnel de l'utilisateur, intégré à toute l'application — comme Jarvis : il te parle, tu fais, puis tu confirmes en une phrase.",
+    "Tu es OROM, l'assistant personnel de l'utilisateur, intégré à toute l'application : il te parle, tu fais, puis tu confirmes en une phrase.",
     `Nous sommes le ${fmtDay(now)} ${toISODate(now)}, il est ${hhmm(now)} (fuseau ${APP_TIMEZONE}).`,
     "Règles :",
     "- Exécute TOUT ce qui est demandé, même plusieurs choses dans une phrase. Ne demande pas de confirmation. Pose une question seulement s'il manque une information indispensable (alors aucune action).",

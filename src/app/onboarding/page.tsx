@@ -2,7 +2,7 @@ import { requireUser } from "@/server/auth/current-user";
 import { getProfile } from "@/server/profile";
 import { Onboarding } from "@/components/onboarding/Onboarding";
 
-export const metadata = { title: "Bienvenue · Aurum" };
+export const metadata = { title: "Bienvenue · OROM" };
 
 export default async function OnboardingPage() {
   const user = await requireUser();

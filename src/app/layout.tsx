@@ -2,12 +2,12 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Aurum",
+  title: "OROM",
   description: "L'agenda qui range ta vie à ta place : cours, travail, sport, nutrition, finances et proches, planifiés automatiquement.",
-  applicationName: "Aurum",
+  applicationName: "OROM",
   appleWebApp: {
     capable: true,
-    title: "Aurum",
+    title: "OROM",
     statusBarStyle: "black-translucent",
   },
   other: {

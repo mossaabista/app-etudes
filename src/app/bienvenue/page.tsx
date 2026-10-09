@@ -57,7 +57,7 @@ export default function LandingPage() {
       <header className="ld-nav">
         <Link href="/bienvenue" className="flex items-center gap-2.5">
           <BrandMark size={30} />
-          <span className="text-sm font-semibold tracking-[0.28em] text-[var(--ink)]">AURUM</span>
+          <span className="text-sm font-semibold tracking-[0.28em] text-[var(--ink)]">OROM</span>
         </Link>
         <nav className="hidden items-center gap-7 text-sm text-[var(--ink-dim)] md:flex">
           <a href="#capture">Saisie</a>
@@ -89,7 +89,7 @@ export default function LandingPage() {
               est <em className="ld-gold">d&apos;or.</em>
             </h1>
             <p className="ld-lead ld-rise" style={{ "--d": "260ms" } as React.CSSProperties}>
-              Tu écris une phrase. Aurum trouve le créneau, la bonne case et la bonne couleur — puis il planifie le reste de ta journée autour.
+              Tu écris une phrase. OROM trouve le créneau, la bonne case et la bonne couleur — puis il planifie le reste de ta journée autour.
             </p>
             <div className="ld-rise flex flex-wrap items-center gap-3" style={{ "--d": "380ms" } as React.CSSProperties}>
               <Link href="/register" className="ld-btn ld-btn-gold ld-btn-lg">
@@ -124,7 +124,7 @@ export default function LandingPage() {
               <em>c&apos;est rangé.</em>
             </h2>
             <p className="ld-p">
-              « Muscu demain 18 h pendant 1 h. » Aurum comprend le jour, l&apos;heure, la durée et la section. La tâche part dans Sport, le créneau dans ton calendrier,
+              « Muscu demain 18 h pendant 1 h. » OROM comprend le jour, l&apos;heure, la durée et la section. La tâche part dans Sport, le créneau dans ton calendrier,
               avec sa couleur. Partout dans l&apos;app : touche <kbd className="ld-kbd">N</kbd>.
             </p>
           </div>
@@ -290,7 +290,7 @@ export default function LandingPage() {
       </main>
 
       <footer className="ld-foot">
-        <span>© {new Date().getFullYear()} Aurum</span>
+        <span>© {new Date().getFullYear()} OROM</span>
         <span>{BRAND.tagline}</span>
         <Link href="/login">Connexion</Link>
       </footer>

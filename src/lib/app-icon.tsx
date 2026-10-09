@@ -32,15 +32,9 @@ export function AppIconArt({ size }: { size: number }) {
         {/* Thin ring turns the monogram into a seal — the part that reads as a mark
             rather than a letter sitting on a background. */}
         <circle cx="50" cy="50" r="43" stroke="url(#gold)" strokeWidth="2.6" opacity="0.7" />
-        {/* One unbroken stroke: up the left stem, into the valley, up to the right
-            peak, down the right stem. Round joins keep it off the font grid. */}
-        <path
-          d="M30 66 L30 34 L50 57 L70 34 L70 66"
-          stroke="url(#gold)"
-          strokeWidth="10"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+        {/* The "O" of OROM: a heavy ring around a small core. */}
+        <circle cx="50" cy="50" r="24" stroke="url(#gold)" strokeWidth="9" />
+        <circle cx="50" cy="50" r="7" fill="url(#gold)" />
       </svg>
     </div>
   );
