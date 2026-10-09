@@ -13,7 +13,7 @@ vi.mock("@/server/layout", () => ({ saveLayout: async () => {}, LAYOUT_MODULE: "
 vi.mock("@/server/briefing", () => ({ briefing: async () => "" }));
 vi.mock("@/server/autonomy", () => ({ getAutonomy: async () => autonomy.value }));
 
-import { commandAction, confirmCommandAction, undoCommandAction } from "@/server/actions/capture.actions";
+import { commandAction, confirmCommandAction, undoCommandAction, undoLoggedAction } from "@/server/actions/capture.actions";
 import { KEEP, claim, settle } from "@/server/agent-log";
 
 const tomorrow = toISODate(addDays(fromISODate(toISODate(new Date()))!, 1));
@@ -69,6 +69,16 @@ describe("with the log table", () => {
     if (!("ok" in r) || !r.undo) throw new Error("expected a change");
     await undoCommandAction(r.undo, "op-dddddddd");
     expect(db.agentAction!.rows[0]).toMatchObject({ status: "undone" });
+  });
+
+  it("undoes one history entry by id, only the user's own", async () => {
+    await commandAction("appeler maman demain", { opId: "op-gggggggg" });
+    const mine = db.agentAction!.rows[0];
+    db.agentAction!.rows.push({ id: "bob-row", userId: "bob", opId: "op-bob", source: "rules", status: "done", summary: "x", undo: { t: "delete-task", id: "t" }, createdAt: new Date(), undoneAt: null });
+    expect(await undoLoggedAction("bob-row")).toHaveProperty("error");
+    expect(await undoLoggedAction(mine.id)).toMatchObject({ ok: true });
+    expect(aliceTasks()).toHaveLength(0);
+    expect(await undoLoggedAction(mine.id)).toEqual({ error: "Cette modification ne peut plus être annulée." });
   });
 
   it("keeps nothing for an answer or an error", async () => {

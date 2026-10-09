@@ -12,7 +12,7 @@ import { runAssistant, runConfirmedPlan, type Confirmation } from "@/server/assi
 import { assessRisk } from "@/lib/risk";
 import { getAutonomy } from "@/server/autonomy";
 import { newOpId, openPending, sealPending } from "@/server/pending";
-import { claim, findOp, markUndone, recentActions, settle } from "@/server/agent-log";
+import { claim, findOp, isUndoable, markUndone, recentActions, settle, type LoggedAction } from "@/server/agent-log";
 import { saveLayout, LAYOUT_MODULE } from "@/server/layout";
 import type { Layout } from "@/lib/layout";
 import { briefing } from "@/server/briefing";
@@ -134,20 +134,32 @@ async function metaCommand(userId: string, text: string): Promise<CommandResult 
   if (UNDO_LAST.test(f)) {
     const rows = await recentActions(userId, 10);
     if (!rows) return { error: "L'historique de l'assistant n'est pas encore activé sur ce serveur : utilise le bouton Annuler juste après une modification." };
-    const day = 24 * 60 * 60 * 1000;
-    const last = rows.find((r) => r.status !== "undone" && r.undo && Date.now() - r.createdAt.getTime() < day);
+    const last = rows.find((r) => isUndoable(r));
     if (!last) return { error: "Je ne trouve aucune modification récente que je peux annuler." };
-    const missed = await revert(userId, last.undo!);
-    await markUndone(userId, { id: last.id });
-    done();
-    return {
-      ok: true,
-      undo: null,
-      partial: missed > 0,
-      message: missed ? `Annulé en partie (${missed} élément${missed > 1 ? "s avaient" : " avait"} déjà changé) : ${last.summary}` : `J'ai annulé : ${last.summary}`,
-    };
+    return undoLogged(userId, last);
   }
   return null;
+}
+
+async function undoLogged(userId: string, row: LoggedAction): Promise<CommandResult> {
+  const missed = await revert(userId, row.undo!);
+  await markUndone(userId, { id: row.id });
+  done();
+  return {
+    ok: true,
+    undo: null,
+    partial: missed > 0,
+    message: missed ? `Annulé en partie (${missed} élément${missed > 1 ? "s avaient" : " avait"} déjà changé) : ${row.summary}` : `J'ai annulé : ${row.summary}`,
+  };
+}
+
+/** Undo one entry of the history, by its id. Only the user's own, recent, not yet undone. */
+export async function undoLoggedAction(id: string): Promise<CommandResult> {
+  const user = await requireUser();
+  const rows = await recentActions(user.id, 50);
+  const row = rows?.find((r) => r.id === id);
+  if (!row || !isUndoable(row)) return { error: "Cette modification ne peut plus être annulée." };
+  return undoLogged(user.id, row);
 }
 
 async function runCommand(userId: string, text: string, options?: CommandOptions): Promise<CommandResult> {

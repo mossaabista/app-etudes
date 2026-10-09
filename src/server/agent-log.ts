@@ -11,6 +11,8 @@ import type { Undo } from "@/server/actions/capture.actions";
 
 /** Rows kept per user; older ones are pruned on write. */
 export const KEEP = 200;
+/** How long a logged change can still be undone from the server. */
+export const UNDO_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export interface LoggedAction {
   id: string;
@@ -96,4 +98,14 @@ export async function markUndone(userId: string, id: { id?: string; opId?: strin
   } catch (e) {
     unavailable(e);
   }
+}
+
+/** A logged change can be undone from the server for a day, once. */
+export const isUndoable = (r: LoggedAction, now = Date.now()) => r.status !== "undone" && !!r.undo && now - r.createdAt.getTime() < UNDO_WINDOW_MS;
+
+/** The history as the settings page shows it. Null when there is no log to read. */
+export async function historyRows(userId: string, take = 15) {
+  const rows = await recentActions(userId, take);
+  const now = Date.now();
+  return rows?.map((r) => ({ id: r.id, createdAt: r.createdAt, summary: r.summary, status: r.status, canUndo: isUndoable(r, now) })) ?? null;
 }

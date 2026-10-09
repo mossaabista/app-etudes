@@ -10,11 +10,16 @@ import { ProfileSettings } from "@/components/settings/ProfileSettings";
 import { AssistantSettings } from "@/components/settings/AssistantSettings";
 import { AutonomySettings } from "@/components/settings/AutonomySettings";
 import { getAutonomy } from "@/server/autonomy";
+import { AgentHistory } from "@/components/settings/AgentHistory";
+import { historyRows } from "@/server/agent-log";
 import { BRAND } from "@/lib/brand";
+import { APP_TIMEZONE } from "@/lib/dates";
 
 export default async function SettingsPage() {
   const user = await requireUser();
-  const [profile, autonomy] = await Promise.all([getProfile(user.id), getAutonomy(user.id)]);
+  const [profile, autonomy, actions] = await Promise.all([getProfile(user.id), getAutonomy(user.id), historyRows(user.id)]);
+  const when = new Intl.DateTimeFormat("fr-CA", { timeZone: APP_TIMEZONE, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const history = actions?.map(({ createdAt, ...a }) => ({ ...a, when: when.format(createdAt) })) ?? null;
   const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
 
   return (
@@ -48,6 +53,13 @@ export default async function SettingsPage() {
             <div className="mt-5 border-t border-[rgba(255,220,148,0.1)] pt-4">
               <AutonomySettings current={autonomy} />
             </div>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader title="Ce que l'assistant a changé" subtitle="Ses dernières modifications, annulables pendant 24 h" />
+          <CardBody>
+            <AgentHistory rows={history} />
           </CardBody>
         </Card>
 
