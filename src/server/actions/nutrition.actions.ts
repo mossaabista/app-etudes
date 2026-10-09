@@ -3,35 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/server/auth/current-user";
-import { FOODS, gramsLabel } from "@/lib/nutrition";
+import { COURSES, addGroceries } from "@/server/groceries";
 
-const COURSES = "quotidien:courses";
-
-/**
- * Put a menu's groceries on the shopping list in one go. Only foods of the nutrition
- * table are accepted (the label and aisle come from it, not from the browser), and a food
- * already waiting on the list is not added twice. Returns the new rows so they can be
- * taken back.
- */
+/** Put a menu's groceries on the shopping list in one go; returns the new rows so they can be taken back. */
 export async function addGroceriesAction(items: { food: string; grams: number }[]): Promise<{ ok: true; added: number; skipped: number; ids: string[] } | { error: string }> {
   const user = await requireUser();
-  const wanted = (Array.isArray(items) ? items : [])
-    .filter((i) => i && typeof i.food === "string" && FOODS[i.food] && Number.isFinite(i.grams) && i.grams > 0)
-    .slice(0, 80);
-  if (!wanted.length) return { error: "Rien à ajouter." };
-  const waiting = await prisma.trackerEntry.findMany({ where: { userId: user.id, module: COURSES, kind: "item", done: false }, select: { text: true } });
-  const has = (label: string) => waiting.some((w) => (w.text ?? "").toLowerCase().startsWith(label.toLowerCase()));
-  const fresh = wanted.filter((i) => !has(FOODS[i.food].label));
-  const rows = await prisma.$transaction(
-    fresh.map((i) =>
-      prisma.trackerEntry.create({
-        data: { userId: user.id, module: COURSES, kind: "item", date: new Date(), text: `${FOODS[i.food].label} — ${gramsLabel(Math.round(i.grams))}`, done: false, data: { aisle: FOODS[i.food].aisle, from: "nutrition" } },
-        select: { id: true },
-      })
-    )
-  );
+  const r = await addGroceries(user.id, items);
+  if ("error" in r) return r;
   revalidatePath("/tasks/[area]/[sub]", "page");
-  return { ok: true, added: rows.length, skipped: wanted.length - fresh.length, ids: rows.map((r) => r.id) };
+  return { ok: true, ...r };
 }
 
 /** Take back groceries just added from a menu (only those still unchecked). */

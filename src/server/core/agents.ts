@@ -33,6 +33,7 @@ export const OPS = [
   "create_project",
   "add_milestone",
   "plan_workouts",
+  "create_workflow",
 ] as const;
 export type Op = (typeof OPS)[number];
 
@@ -219,6 +220,21 @@ export const AGENTS: AgentDef[] = [
       "Question sur les documents : réponds UNIQUEMENT à partir des extraits DOCUMENTS fournis et cite la source en clair (« d'après syllabus.pdf, page 2 »). Si les extraits ne contiennent pas la réponse, dis-le ; n'invente rien.",
       "Aucun extrait fourni : dis que tu ne trouves rien dans ses documents et propose la page Documents (navigate /documents).",
       "Transformer les actions d'un document en tâches : create_task pour chacune, telles qu'écrites dans l'extrait.",
+    ],
+    timeoutMs: 30000,
+  },
+  {
+    id: "workflows",
+    name: "Automatisations",
+    version: 1,
+    domain: "Créer des enchaînements d'étapes qui se répètent : chaque matin, chaque dimanche, ou à la demande.",
+    triggers: /\b(automatis|workflow|chaque (matin|jour|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|semaine)|tous les (matins|jours|lundis|mardis|mercredis|jeudis|vendredis|samedis|dimanches)|every (morning|day|monday|sunday))/,
+    tools: ["create_workflow", "navigate"],
+    needs: [],
+    instructions: [
+      "« chaque matin, planifie ma journée et envoie-moi le résumé » → create_workflow avec workflow = {name, days (Monday…Sunday ; vide = à la demande), condition ('always' ou 'if_due_soon'), steps}. Étapes possibles uniquement : {type:'plan_day'}, {type:'plan_week'}, {type:'plan_workouts', sessions, minutes, when}, {type:'create_task', title, dueInDays}, {type:'groceries_week'}, {type:'notify_briefing'}.",
+      "Une demande hors de ces étapes (envoyer un courriel, publier, payer, lancer un programme) : dis que ce n'est pas possible en automatisation, sans rien créer.",
+      "Les automatisations planifiées tournent le matin (vers 7 h), pas à une heure précise : dis-le si on te demande une autre heure.",
     ],
     timeoutMs: 30000,
   },

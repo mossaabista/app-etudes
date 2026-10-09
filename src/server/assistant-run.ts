@@ -4,6 +4,8 @@ import { addMinutes, minutesBetween } from "@/lib/command";
 import { guessAisle } from "@/lib/grocery";
 import { LIBRARY, LIBRARY_SUBS, PALETTE, sanitizeLayout, slug, type AreaSpec, type Layout, type SubSpec } from "@/lib/layout";
 import { scheduleWorkouts } from "@/server/fitness";
+import { saveWorkflow } from "@/server/workflows";
+import { stepLabel, triggerLabel } from "@/lib/workflows";
 import { askAssistant, assistantContext, type AssistantAction, type Turn } from "@/server/assistant";
 import { agentById, allowedOps, neededContext, type AgentDef, type Op } from "@/server/core/agents";
 import { assessRisk, type Risk } from "@/lib/risk";
@@ -51,6 +53,7 @@ const VERBS: Record<AssistantAction["op"], string> = {
   create_project: "créer le projet",
   add_milestone: "ajouter le jalon",
   plan_workouts: "planifier les séances",
+  create_workflow: "créer l'automatisation",
 };
 
 export const describeAction = (a: AssistantAction, labels?: Map<string, string>) => {
@@ -436,6 +439,23 @@ export async function executePlan(userId: string, actions: AssistantAction[], re
           ok = true;
           break;
         }
+        case "create_workflow": {
+          const wf = a.workflow ?? {};
+          const days = Array.isArray(wf.days) ? wf.days : [];
+          // Asked for out loud, with its days: that request is the authorisation to run on its own.
+          const r = await saveWorkflow(userId, { name: wf.name ?? a.title, condition: wf.condition, steps: wf.steps, trigger: days.length ? { type: "daily", days } : { type: "manual" }, authorize: days.length > 0 });
+          if ("error" in r) {
+            failed.push(`créer l'automatisation (${r.error.replace(/\.$/, "")})`);
+            break;
+          }
+          undos.push({ t: "entry-delete", id: r.workflow.id });
+          did.push(
+            `Automatisation « ${r.workflow.name} » créée : ${r.workflow.steps.map(stepLabel).join(", ").toLowerCase()}. ` +
+              (r.workflow.trigger.type === "daily" ? `${triggerLabel(r.workflow.trigger)}, vers 7 h ; tu peux la désactiver dans Automatisations.` : "Lance-la quand tu veux depuis Automatisations.")
+          );
+          ok = true;
+          break;
+        }
         case "create_project": {
           const title = (a.title ?? a.name ?? "").trim().slice(0, 120);
           if (!title) break;
@@ -484,7 +504,7 @@ export async function executePlan(userId: string, actions: AssistantAction[], re
           break;
         }
         case "navigate": {
-          if (a.url && /^\/(today|calendar|courses|tasks|projects|settings|syllabus|sync|assessments|labs|assistant|documents)(\/[\w-]+){0,2}$/.test(a.url)) {
+          if (a.url && /^\/(today|calendar|courses|tasks|projects|settings|syllabus|sync|assessments|labs|assistant|documents|workflows)(\/[\w-]+){0,2}$/.test(a.url)) {
             navigate = a.url;
             ok = true;
           }

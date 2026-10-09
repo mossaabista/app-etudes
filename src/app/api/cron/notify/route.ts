@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { checkCronAuth } from "@/server/cron-auth";
 import { buildDailyDigest } from "@/server/notifications/digest";
 import { pushIsConfigured, sendToUser } from "@/server/notifications/push";
+import { runScheduledWorkflows } from "@/server/workflows";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,8 +22,16 @@ export async function GET(request: Request) {
   if (auth === "unauthorized") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // The morning workflows the users authorised run first, push or not; each runs at
+  // most once a day, so a repeated call does nothing more.
+  let workflows: Awaited<ReturnType<typeof runScheduledWorkflows>> | { error: string };
+  try {
+    workflows = await runScheduledWorkflows();
+  } catch {
+    workflows = { error: "workflows failed" };
+  }
   if (!pushIsConfigured()) {
-    return NextResponse.json({ error: "VAPID keys are not configured" }, { status: 500 });
+    return NextResponse.json({ error: "VAPID keys are not configured", workflows }, { status: 500 });
   }
 
   // Only users with at least one device subscribed are worth building a digest for.
@@ -52,5 +61,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ ranAt: new Date().toISOString(), users: results.length, results });
+  return NextResponse.json({ ranAt: new Date().toISOString(), users: results.length, results, workflows });
 }

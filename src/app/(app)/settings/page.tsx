@@ -1,4 +1,4 @@
-import { Download } from "lucide-react";
+import { Download, Workflow } from "lucide-react";
 import { requireUser } from "@/server/auth/current-user";
 import { getProfile } from "@/server/profile";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -91,6 +91,16 @@ export default async function SettingsPage() {
             <div className="mt-5 border-t border-[rgba(255,220,148,0.1)] pt-4">
               <AutonomySettings current={autonomy} />
             </div>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader title="Automatisations" subtitle="Des enchaînements d'étapes, à la demande ou chaque matin" />
+          <CardBody>
+            <p className="text-sm leading-6 text-[var(--ink-dim)]">Planifier ta journée et t&apos;envoyer le résumé chaque matin, préparer ta semaine le dimanche… Rien ne se lance seul sans ton autorisation, et chaque exécution est journalisée et annulable.</p>
+            <a href="/workflows" className="mod-chip mod-chip-gold focus-ring mt-3 inline-flex">
+              <Workflow size={13} /> Ouvrir les automatisations
+            </a>
           </CardBody>
         </Card>
 

@@ -127,4 +127,17 @@ describe("executePlan with agents", () => {
     expect(r.partial).toBe(true);
     expect(db.projectMilestone!.rows).toHaveLength(0);
   });
+
+  it("builds a workflow from a spoken request, only from catalogue steps, and can take it back", async () => {
+    db.trackerEntry = table();
+    const r = await executePlan("alice", [{ op: "create_workflow", workflow: { name: "Matin", days: ["Monday", "Friday"], steps: [{ type: "plan_day" }, { type: "notify_briefing" }] } }], "", ctx, [agentById("workflows")!]);
+    expect(r.partial).toBe(false);
+    expect(r.message).toMatch(/Automatisation « Matin » créée : planifier ma journée, m'envoyer le résumé du jour\. Le matin : lundi, vendredi/);
+    expect(db.trackerEntry!.rows[0]).toMatchObject({ userId: "alice", module: "app:workflows", data: { authorizedAt: expect.any(String) } });
+    expect(r.undos).toEqual([{ t: "entry-delete", id: db.trackerEntry!.rows[0].id }]);
+    const bad = await executePlan("alice", [{ op: "create_workflow", workflow: { name: "Spam", steps: [{ type: "send_email" }] } }], "C'est fait.", ctx, [agentById("workflows")!]);
+    expect(bad.partial).toBe(true);
+    expect(bad.message).toMatch(/pas reconnue/);
+    expect(db.trackerEntry!.rows).toHaveLength(1);
+  });
 });
