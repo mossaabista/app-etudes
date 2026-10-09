@@ -9,8 +9,14 @@ import { categoriesFor, categoryOfSection, type CalCategory } from "@/lib/calend
 import { getProfile } from "@/server/profile";
 import { PROFILES, type ProfileType } from "@/lib/profile";
 import { PILOT_NOTE } from "@/server/pilot";
-import { label as frLabel } from "@/lib/labels";
+import { labelIn } from "@/lib/labels";
+import { getLocale, getMessages } from "@/i18n/server";
+import { INTL } from "@/i18n/config";
 import { currentZone, addDays, addMonths, dayName, fromISODate, startOfMonth, toISODate } from "@/lib/dates";
+
+export async function generateMetadata() {
+  return { title: (await getMessages()).nav.calendar };
+}
 
 // Sunday first, as in the printed échéancier.
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -41,6 +47,7 @@ function assessmentCategory(type: string): CalCategory {
 export default async function CalendarPage({ searchParams }: { searchParams: Promise<{ m?: string; profil?: string }> }) {
   const user = await requireUser();
   const { m, profil } = await searchParams;
+  const [t, locale] = await Promise.all([getMessages(), getLocale()]);
   const profile = await getProfile(user.id);
   // Development only: ?profil=entrepreneur previews another profile's legend, nothing saved.
   const preview = process.env.NODE_ENV !== "production" && PROFILES.some((p) => p.type === profil) ? (profil as ProfileType) : null;
@@ -90,8 +97,8 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   // The same thing captured as a task and an event shows once, as the event.
   const eventKeys = new Set(personal.map((e) => `${e.title.toLowerCase()}|${toISODate(e.date)}`));
   const sectionCategory = (tag: string | null | undefined): CalCategory | null => {
-    const t = areaOfTag(tag);
-    return t ? categoryOfSection(t.area.key, t.sub?.key) : null;
+    const found = areaOfTag(tag);
+    return found ? categoryOfSection(found.area.key, found.sub?.key) : null;
   };
 
   const items: CalItem[] = [
@@ -103,7 +110,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       code: a.course.code,
       short: short.get(a.course.code),
       category: fold(assessmentCategory(a.type)),
-      detail: [frLabel(a.type), a.weight != null ? `${String(a.weight).replace(".", ",")} %` : null].filter(Boolean).join(" · "),
+      detail: [labelIn(a.type, locale), a.weight != null ? (locale === "fr" ? `${String(a.weight).replace(".", ",")} %` : `${a.weight}%`) : null].filter(Boolean).join(" · "),
       done: a.status === "Completed",
     })),
     ...labs.map((l) => ({
@@ -114,23 +121,23 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       code: l.course.code,
       short: short.get(l.course.code),
       category: fold("lab"),
-      detail: "Laboratoire",
+      detail: t.today.lab,
       done: l.status === "Completed" || l.status === "Submitted",
     })),
     ...tasks
-      .filter((t) => !eventKeys.has(`${t.title.toLowerCase()}|${toISODate(t.dueDate!)}`))
-      .map((t) => {
-        const tag = areaOfTag(t.category);
-        const time = hhmm(t.dueDate!);
+      .filter((task) => !eventKeys.has(`${task.title.toLowerCase()}|${toISODate(task.dueDate!)}`))
+      .map((task) => {
+        const tag = areaOfTag(task.category);
+        const time = hhmm(task.dueDate!);
         return {
-          id: `t${t.id}`,
-          date: toISODate(t.dueDate!),
+          id: `t${task.id}`,
+          date: toISODate(task.dueDate!),
           time: time === "23:59" ? null : time,
-          title: t.title,
-          code: t.course?.code ?? tag?.area.front,
-          short: t.course ? short.get(t.course.code) : undefined,
-          category: fold(t.course ? "devoir" : (sectionCategory(t.category) ?? "tache")),
-          detail: tag?.sub?.label ?? "Tâche",
+          title: task.title,
+          code: task.course?.code ?? tag?.area.front,
+          short: task.course ? short.get(task.course.code) : undefined,
+          category: fold(task.course ? "devoir" : (sectionCategory(task.category) ?? "tache")),
+          detail: tag?.sub?.label ?? t.today.task,
         };
       }),
     ...personal.map((e) => {
@@ -144,7 +151,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         title: e.title,
         code: pilot ? undefined : tag?.area.front,
         category: fold(pilot ? "pilote" : (sectionCategory(e.type) ?? (e.type === "Meeting" ? "reunion" : "perso"))),
-        detail: pilot ? "Planifié par le Pilote" : [tag?.sub?.label, e.notes].filter(Boolean).join(" · ") || undefined,
+        detail: pilot ? t.today.pilot : [tag?.sub?.label, e.notes].filter(Boolean).join(" · ") || undefined,
         edit: { id: e.id, notes: e.notes },
       };
     }),
@@ -165,7 +172,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         date: iso,
         time: s.startTime,
         end: s.endTime,
-        title: frLabel(s.type),
+        title: labelIn(s.type, locale),
         code: s.course.code,
         short: short.get(s.course.code),
         category: fold("cours"),
@@ -175,7 +182,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     }
   }
 
-  const monthLabel = new Intl.DateTimeFormat("fr-CA", { timeZone: currentZone(), month: "long", year: "numeric" }).format(first);
+  const monthLabel = new Intl.DateTimeFormat(INTL[locale], { timeZone: currentZone(), month: "long", year: "numeric" }).format(first);
   const href = (d: Date) => `/calendar?m=${toISODate(d).slice(0, 7)}`;
   const isCurrentMonth = todayIso.startsWith(monthPrefix);
 
@@ -184,7 +191,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       <div className="glass-backdrop" aria-hidden />
 
       <div className="mb-6 flex items-center gap-2.5">
-        <Link href={href(addMonths(first, -1))} aria-label="Mois précédent" className="lm focus-ring h-11 w-11 shrink-0">
+        <Link href={href(addMonths(first, -1))} aria-label={t.workspace.cal.prevMonth} className="lm focus-ring h-11 w-11 shrink-0">
           <LiquidLayers>
             <ChevronLeft size={18} />
           </LiquidLayers>
@@ -195,11 +202,11 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           </h1>
           {!isCurrentMonth && (
             <Link href="/calendar" className="text-xs text-[var(--ink-dim)] hover:text-[var(--ink)]">
-              Revenir à ce mois-ci
+              {t.workspace.cal.thisMonth}
             </Link>
           )}
         </div>
-        <Link href={href(next)} aria-label="Mois suivant" className="lm focus-ring h-11 w-11 shrink-0">
+        <Link href={href(next)} aria-label={t.workspace.cal.nextMonth} className="lm focus-ring h-11 w-11 shrink-0">
           <LiquidLayers>
             <ChevronRight size={18} />
           </LiquidLayers>

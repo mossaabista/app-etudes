@@ -3,6 +3,8 @@
 import { useMemo, useState, useTransition } from "react";
 import { CalendarPlus, Check, Minus, Plus, Trash2, X } from "lucide-react";
 import { addEntryAction, deleteEntryAction, scheduleAction, updateEntryAction } from "@/server/actions/tracker.actions";
+import { useI18n } from "@/i18n/client";
+import { INTL, fmt, type Locale } from "@/i18n/config";
 
 /** A recorded row as the section pages see it. */
 export interface Entry {
@@ -46,8 +48,12 @@ export const addDays = (iso: string, n: number) => {
 };
 export const daysBetween = (a: string, b: string) =>
   Math.round((new Date(`${b}T12:00:00Z`).getTime() - new Date(`${a}T12:00:00Z`).getTime()) / 86400000);
-export const dayLabel = (iso: string, opts: Intl.DateTimeFormatOptions = { weekday: "short", day: "numeric", month: "short" }) =>
-  new Intl.DateTimeFormat("fr-CA", { timeZone: "UTC", ...opts }).format(new Date(`${iso}T12:00:00Z`));
+/** A calendar day ("2026-10-09") in words. The day is already a date, so it is read as-is (UTC noon). */
+export const dayLabel = (
+  iso: string,
+  opts: Intl.DateTimeFormatOptions = { weekday: "short", day: "numeric", month: "short" },
+  locale: Locale = "fr"
+) => new Intl.DateTimeFormat(INTL[locale], { timeZone: "UTC", ...opts }).format(new Date(`${iso}T12:00:00Z`));
 export const lastDays = (today: string, n: number) => Array.from({ length: n }, (_, i) => addDays(today, i - n + 1));
 
 /** Consecutive days ending today (or yesterday, if today is not done yet) that pass `ok`. */
@@ -59,6 +65,29 @@ export function streak(today: string, ok: (day: string) => boolean) {
     day = addDays(day, -1);
   }
   return n;
+}
+
+/**
+ * What section pages need to speak the reader's language: the strings, days in words,
+ * amounts of money, and the display name of a choice stored in French in the row.
+ */
+export function useModuleText() {
+  const { t, locale } = useI18n();
+  return useMemo(() => {
+    const values = t.modulesB.values as Record<string, string>;
+    return {
+      t,
+      locale,
+      day: (iso: string, opts?: Intl.DateTimeFormatOptions) => dayLabel(iso, opts, locale),
+      value: (v: unknown) => {
+        const s = v == null ? "" : String(v);
+        return values[s] ?? s;
+      },
+      money: (n: number) => n.toLocaleString(INTL[locale], { style: "currency", currency: "CAD" }),
+      /** "42 %" in French, "42%" in English. */
+      pct: (n: number | string) => (locale === "fr" ? `${n} %` : `${n}%`),
+    };
+  }, [t, locale]);
 }
 
 // --------------------------------------------------------------------------- mutations
@@ -139,13 +168,14 @@ export function Stats({ items }: { items: { label: string; value: string; sub?: 
 }
 
 export function Meter({ value, max, label }: { value: number; max: number; label?: string }) {
+  const { pct: percent } = useModuleText();
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
   return (
     <div>
       {label && (
         <div className="mb-1.5 flex justify-between text-xs text-[var(--ink-dim)]">
           <span>{label}</span>
-          <span className="tabular-nums">{Math.round(pct)} %</span>
+          <span className="tabular-nums">{percent(Math.round(pct))}</span>
         </div>
       )}
       <div className="mod-meter" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
@@ -174,13 +204,14 @@ export function Sparkline({ points, height = 44 }: { points: number[]; height?: 
 
 /** Seven (or n) day bars: how much of a daily target each day reached. */
 export function DayBars({ days, value, target, unit }: { days: string[]; value: (day: string) => number; target: number; unit: string }) {
+  const { t, day: dayLabel } = useModuleText();
   return (
-    <div className="flex items-end gap-1.5" aria-label="Historique">
+    <div className="flex items-end gap-1.5" aria-label={t.modulesB.kit.history}>
       {days.map((d) => {
         const v = value(d);
         const pct = Math.min(1, target ? v / target : 0);
         return (
-          <div key={d} className="flex flex-1 flex-col items-center gap-1" title={`${dayLabel(d)} : ${v} ${unit}`}>
+          <div key={d} className="flex flex-1 flex-col items-center gap-1" title={fmt(t.modulesB.kit.dayValue, { day: dayLabel(d), v, unit })}>
             <div className="mod-bar">
               <span style={{ height: `${Math.max(pct * 100, v ? 6 : 0)}%` }} data-full={pct >= 1 || undefined} />
             </div>
@@ -225,16 +256,17 @@ export function CheckBox({ checked, onChange, label, disabled }: { checked: bool
 }
 
 export function Counter({ value, onChange, min = 0, max = 99, unit }: { value: number; onChange: (v: number) => void; min?: number; max?: number; unit?: string }) {
+  const { t } = useI18n();
   return (
     <div className="inline-flex items-center gap-2">
-      <IconButton label="Moins" onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min}>
+      <IconButton label={t.modulesB.kit.less} onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min}>
         <Minus size={14} />
       </IconButton>
       <span className="min-w-[3ch] text-center text-lg font-semibold tabular-nums text-[var(--ink)]">
         {value}
         {unit && <span className="ml-1 text-xs font-normal text-[var(--ink-dim)]">{unit}</span>}
       </span>
-      <IconButton label="Plus" tone="gold" onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max}>
+      <IconButton label={t.modulesB.kit.more} tone="gold" onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max}>
         <Plus size={14} />
       </IconButton>
     </div>
@@ -252,7 +284,7 @@ export function ScheduleButton({
   minutes = 60,
   today,
   onSchedule,
-  label = "Planifier",
+  label,
   defaultTime = "",
 }: {
   title: string;
@@ -264,6 +296,8 @@ export function ScheduleButton({
   /** Pre-filled time where one is obvious (a meal's usual hour). */
   defaultTime?: string;
 }) {
+  const { t } = useI18n();
+  const k = t.modulesB.kit;
   const [open, setOpen] = useState(false);
   const [day, setDay] = useState(today);
   // No time chosen in advance: the user picks it, so nothing lands on the calendar by accident.
@@ -280,16 +314,16 @@ export function ScheduleButton({
     return (
       <button type="button" onClick={() => setOpen(true)} className="mod-chip focus-ring">
         {done ? <Check size={13} /> : <CalendarPlus size={13} />}
-        {done ? "Ajouté" : label}
+        {done ? k.scheduled : label ?? k.schedule}
       </button>
     );
   }
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <input type="date" value={day} onChange={(e) => setDay(e.target.value)} className={`${field} w-36`} aria-label="Jour" />
-      <input type="time" value={start} onChange={(e) => setStart(e.target.value)} className={`${field} w-24`} aria-label="Heure" autoFocus />
+      <input type="date" value={day} onChange={(e) => setDay(e.target.value)} className={`${field} w-36`} aria-label={k.day} />
+      <input type="time" value={start} onChange={(e) => setStart(e.target.value)} className={`${field} w-24`} aria-label={k.time} autoFocus />
       <IconButton
-        label="Ajouter au calendrier"
+        label={k.addToCalendar}
         tone="gold"
         disabled={!start}
         onClick={() => {
@@ -300,7 +334,7 @@ export function ScheduleButton({
       >
         <Check size={14} />
       </IconButton>
-      <IconButton label="Annuler" onClick={() => setOpen(false)}>
+      <IconButton label={t.common.cancel} onClick={() => setOpen(false)}>
         <X size={14} />
       </IconButton>
     </div>
@@ -334,8 +368,8 @@ export function EntryList({
   today,
   render,
   checkable = true,
-  addLabel = "Ajouter",
-  empty = "Rien pour l'instant.",
+  addLabel,
+  empty,
   sort,
   extra,
 }: {
@@ -352,6 +386,7 @@ export function EntryList({
   extra?: (e: Entry) => React.ReactNode;
 }) {
   const { add, update, remove, pending } = useEntries(module);
+  const { t, value: valueLabel } = useModuleText();
   const initial = () => Object.fromEntries(fields.map((f) => [f.key, f.defaultValue ?? (f.type === "date" ? today : f.type === "select" ? f.options?.[0] ?? "" : "")]));
   const [form, setForm] = useState<Record<string, string>>(initial);
   const rows = useMemo(() => {
@@ -389,7 +424,9 @@ export function EntryList({
               className={`${field} ${f.width ?? "w-36"} cursor-pointer appearance-none`}
             >
               {f.options?.map((o) => (
-                <option key={o}>{o}</option>
+                <option key={o} value={o}>
+                  {valueLabel(o)}
+                </option>
               ))}
             </select>
           ) : (
@@ -407,26 +444,26 @@ export function EntryList({
           )
         )}
         <button type="submit" disabled={pending} className="mod-chip mod-chip-gold focus-ring">
-          <Plus size={13} /> {addLabel}
+          <Plus size={13} /> {addLabel ?? t.modulesB.kit.add}
         </button>
       </form>
 
       {rows.length === 0 ? (
-        <Empty>{empty}</Empty>
+        <Empty>{empty ?? t.modulesB.kit.empty}</Empty>
       ) : (
         <ul className="space-y-2">
           {rows.map((e) => {
             const r = render(e);
             return (
               <li key={e.id} className={`tile flex items-center gap-3 px-3.5 py-2.5 ${checkable && e.done ? "opacity-55" : ""}`}>
-                {checkable && <CheckBox checked={e.done} label="Fait" disabled={pending} onChange={() => update(e.id, { done: !e.done })} />}
+                {checkable && <CheckBox checked={e.done} label={t.modulesB.kit.done} disabled={pending} onChange={() => update(e.id, { done: !e.done })} />}
                 <div className="min-w-0 flex-1">
                   <p className={`text-sm text-[var(--ink)] ${checkable && e.done ? "line-through" : ""}`}>{r.title}</p>
                   {r.sub && <p className="mt-0.5 text-xs text-[var(--ink-dim)]">{r.sub}</p>}
                 </div>
                 {r.aside && <div className="shrink-0 text-xs text-[var(--ink-dim)]">{r.aside}</div>}
                 {extra?.(e)}
-                <IconButton label="Supprimer" onClick={() => remove(e.id)} disabled={pending}>
+                <IconButton label={t.common.delete} onClick={() => remove(e.id)} disabled={pending}>
                   <Trash2 size={13} />
                 </IconButton>
               </li>
@@ -454,6 +491,7 @@ export function DailyChecklist({
   items: { key: string; label: string; sub?: string }[];
 }) {
   const { add, remove, pending } = useEntries(module);
+  const { t } = useI18n();
   const ticks = entries.filter((e) => e.kind === "check");
   const tickOf = (day: string, key: string) => ticks.find((t) => t.day === day && t.data.item === key);
   const doneOn = (day: string) => items.filter((i) => tickOf(day, i.key)).length;
@@ -483,23 +521,24 @@ export function DailyChecklist({
       <div className="mt-4">
         <DayBars days={lastDays(today, 7)} value={doneOn} target={items.length} unit={`/ ${items.length}`} />
         <p className="mt-2 text-xs text-[var(--ink-dim)]">
-          {run > 0 ? `Série en cours : ${run} jour${run > 1 ? "s" : ""} complet${run > 1 ? "s" : ""}.` : "Coche tout aujourd'hui pour lancer une série."}
+          {run > 1 ? fmt(t.modulesB.kit.streakMany, { n: run }) : run === 1 ? t.modulesB.kit.streakOne : t.modulesB.kit.streakStart}
         </p>
       </div>
     </div>
   );
 }
 
-export function Sources({ items, health }: { items: string[]; health?: boolean }) {
+export function Sources({ items, health }: { items: readonly string[]; health?: boolean }) {
+  const { t } = useI18n();
   return (
     <footer className="mt-6 text-[0.7rem] leading-5 text-[var(--ink-faint)]">
-      <p className="font-semibold uppercase tracking-wide">Sources</p>
+      <p className="font-semibold uppercase tracking-wide">{t.modulesB.kit.sources}</p>
       <ul className="mt-1 list-disc space-y-0.5 pl-4">
         {items.map((s) => (
           <li key={s}>{s}</li>
         ))}
       </ul>
-      {health && <p className="mt-2">Ces repères sont informatifs et ne remplacent pas l&apos;avis d&apos;un professionnel de santé.</p>}
+      {health && <p className="mt-2">{t.modulesB.kit.health}</p>}
     </footer>
   );
 }
@@ -513,15 +552,7 @@ export function RecurringList({
   entries,
   today,
   suggestions = [],
-  periods = [
-    ["Chaque jour", 1],
-    ["Chaque semaine", 7],
-    ["Toutes les 2 semaines", 14],
-    ["Chaque mois", 30],
-    ["Tous les 3 mois", 91],
-    ["Tous les 6 mois", 182],
-    ["Chaque année", 365],
-  ],
+  periods: periodsProp,
 }: {
   module: string;
   entries: Entry[];
@@ -530,6 +561,17 @@ export function RecurringList({
   periods?: [string, number][];
 }) {
   const { add, update, remove, pending } = useEntries(module);
+  const { t, day: dayLabel } = useModuleText();
+  const k = t.modulesB.kit;
+  const periods: [string, number][] = periodsProp ?? [
+    [k.daily, 1],
+    [k.weekly, 7],
+    [k.biweekly, 14],
+    [k.monthly, 30],
+    [k.quarterly, 91],
+    [k.halfYearly, 182],
+    [k.yearly, 365],
+  ];
   const [text, setText] = useState("");
   const [period, setPeriod] = useState(String(periods[1][1]));
   const rows = entries
@@ -541,7 +583,7 @@ export function RecurringList({
     })
     .sort((a, b) => a.late - b.late);
   const missing = suggestions.filter((s) => !rows.some((r) => r.e.text === s.text));
-  const periodName = (n: number) => periods.find(([, d]) => d === n)?.[0] ?? `Tous les ${n} jours`;
+  const periodName = (n: number) => periods.find(([, d]) => d === n)?.[0] ?? fmt(k.everyNDays, { n });
 
   return (
     <div>
@@ -554,8 +596,8 @@ export function RecurringList({
         }}
         className="mb-3 flex flex-wrap items-center gap-2"
       >
-        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Nouvelle tâche récurrente" aria-label="Tâche" className={`${field} flex-1 basis-40`} />
-        <select value={period} onChange={(e) => setPeriod(e.target.value)} aria-label="Fréquence" className={`${field} w-44 cursor-pointer appearance-none`}>
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder={k.newRecurring} aria-label={k.task} className={`${field} flex-1 basis-40`} />
+        <select value={period} onChange={(e) => setPeriod(e.target.value)} aria-label={k.frequency} className={`${field} w-44 cursor-pointer appearance-none`}>
           {periods.map(([l, d]) => (
             <option key={d} value={d}>
               {l}
@@ -563,7 +605,7 @@ export function RecurringList({
           ))}
         </select>
         <button type="submit" disabled={pending} className="mod-chip mod-chip-gold focus-ring">
-          <Plus size={13} /> Ajouter
+          <Plus size={13} /> {k.add}
         </button>
       </form>
 
@@ -578,7 +620,7 @@ export function RecurringList({
       )}
 
       {rows.length === 0 ? (
-        <Empty>Ajoute ce qui revient régulièrement, ou pioche dans les suggestions.</Empty>
+        <Empty>{k.recurringEmpty}</Empty>
       ) : (
         <ul className="space-y-2">
           {rows.map(({ e, last, late }) => (
@@ -586,16 +628,16 @@ export function RecurringList({
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-[var(--ink)]">{e.text}</p>
                 <p className="mt-0.5 text-xs text-[var(--ink-dim)]">
-                  {periodName(e.value ?? 7)} · {last ? `fait le ${dayLabel(last)}` : "jamais fait"}
+                  {periodName(e.value ?? 7)} · {last ? fmt(k.doneOn, { day: dayLabel(last) }) : k.neverDone}
                 </p>
               </div>
               <span className={`shrink-0 text-xs font-semibold ${late <= 0 ? "text-[#f0cd79]" : "text-[var(--ink-faint)]"}`}>
-                {late < 0 ? `En retard de ${-late} j` : late === 0 ? "Aujourd'hui" : `Dans ${late} j`}
+                {late < 0 ? fmt(k.lateBy, { n: -late }) : late === 0 ? k.today : fmt(k.inDays, { n: late })}
               </span>
               <button type="button" disabled={pending} onClick={() => update(e.id, { data: { last: today } })} className="mod-chip focus-ring">
-                <Check size={13} /> Fait
+                <Check size={13} /> {k.done}
               </button>
-              <IconButton label="Supprimer" onClick={() => remove(e.id)} disabled={pending}>
+              <IconButton label={t.common.delete} onClick={() => remove(e.id)} disabled={pending}>
                 <Trash2 size={13} />
               </IconButton>
             </li>

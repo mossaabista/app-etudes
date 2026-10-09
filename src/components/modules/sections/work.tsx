@@ -13,21 +13,23 @@ import {
   IconButton,
   Meter,
   Stats,
-  dayLabel,
   daysBetween,
   field,
   lastDays,
   useEntries,
+  useModuleText,
   type Entry,
   type ModuleProps,
 } from "@/components/modules/kit";
+import { fmt } from "@/i18n/config";
 
 // =========================================================================== Réunions (shared)
 
-const AGENDA = ["Objectif de la réunion", "Points à aborder", "Décisions", "Actions : qui fait quoi, pour quand"];
-
 function Meetings({ module, today, entries, kinds }: ModuleProps & { kinds: string[] }) {
   const { add, update, remove, schedule, pending } = useEntries(module);
+  const { t, locale, day: dayLabel, value: valueLabel } = useModuleText();
+  const m_ = t.modulesB.meetings;
+  const k = t.modulesB.kit;
   const [title, setTitle] = useState("");
   const [day, setDay] = useState(today);
   const [time, setTime] = useState("10:00");
@@ -36,14 +38,20 @@ function Meetings({ module, today, entries, kinds }: ModuleProps & { kinds: stri
   const [openId, setOpenId] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [noteIsError, setNoteIsError] = useState(false);
+  const fail = (text: string) => {
+    setNoteIsError(true);
+    setNote(text);
+  };
 
   // The assistant drafts the agenda from the subject and length…
   const draftAgenda = async (m: Entry) => {
     setBusy(`agenda-${m.id}`);
     setNote(null);
+    setNoteIsError(false);
     const res = await aiHelperAction({ kind: "agenda", subject: m.text ?? "", minutes: Number(m.data.length ?? 30), type: String(m.data.type ?? "") });
     setBusy(null);
-    if ("error" in res) return setNote(res.error);
+    if ("error" in res) return fail(t.modulesB.ai.unavailable);
     update(m.id, { data: { notes: String(res.result.agenda ?? "") } });
   };
   // …and turns the notes into actions: each one listed below, and the ones without an
@@ -51,17 +59,18 @@ function Meetings({ module, today, entries, kinds }: ModuleProps & { kinds: stri
   const extractActions = async (m: Entry) => {
     setBusy(`actions-${m.id}`);
     setNote(null);
+    setNoteIsError(false);
     const res = await aiHelperAction({ kind: "actions", notes: String(m.data.notes ?? ""), today });
     setBusy(null);
-    if ("error" in res) return setNote(res.error);
+    if ("error" in res) return fail(t.modulesB.ai.unavailable);
     const list = (res.result.actions as { text: string; owner?: string | null; due?: string | null }[] | undefined) ?? [];
-    if (!list.length) return setNote("Aucune action trouvée dans ces notes.");
+    if (!list.length) return fail(m_.noActions);
     for (const a of list.slice(0, 12)) {
       const due = a.due && /^\d{4}-\d{2}-\d{2}$/.test(a.due) ? a.due : addDays(today, 7);
       add("action", { day: due, text: a.text, data: { owner: a.owner ?? "", from: m.text } });
       if (!a.owner || /^(moi|je)$/i.test(a.owner)) await quickTaskAction({ title: a.text, category: module, due });
     }
-    setNote(`${list.length} action${list.length > 1 ? "s" : ""} ajoutée${list.length > 1 ? "s" : ""}.`);
+    setNote(list.length > 1 ? fmt(m_.actionsMany, { n: list.length }) : m_.actionsOne);
   };
   const meetings = entries.filter((e) => e.kind === "meeting").sort((a, b) => b.day.localeCompare(a.day));
   const upcoming = meetings.filter((m) => m.day >= today).reverse();
@@ -75,10 +84,10 @@ function Meetings({ module, today, entries, kinds }: ModuleProps & { kinds: stri
           <button type="button" onClick={() => setOpenId(open ? null : m.id)} className="min-w-0 flex-1 text-left">
             <p className="text-sm text-[var(--ink)]">{m.text}</p>
             <p className="text-xs text-[var(--ink-dim)]">
-              {dayLabel(m.day)} · {String(m.data.time ?? "")} · {String(m.data.length ?? 30)} min · {String(m.data.type ?? "")}
+              {dayLabel(m.day)} · {String(m.data.time ?? "")} · {String(m.data.length ?? 30)} min · {valueLabel(m.data.type)}
             </p>
           </button>
-          <IconButton label="Supprimer" onClick={() => remove(m.id)} disabled={pending}>
+          <IconButton label={t.common.delete} onClick={() => remove(m.id)} disabled={pending}>
             <Trash2 size={13} />
           </IconButton>
         </div>
@@ -86,18 +95,18 @@ function Meetings({ module, today, entries, kinds }: ModuleProps & { kinds: stri
           <>
           <div className="mt-2.5 flex flex-wrap gap-1.5">
             <button type="button" onClick={() => void draftAgenda(m)} disabled={!!busy} className="mod-chip focus-ring">
-              <Sparkles size={12} /> {busy === `agenda-${m.id}` ? "Rédaction…" : "Préparer l'ordre du jour"}
+              <Sparkles size={12} /> {busy === `agenda-${m.id}` ? m_.drafting : m_.draftAgenda}
             </button>
             <button type="button" onClick={() => void extractActions(m)} disabled={!!busy || !m.data.notes} className="mod-chip focus-ring">
-              <ListChecks size={12} /> {busy === `actions-${m.id}` ? "Lecture…" : "Extraire les actions"}
+              <ListChecks size={12} /> {busy === `actions-${m.id}` ? m_.reading : m_.extract}
             </button>
           </div>
           <textarea
             key={String(m.data.notes ?? "")}
-            defaultValue={String(m.data.notes ?? AGENDA.map((a) => `${a} :\n`).join("\n"))}
+            defaultValue={String(m.data.notes ?? m_.agenda.map((a) => `${a}${locale === "fr" ? " :" : ":"}\n`).join("\n"))}
             onBlur={(e) => update(m.id, { data: { notes: e.target.value } })}
             rows={8}
-            aria-label="Ordre du jour et notes"
+            aria-label={m_.notesAria}
             className="mt-2.5 w-full rounded-xl bg-[rgba(10,6,2,0.4)] p-3 text-sm leading-6 text-[var(--ink)] outline-none ring-1 ring-[rgba(255,220,148,0.15)] focus:ring-[rgba(255,220,148,0.4)]"
           />
           </>
@@ -108,8 +117,12 @@ function Meetings({ module, today, entries, kinds }: ModuleProps & { kinds: stri
 
   return (
     <>
-      <Block title="Planifier une réunion" hint="Elle va dans ton calendrier. Ouvre-la ensuite : l'assistant prépare l'ordre du jour, et après la réunion il transforme tes notes en actions." wide>
-        {note && <p className="mb-3 text-xs text-[#f0cd79]">{note}</p>}
+      <Block title={m_.planTitle} hint={m_.planHint} wide>
+        {note && (
+          <p className={noteIsError ? "mb-3 rounded-xl bg-[rgba(220,60,40,0.18)] px-3 py-2 text-xs text-[#ffd9cf]" : "mb-3 text-xs text-[#f0cd79]"} role={noteIsError ? "alert" : "status"}>
+            {note}
+          </p>
+        )}
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -122,15 +135,17 @@ function Meetings({ module, today, entries, kinds }: ModuleProps & { kinds: stri
           }}
           className="flex flex-wrap items-center gap-2"
         >
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Sujet" aria-label="Sujet" className={`${field} flex-1 basis-48`} required />
-          <select value={type} onChange={(e) => setType(e.target.value)} aria-label="Type" className={`${field} w-40 cursor-pointer appearance-none`}>
-            {kinds.map((k) => (
-              <option key={k}>{k}</option>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={m_.subject} aria-label={m_.subject} className={`${field} flex-1 basis-48`} required />
+          <select value={type} onChange={(e) => setType(e.target.value)} aria-label={m_.type} className={`${field} w-40 cursor-pointer appearance-none`}>
+            {kinds.map((kind) => (
+              <option key={kind} value={kind}>
+                {valueLabel(kind)}
+              </option>
             ))}
           </select>
-          <input type="date" value={day} onChange={(e) => setDay(e.target.value)} aria-label="Jour" className={`${field} w-36`} />
-          <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Heure" className={`${field} w-24`} />
-          <select value={length} onChange={(e) => setLength(e.target.value)} aria-label="Durée" className={`${field} w-28 cursor-pointer appearance-none`}>
+          <input type="date" value={day} onChange={(e) => setDay(e.target.value)} aria-label={k.day} className={`${field} w-36`} />
+          <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label={k.time} className={`${field} w-24`} />
+          <select value={length} onChange={(e) => setLength(e.target.value)} aria-label={m_.length} className={`${field} w-28 cursor-pointer appearance-none`}>
             {[15, 30, 45, 60, 90].map((n) => (
               <option key={n} value={n}>
                 {n} min
@@ -138,32 +153,32 @@ function Meetings({ module, today, entries, kinds }: ModuleProps & { kinds: stri
             ))}
           </select>
           <button type="submit" disabled={pending} className="mod-chip mod-chip-gold focus-ring">
-            <Plus size={13} /> Planifier
+            <Plus size={13} /> {k.schedule}
           </button>
         </form>
       </Block>
 
-      <Block title="À venir">{upcoming.length ? <ul className="space-y-2">{upcoming.map(row)}</ul> : <Empty>Aucune réunion prévue.</Empty>}</Block>
-      <Block title="Comptes rendus">{past.length ? <ul className="space-y-2">{past.slice(0, 10).map(row)}</ul> : <Empty>Les réunions passées et leurs notes apparaîtront ici.</Empty>}</Block>
+      <Block title={m_.upcoming}>{upcoming.length ? <ul className="space-y-2">{upcoming.map(row)}</ul> : <Empty>{m_.upcomingEmpty}</Empty>}</Block>
+      <Block title={m_.minutes}>{past.length ? <ul className="space-y-2">{past.slice(0, 10).map(row)}</ul> : <Empty>{m_.minutesEmpty}</Empty>}</Block>
 
-      <Block title="Actions décidées" hint="Ce qui sort des réunions : une action, un responsable, une échéance." wide>
+      <Block title={m_.actions} hint={m_.actionsHint} wide>
         <EntryList
           module={module}
           kind="action"
           entries={entries}
           today={today}
           fields={[
-            { key: "text", label: "Action", type: "text", to: "text", required: true },
-            { key: "owner", label: "Responsable", type: "text", width: "w-36" },
-            { key: "day", label: "Échéance", type: "date", to: "day" },
+            { key: "text", label: m_.action, type: "text", to: "text", required: true },
+            { key: "owner", label: m_.owner, type: "text", width: "w-36" },
+            { key: "day", label: m_.due, type: "date", to: "day" },
           ]}
           sort={(a, b) => Number(a.done) - Number(b.done) || a.day.localeCompare(b.day)}
           render={(e) => ({
             title: e.text,
-            sub: `${e.data.owner ? `${e.data.owner} · ` : ""}pour le ${dayLabel(e.day)}`,
-            aside: !e.done && e.day < today ? <span className="font-semibold text-[#f0cd79]">En retard</span> : undefined,
+            sub: `${e.data.owner ? `${e.data.owner} · ` : ""}${fmt(m_.forDay, { day: dayLabel(e.day) })}`,
+            aside: !e.done && e.day < today ? <span className="font-semibold text-[#f0cd79]">{k.late}</span> : undefined,
           })}
-          empty="Aucune action en cours."
+          empty={m_.actionsEmpty}
         />
       </Block>
     </>
@@ -184,6 +199,8 @@ const STAGES = ["À faire", "En cours", "En revue", "Livré"];
 
 export function Livrables({ module, today, entries }: ModuleProps) {
   const { add, update, remove, pending } = useEntries(module);
+  const { t, day: dayLabel, value: valueLabel } = useModuleText();
+  const d_ = t.modulesB.deliverables;
   const [text, setText] = useState("");
   const [forWho, setForWho] = useState("");
   const [day, setDay] = useState(today);
@@ -191,7 +208,7 @@ export function Livrables({ module, today, entries }: ModuleProps) {
 
   return (
     <>
-      <Block title="Nouveau livrable" hint="Rapport, présentation, code, maquette… avec son destinataire et sa date de remise." wide>
+      <Block title={d_.newTitle} hint={d_.newHint} wide>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -202,11 +219,11 @@ export function Livrables({ module, today, entries }: ModuleProps) {
           }}
           className="flex flex-wrap items-center gap-2"
         >
-          <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Livrable" aria-label="Livrable" className={`${field} flex-1 basis-48`} required />
-          <input value={forWho} onChange={(e) => setForWho(e.target.value)} placeholder="Pour qui" aria-label="Destinataire" className={`${field} w-40`} />
-          <input type="date" value={day} onChange={(e) => setDay(e.target.value)} aria-label="Échéance" className={`${field} w-36`} />
+          <input value={text} onChange={(e) => setText(e.target.value)} placeholder={d_.deliverable} aria-label={d_.deliverable} className={`${field} flex-1 basis-48`} required />
+          <input value={forWho} onChange={(e) => setForWho(e.target.value)} placeholder={d_.forWho} aria-label={d_.recipient} className={`${field} w-40`} />
+          <input type="date" value={day} onChange={(e) => setDay(e.target.value)} aria-label={d_.due} className={`${field} w-36`} />
           <button type="submit" disabled={pending} className="mod-chip mod-chip-gold focus-ring">
-            <Plus size={13} /> Ajouter
+            <Plus size={13} /> {t.modulesB.kit.add}
           </button>
         </form>
       </Block>
@@ -217,7 +234,7 @@ export function Livrables({ module, today, entries }: ModuleProps) {
           return (
             <section key={stage} className="glass-card p-4">
               <h3 className="mb-3 flex items-center justify-between text-sm font-semibold text-[var(--ink)]">
-                {stage} <span className="text-xs font-normal text-[var(--ink-dim)]">{col.length}</span>
+                {valueLabel(stage)} <span className="text-xs font-normal text-[var(--ink-dim)]">{col.length}</span>
               </h3>
               <ul className="space-y-2">
                 {col.map((i) => {
@@ -227,21 +244,21 @@ export function Livrables({ module, today, entries }: ModuleProps) {
                       <p className="text-sm text-[var(--ink)]">{i.text}</p>
                       <p className="mt-0.5 text-xs text-[var(--ink-dim)]">
                         {i.data.for ? `${i.data.for} · ` : ""}
-                        <span className={stage !== "Livré" && d < 0 ? "font-semibold text-[#f0cd79]" : ""}>{stage === "Livré" ? dayLabel(i.day) : d < 0 ? `en retard de ${-d} j` : d === 0 ? "aujourd'hui" : `J-${d}`}</span>
+                        <span className={stage !== "Livré" && d < 0 ? "font-semibold text-[#f0cd79]" : ""}>{stage === "Livré" ? dayLabel(i.day) : d < 0 ? fmt(d_.lateBy, { n: -d }) : d === 0 ? d_.today : fmt(t.modulesB.kit.countdown, { n: d })}</span>
                       </p>
                       <div className="mt-2 flex items-center gap-1.5">
                         {si > 0 && (
-                          <button type="button" disabled={pending} onClick={() => update(i.id, { data: { stage: STAGES[si - 1] } })} className="mod-chip px-2 py-1 focus-ring">
+                          <button type="button" disabled={pending} onClick={() => update(i.id, { data: { stage: STAGES[si - 1] } })} aria-label={d_.back} title={d_.back} className="mod-chip px-2 py-1 focus-ring">
                             ←
                           </button>
                         )}
                         {si < STAGES.length - 1 && (
                           <button type="button" disabled={pending} onClick={() => update(i.id, { data: { stage: STAGES[si + 1] }, done: si + 1 === STAGES.length - 1 })} className="mod-chip px-2 py-1 focus-ring">
-                            {STAGES[si + 1]} →
+                            {valueLabel(STAGES[si + 1])} →
                           </button>
                         )}
                         <span className="flex-1" />
-                        <IconButton label="Supprimer" onClick={() => remove(i.id)} disabled={pending}>
+                        <IconButton label={t.common.delete} onClick={() => remove(i.id)} disabled={pending}>
                           <Trash2 size={12} />
                         </IconButton>
                       </div>
@@ -261,15 +278,17 @@ export function Livrables({ module, today, entries }: ModuleProps) {
 // =========================================================================== Suivis
 
 export function Suivis({ module, today, entries }: ModuleProps) {
+  const { t, day: dayLabel, value: valueLabel } = useModuleText();
+  const f = t.modulesB.followups;
   const open = entries.filter((e) => e.kind === "followup" && !e.done);
   const late = open.filter((e) => e.day < today).length;
   return (
     <>
-      <Block title="Relances" hint="Ce que tu attends de quelqu'un, et quand le relancer si rien n'arrive." wide>
+      <Block title={f.title} hint={f.hint} wide>
         <Stats
           items={[
-            { label: "En attente", value: `${open.length}` },
-            { label: "À relancer", value: `${late}`, tone: "gold" },
+            { label: f.waiting, value: `${open.length}` },
+            { label: f.toChase, value: `${late}`, tone: "gold" },
           ]}
         />
         <div className="mt-4">
@@ -279,18 +298,18 @@ export function Suivis({ module, today, entries }: ModuleProps) {
             entries={entries}
             today={today}
             fields={[
-              { key: "text", label: "Sujet", type: "text", to: "text", required: true },
-              { key: "person", label: "Personne", type: "text", width: "w-36" },
-              { key: "channel", label: "Canal", type: "select", options: ["Courriel", "Appel", "Message", "En personne"], width: "w-36" },
-              { key: "day", label: "Relancer le", type: "date", to: "day" },
+              { key: "text", label: f.subject, type: "text", to: "text", required: true },
+              { key: "person", label: f.person, type: "text", width: "w-36" },
+              { key: "channel", label: f.channel, type: "select", options: ["Courriel", "Appel", "Message", "En personne"], width: "w-36" },
+              { key: "day", label: f.chaseOn, type: "date", to: "day" },
             ]}
             sort={(a, b) => Number(a.done) - Number(b.done) || a.day.localeCompare(b.day)}
             render={(e) => ({
               title: e.text,
-              sub: `${e.data.person ? `${e.data.person} · ` : ""}${String(e.data.channel ?? "")} · relancer le ${dayLabel(e.day)}`,
-              aside: !e.done && e.day <= today ? <span className="font-semibold text-[#f0cd79]">{e.day < today ? "En retard" : "Aujourd'hui"}</span> : undefined,
+              sub: `${e.data.person ? `${e.data.person} · ` : ""}${valueLabel(e.data.channel)} · ${fmt(f.chaseOnDay, { day: dayLabel(e.day) })}`,
+              aside: !e.done && e.day <= today ? <span className="font-semibold text-[#f0cd79]">{e.day < today ? t.modulesB.kit.late : t.modulesB.kit.today}</span> : undefined,
             })}
-            empty="Aucune relance en attente."
+            empty={f.empty}
           />
         </div>
       </Block>
@@ -304,9 +323,11 @@ const members = (related: Record<string, Entry[]>, entries: Entry[], module: str
   (module === "equipe:membres" ? entries : related["equipe:membres"] ?? []).filter((e) => e.kind === "member");
 
 export function Membres({ module, today, entries }: ModuleProps) {
+  const { t } = useModuleText();
+  const m_ = t.modulesB.team;
   const team = entries.filter((e) => e.kind === "member");
   return (
-    <Block title={`L'équipe · ${team.length}`} hint="Qui fait partie de l'équipe, son rôle et comment le joindre." wide>
+    <Block title={fmt(m_.title, { n: team.length })} hint={m_.hint} wide>
       <EntryList
         module={module}
         kind="member"
@@ -314,9 +335,9 @@ export function Membres({ module, today, entries }: ModuleProps) {
         today={today}
         checkable={false}
         fields={[
-          { key: "text", label: "Nom", type: "text", to: "text", required: true },
-          { key: "role", label: "Rôle", type: "text", width: "w-40" },
-          { key: "email", label: "Courriel", type: "text", width: "w-48" },
+          { key: "text", label: m_.name, type: "text", to: "text", required: true },
+          { key: "role", label: m_.role, type: "text", width: "w-40" },
+          { key: "email", label: m_.email, type: "text", width: "w-48" },
         ]}
         sort={(a, b) => (a.text ?? "").localeCompare(b.text ?? "")}
         render={(e) => ({
@@ -337,48 +358,50 @@ export function Membres({ module, today, entries }: ModuleProps) {
         })}
         extra={(e) =>
           e.data.email ? (
-            <a href={`mailto:${String(e.data.email)}`} aria-label={`Écrire à ${e.text}`} className="mod-icon focus-ring">
+            <a href={`mailto:${String(e.data.email)}`} aria-label={fmt(m_.writeTo, { name: e.text ?? "" })} className="mod-icon focus-ring">
               <Mail size={13} />
             </a>
           ) : null
         }
-        empty="Ajoute les membres de ton équipe."
+        empty={m_.membersEmpty}
       />
     </Block>
   );
 }
 
 export function Delegue({ module, today, entries, related }: ModuleProps) {
+  const { t, day: dayLabel } = useModuleText();
+  const m_ = t.modulesB.team;
   const team = members(related, entries, module);
   const items = entries.filter((e) => e.kind === "delegated");
   const people = [...new Set(items.filter((i) => !i.done).map((i) => String(i.data.to ?? "—")))];
   return (
     <>
-      <Block title="Confier une tâche" hint="Déléguer, c'est préciser le résultat attendu, la personne et l'échéance." wide>
+      <Block title={m_.delegateTitle} hint={m_.delegateHint} wide>
         <EntryList
           module={module}
           kind="delegated"
           entries={entries}
           today={today}
           fields={[
-            { key: "text", label: "Tâche", type: "text", to: "text", required: true },
+            { key: "text", label: m_.task, type: "text", to: "text", required: true },
             team.length
-              ? { key: "to", label: "À qui", type: "select", options: team.map((m) => m.text ?? "—"), width: "w-40" }
-              : { key: "to", label: "À qui", type: "text", width: "w-40" },
-            { key: "day", label: "Pour le", type: "date", to: "day" },
+              ? { key: "to", label: m_.toWhom, type: "select", options: team.map((m) => m.text ?? "—"), width: "w-40" }
+              : { key: "to", label: m_.toWhom, type: "text", width: "w-40" },
+            { key: "day", label: m_.forDay, type: "date", to: "day" },
           ]}
           sort={(a, b) => Number(a.done) - Number(b.done) || a.day.localeCompare(b.day)}
           render={(e) => ({
             title: e.text,
-            sub: `${String(e.data.to ?? "—")} · pour le ${dayLabel(e.day)}`,
-            aside: !e.done && e.day < today ? <span className="font-semibold text-[#f0cd79]">En retard</span> : undefined,
+            sub: `${String(e.data.to ?? "—")} · ${fmt(m_.forDayLower, { day: dayLabel(e.day) })}`,
+            aside: !e.done && e.day < today ? <span className="font-semibold text-[#f0cd79]">{m_.late}</span> : undefined,
           })}
-          empty={team.length ? "Rien de délégué pour l'instant." : "Rien de délégué. Ajoute ton équipe dans Membres pour choisir dans une liste."}
+          empty={team.length ? m_.delegateEmpty : m_.delegateEmptyNoTeam}
         />
       </Block>
-      <Block title="Charge par personne">
+      <Block title={m_.load}>
         {people.length === 0 ? (
-          <Empty>Personne n&apos;a de tâche en cours.</Empty>
+          <Empty>{m_.loadEmpty}</Empty>
         ) : (
           <ul className="space-y-2.5">
             {people.map((p) => {
@@ -387,7 +410,7 @@ export function Delegue({ module, today, entries, related }: ModuleProps) {
                 <li key={p}>
                   <div className="mb-1 flex justify-between text-xs">
                     <span className="text-[var(--ink)]">{p}</span>
-                    <span className="text-[var(--ink-dim)]">{n} en cours</span>
+                    <span className="text-[var(--ink-dim)]">{fmt(m_.inProgress, { n })}</span>
                   </div>
                   <Meter value={n} max={Math.max(...people.map((q) => items.filter((i) => !i.done && String(i.data.to ?? "—") === q).length))} />
                 </li>
@@ -407,20 +430,22 @@ export function SuiviEquipe({ module, today, entries, related }: ModuleProps) {
   const team = (related["equipe:membres"] ?? []).filter((e) => e.kind === "member").length;
   const kpis = entries.filter((e) => e.kind === "kpi");
   const { update, pending } = useEntries(module);
+  const { t, pct } = useModuleText();
+  const m_ = t.modulesB.team;
 
   return (
     <>
-      <Block title="Vue d'ensemble" wide>
+      <Block title={m_.overview} wide>
         <Stats
           items={[
-            { label: "Membres", value: `${team}` },
-            { label: "Tâches déléguées", value: `${delegated.length}` },
-            { label: "Terminées", value: delegated.length ? `${Math.round((done / delegated.length) * 100)} %` : "—", tone: "gold" },
-            { label: "En retard", value: `${late}` },
+            { label: m_.members, value: `${team}` },
+            { label: m_.delegated, value: `${delegated.length}` },
+            { label: m_.completed, value: delegated.length ? pct(Math.round((done / delegated.length) * 100)) : "—", tone: "gold" },
+            { label: m_.late, value: `${late}` },
           ]}
         />
       </Block>
-      <Block title="Objectifs" hint="Des indicateurs chiffrés : une valeur actuelle et une cible." wide>
+      <Block title={m_.goals} hint={m_.goalsHint} wide>
         <EntryList
           module={module}
           kind="kpi"
@@ -428,9 +453,9 @@ export function SuiviEquipe({ module, today, entries, related }: ModuleProps) {
           today={today}
           checkable={false}
           fields={[
-            { key: "text", label: "Objectif", type: "text", to: "text", required: true },
-            { key: "value", label: "Actuel", type: "number", to: "value", width: "w-24" },
-            { key: "target", label: "Cible", type: "number", width: "w-24" },
+            { key: "text", label: m_.goal, type: "text", to: "text", required: true },
+            { key: "value", label: m_.current, type: "number", to: "value", width: "w-24" },
+            { key: "target", label: m_.target, type: "number", width: "w-24" },
           ]}
           render={(e) => ({
             title: e.text,
@@ -444,15 +469,15 @@ export function SuiviEquipe({ module, today, entries, related }: ModuleProps) {
             <input
               type="number"
               defaultValue={e.value ?? 0}
-              aria-label="Mettre à jour"
+              aria-label={m_.update}
               disabled={pending}
               onBlur={(ev) => Number(ev.target.value) !== e.value && update(e.id, { value: Number(ev.target.value) })}
               className={`${field} w-20`}
             />
           )}
-          empty="Aucun objectif chiffré."
+          empty={m_.goalsEmpty}
         />
-        {kpis.length > 0 && <p className="mt-2 text-xs text-[var(--ink-faint)]">Modifie la valeur actuelle dans le champ à droite.</p>}
+        {kpis.length > 0 && <p className="mt-2 text-xs text-[var(--ink-faint)]">{m_.goalsTip}</p>}
       </Block>
     </>
   );
@@ -462,16 +487,18 @@ export function SuiviEquipe({ module, today, entries, related }: ModuleProps) {
 
 export function Lectures({ module, today, entries }: ModuleProps) {
   const { update, pending } = useEntries(module);
+  const { t } = useModuleText();
+  const l = t.modulesB.learning;
   const books = entries.filter((e) => e.kind === "book");
   const year = today.slice(0, 4);
   const finished = books.filter((b) => b.done && String(b.data.finished ?? "").startsWith(year)).length;
   return (
     <>
-      <Block title="Ma bibliothèque" hint="Les livres en cours avec la page atteinte ; un livre terminé compte pour l'année." wide>
+      <Block title={l.library} hint={l.libraryHint} wide>
         <Stats
           items={[
-            { label: "En cours", value: `${books.filter((b) => !b.done).length}` },
-            { label: `Lus en ${year}`, value: `${finished}`, tone: "gold" },
+            { label: l.reading, value: `${books.filter((b) => !b.done).length}` },
+            { label: fmt(l.readIn, { year }), value: `${finished}`, tone: "gold" },
           ]}
         />
         <div className="mt-4">
@@ -482,9 +509,9 @@ export function Lectures({ module, today, entries }: ModuleProps) {
             today={today}
             checkable={false}
             fields={[
-              { key: "text", label: "Titre", type: "text", to: "text", required: true },
-              { key: "author", label: "Auteur", type: "text", width: "w-36" },
-              { key: "pages", label: "Pages", type: "number", width: "w-24" },
+              { key: "text", label: l.bookTitle, type: "text", to: "text", required: true },
+              { key: "author", label: l.author, type: "text", width: "w-36" },
+              { key: "pages", label: l.pages, type: "number", width: "w-24" },
             ]}
             sort={(a, b) => Number(a.done) - Number(b.done)}
             render={(e) => {
@@ -495,7 +522,7 @@ export function Lectures({ module, today, entries }: ModuleProps) {
                 sub: (
                   <span className="mt-1 block">
                     {e.data.author ? `${e.data.author} · ` : ""}
-                    {e.done ? "Terminé" : pages ? `page ${at} / ${pages}` : "en cours"}
+                    {e.done ? l.finished : pages ? fmt(l.pageOf, { at, pages }) : l.inProgress}
                     {pages > 0 && !e.done && (
                       <span className="mt-1.5 block">
                         <Meter value={at} max={pages} />
@@ -510,19 +537,19 @@ export function Lectures({ module, today, entries }: ModuleProps) {
                 <span className="flex items-center gap-1.5">
                   <input
                     type="number"
-                    placeholder="Page"
-                    aria-label="Page atteinte"
+                    placeholder={l.page}
+                    aria-label={l.pageReached}
                     disabled={pending}
                     onBlur={(ev) => ev.target.value && update(e.id, { data: { at: Number(ev.target.value) } })}
                     className={`${field} w-20`}
                   />
                   <button type="button" disabled={pending} onClick={() => update(e.id, { done: true, data: { finished: today, at: Number(e.data.pages) || 0 } })} className="mod-chip focus-ring">
-                    Fini
+                    {l.finish}
                   </button>
                 </span>
               )
             }
-            empty="Ajoute le livre que tu lis en ce moment."
+            empty={l.booksEmpty}
           />
         </div>
       </Block>
@@ -532,17 +559,19 @@ export function Lectures({ module, today, entries }: ModuleProps) {
 
 export function Formations({ module, today, entries }: ModuleProps) {
   const { update, pending } = useEntries(module);
+  const { t } = useModuleText();
+  const l = t.modulesB.learning;
   return (
-    <Block title="Mes formations" hint="Cours en ligne, certifications, MOOC : avec la progression et les heures." wide>
+    <Block title={l.courses} hint={l.coursesHint} wide>
       <EntryList
         module={module}
         kind="course"
         entries={entries}
         today={today}
         fields={[
-          { key: "text", label: "Formation", type: "text", to: "text", required: true },
-          { key: "platform", label: "Plateforme", type: "text", width: "w-36", placeholder: "Coursera, edX…" },
-          { key: "hours", label: "Heures", type: "number", width: "w-24" },
+          { key: "text", label: l.course, type: "text", to: "text", required: true },
+          { key: "platform", label: l.platform, type: "text", width: "w-36", placeholder: "Coursera, edX…" },
+          { key: "hours", label: l.hours, type: "number", width: "w-24" },
         ]}
         sort={(a, b) => Number(a.done) - Number(b.done)}
         render={(e) => ({
@@ -551,7 +580,7 @@ export function Formations({ module, today, entries }: ModuleProps) {
             <span className="mt-1 block">
               {[e.data.platform, e.data.hours ? `${e.data.hours} h` : null].filter(Boolean).join(" · ")}
               <span className="mt-1.5 block">
-                <Meter value={e.value ?? 0} max={100} label={e.done ? "Certifié" : "Progression"} />
+                <Meter value={e.value ?? 0} max={100} label={e.done ? l.certified : l.progress} />
               </span>
             </span>
           ),
@@ -563,7 +592,7 @@ export function Formations({ module, today, entries }: ModuleProps) {
             </button>
           )
         }
-        empty="Aucune formation en cours."
+        empty={l.coursesEmpty}
       />
     </Block>
   );
@@ -571,6 +600,8 @@ export function Formations({ module, today, entries }: ModuleProps) {
 
 export function Competences({ module, today, entries }: ModuleProps) {
   const { add, update, remove, pending } = useEntries(module);
+  const { t } = useModuleText();
+  const l = t.modulesB.learning;
   const [name, setName] = useState("");
   const skills = entries.filter((e) => e.kind === "skill");
   const practice = entries.filter((e) => e.kind === "practice");
@@ -578,7 +609,7 @@ export function Competences({ module, today, entries }: ModuleProps) {
 
   return (
     <>
-      <Block title="Mes compétences" hint="Évalue ton niveau de 1 à 5 et note tes séances de pratique délibérée." wide>
+      <Block title={l.skills} hint={l.skillsHint} wide>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -588,13 +619,13 @@ export function Competences({ module, today, entries }: ModuleProps) {
           }}
           className="mb-3 flex items-center gap-2"
         >
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Compétence (Python, prise de parole, anglais…)" aria-label="Compétence" className={`${field} flex-1`} />
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder={l.skillPlaceholder} aria-label={l.skill} className={`${field} flex-1`} />
           <button type="submit" disabled={pending} className="mod-chip mod-chip-gold focus-ring">
-            <Plus size={13} /> Ajouter
+            <Plus size={13} /> {t.modulesB.kit.add}
           </button>
         </form>
         {skills.length === 0 ? (
-          <Empty>Ajoute une compétence à développer.</Empty>
+          <Empty>{l.skillsEmpty}</Empty>
         ) : (
           <ul className="space-y-2">
             {skills.map((s) => {
@@ -603,9 +634,9 @@ export function Competences({ module, today, entries }: ModuleProps) {
                 <li key={s.id} className="tile flex flex-wrap items-center gap-3 px-3.5 py-2.5">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm text-[var(--ink)]">{s.text}</p>
-                    <p className="text-xs text-[var(--ink-dim)]">{Math.round(mins / 6) / 10} h de pratique</p>
+                    <p className="text-xs text-[var(--ink-dim)]">{fmt(l.practiceHours, { n: Math.round(mins / 6) / 10 })}</p>
                   </div>
-                  <div className="flex gap-1" role="radiogroup" aria-label={`Niveau en ${s.text}`}>
+                  <div className="flex gap-1" role="radiogroup" aria-label={fmt(l.level, { skill: s.text ?? "" })}>
                     {[1, 2, 3, 4, 5].map((n) => (
                       <button
                         key={n}
@@ -623,7 +654,7 @@ export function Competences({ module, today, entries }: ModuleProps) {
                       +{m} min
                     </button>
                   ))}
-                  <IconButton label="Supprimer" onClick={() => remove(s.id)} disabled={pending}>
+                  <IconButton label={t.common.delete} onClick={() => remove(s.id)} disabled={pending}>
                     <Trash2 size={13} />
                   </IconButton>
                 </li>
@@ -632,34 +663,31 @@ export function Competences({ module, today, entries }: ModuleProps) {
           </ul>
         )}
       </Block>
-      <Block title="Pratique de la semaine" wide>
+      <Block title={l.week} wide>
         <DayBars days={lastDays(today, 7)} value={minutesOn} target={60} unit="min" />
-        <p className="mt-2 text-xs text-[var(--ink-dim)]">{lastDays(today, 7).reduce((a, d) => a + minutesOn(d), 0)} min sur 7 jours.</p>
+        <p className="mt-2 text-xs text-[var(--ink-dim)]">{fmt(l.weekTotal, { n: lastDays(today, 7).reduce((a, d) => a + minutesOn(d), 0) })}</p>
       </Block>
     </>
   );
 }
 
 export function GeneralProjets({ module, today, entries }: ModuleProps) {
+  const { t, value: valueLabel } = useModuleText();
+  const i_ = t.modulesB.ideas;
   return (
-    <Block title="Idées de projets" hint="Ce que tu aimerais lancer : note-le avant de l'oublier." wide>
+    <Block title={i_.title} hint={i_.hint} wide>
       <EntryList
         module={module}
         kind="idea"
         entries={entries}
         today={today}
         fields={[
-          { key: "text", label: "Idée", type: "text", to: "text", required: true },
-          { key: "horizon", label: "Horizon", type: "select", options: ["Ce mois-ci", "Ce trimestre", "Cette année", "Un jour"], width: "w-40" },
+          { key: "text", label: i_.idea, type: "text", to: "text", required: true },
+          { key: "horizon", label: i_.horizon, type: "select", options: ["Ce mois-ci", "Ce trimestre", "Cette année", "Un jour"], width: "w-40" },
         ]}
-        render={(e) => ({ title: e.text, sub: e.data.horizon ? String(e.data.horizon) : undefined })}
-        empty="Aucune idée notée."
+        render={(e) => ({ title: e.text, sub: e.data.horizon ? valueLabel(e.data.horizon) : undefined })}
+        empty={i_.empty}
       />
     </Block>
   );
 }
-
-export const WORK_SOURCES = {
-  taches: ["Cirillo F., The Pomodoro Technique (2006).", "Matrice d'Eisenhower, popularisée par S. Covey, The 7 Habits of Highly Effective People (1989)."],
-  competences: ["Ericsson K.A. et al., The role of deliberate practice in the acquisition of expert performance, Psychol Rev 100(3) (1993)."],
-};

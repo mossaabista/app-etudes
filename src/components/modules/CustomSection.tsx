@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { Check, Lightbulb, Plus, Trash2 } from "lucide-react";
-import { Block, CheckBox, DailyChecklist, DayBars, Empty, IconButton, RecurringList, Stats, addDays, field, lastDays, streak, useEntries, type Entry } from "@/components/modules/kit";
+import { Block, CheckBox, DailyChecklist, DayBars, Empty, IconButton, RecurringList, Stats, addDays, field, lastDays, streak, useEntries, useModuleText, type Entry } from "@/components/modules/kit";
+import { fmt } from "@/i18n/config";
 import { slug, type BlockSpec } from "@/lib/layout";
 
 /**
@@ -11,14 +12,21 @@ import { slug, type BlockSpec } from "@/lib/layout";
  * so two lists in one section never mix.
  */
 export function CustomSection({ module, today, entries, blocks }: { module: string; today: string; entries: Entry[]; blocks: BlockSpec[] }) {
-  if (!blocks.length) return <Block title="Section vide" wide><Empty>Demande à l&apos;assistant de la remplir : « ajoute un journal et une liste à cette section ».</Empty></Block>;
+  const { t } = useModuleText();
+  const c = t.modulesB.custom;
+  if (!blocks.length)
+    return (
+      <Block title={c.emptyTitle} wide>
+        <Empty>{c.emptyText}</Empty>
+      </Block>
+    );
   return (
     <>
       {blocks.map((b, i) => {
         switch (b.type) {
           case "checklist":
             return (
-              <Block key={i} title={b.title} hint="Coche au fil de la journée ; la série compte les jours complets.">
+              <Block key={i} title={b.title} hint={c.checklistHint}>
                 <DailyChecklist module={module} entries={entries} today={today} items={b.items.map((label) => ({ key: `${i}-${slug(label)}`, label }))} />
               </Block>
             );
@@ -28,7 +36,7 @@ export function CustomSection({ module, today, entries, blocks }: { module: stri
             return <ListBlock key={i} index={i} spec={b} module={module} entries={entries} />;
           case "recurring":
             return (
-              <Block key={i} title={b.title} hint="Ce qui revient régulièrement, avec la prochaine échéance.">
+              <Block key={i} title={b.title} hint={c.recurringHint}>
                 <RecurringList module={module} entries={entries} today={today} suggestions={b.items.map((x) => ({ text: x.label, period: x.every }))} />
               </Block>
             );
@@ -56,6 +64,9 @@ export function CustomSection({ module, today, entries, blocks }: { module: stri
 function LogBlock({ index, spec, module, today, entries }: { index: number; spec: Extract<BlockSpec, { type: "log" }>; module: string; today: string; entries: Entry[] }) {
   const kind = `log-${index}`;
   const { add, remove, pending } = useEntries(module);
+  const { t, day: dayLabel } = useModuleText();
+  const c = t.modulesB.custom;
+  const k = t.modulesB.kit;
   const [value, setValue] = useState("");
   const [note, setNote] = useState("");
   const rows = entries.filter((e) => e.kind === kind);
@@ -68,13 +79,13 @@ function LogBlock({ index, spec, module, today, entries }: { index: number; spec
   const unit = spec.unit ? ` ${short[spec.unit.toLowerCase()] ?? spec.unit}` : "";
 
   return (
-    <Block title={spec.title} hint={goal ? `Objectif : ${goal}${unit} par ${spec.period === "week" ? "semaine" : "jour"}.` : undefined}>
+    <Block title={spec.title} hint={goal ? fmt(spec.period === "week" ? c.goalWeek : c.goalDay, { goal, unit }) : undefined}>
       <Stats
         items={[
-          { label: "Aujourd'hui", value: `${on(today)}${unit}`, tone: "gold" },
-          { label: "7 jours", value: `${week}${unit}` },
-          { label: "Série", value: `${run} j` },
-          { label: "Entrées", value: String(rows.length) },
+          { label: k.today, value: `${on(today)}${unit}`, tone: "gold" },
+          { label: c.days7, value: `${week}${unit}` },
+          { label: c.streak, value: fmt(c.nDays, { n: run }) },
+          { label: c.entries, value: String(rows.length) },
         ]}
       />
       <form
@@ -88,10 +99,10 @@ function LogBlock({ index, spec, module, today, entries }: { index: number; spec
         }}
         className="mt-4 flex flex-wrap gap-2"
       >
-        <input value={value} onChange={(e) => setValue(e.target.value)} inputMode="decimal" placeholder={spec.unit || "Valeur"} aria-label="Valeur" className={`${field} w-28`} />
-        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (facultatif)" aria-label="Note" className={`${field} flex-1 basis-40`} />
+        <input value={value} onChange={(e) => setValue(e.target.value)} inputMode="decimal" placeholder={spec.unit || c.value} aria-label={c.value} className={`${field} w-28`} />
+        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={c.note} aria-label={c.noteAria} className={`${field} flex-1 basis-40`} />
         <button type="submit" disabled={pending} className="mod-chip mod-chip-gold focus-ring">
-          <Plus size={13} /> Noter
+          <Plus size={13} /> {c.log}
         </button>
       </form>
       <div className="mt-4">
@@ -101,13 +112,13 @@ function LogBlock({ index, spec, module, today, entries }: { index: number; spec
         <ul className="mt-4 space-y-1.5">
           {rows.slice(0, 6).map((r) => (
             <li key={r.id} className="flex items-center gap-3 text-xs text-[var(--ink-dim)]">
-              <span className="w-20 shrink-0">{r.day === today ? "Aujourd'hui" : r.day === addDays(today, -1) ? "Hier" : r.day}</span>
+              <span className="w-20 shrink-0">{r.day === today ? k.today : r.day === addDays(today, -1) ? k.yesterday : dayLabel(r.day, { day: "numeric", month: "short" })}</span>
               <span className="font-semibold text-[var(--ink)]">
                 {r.value}
                 {unit}
               </span>
               <span className="min-w-0 flex-1 truncate">{r.text}</span>
-              <IconButton label="Supprimer" onClick={() => remove(r.id)} disabled={pending}>
+              <IconButton label={t.common.delete} onClick={() => remove(r.id)} disabled={pending}>
                 <Trash2 size={12} />
               </IconButton>
             </li>
@@ -121,10 +132,13 @@ function LogBlock({ index, spec, module, today, entries }: { index: number; spec
 function ListBlock({ index, spec, module, entries }: { index: number; spec: Extract<BlockSpec, { type: "list" }>; module: string; entries: Entry[] }) {
   const kind = `list-${index}`;
   const { add, update, remove, pending } = useEntries(module);
+  const { t } = useModuleText();
+  const c = t.modulesB.custom;
   const [text, setText] = useState("");
   const rows = entries.filter((e) => e.kind === kind).sort((a, b) => Number(a.done) - Number(b.done));
+  const doneCount = rows.filter((r) => r.done).length;
   return (
-    <Block title={spec.title} hint={`${rows.filter((r) => !r.done).length} en cours · ${rows.filter((r) => r.done).length} fait${rows.filter((r) => r.done).length > 1 ? "s" : ""}`}>
+    <Block title={spec.title} hint={fmt(doneCount > 1 ? c.listHintMany : c.listHintOne, { open: rows.length - doneCount, done: doneCount })}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -134,20 +148,20 @@ function ListBlock({ index, spec, module, entries }: { index: number; spec: Extr
         }}
         className="mb-3 flex gap-2"
       >
-        <input value={text} onChange={(e) => setText(e.target.value)} placeholder={spec.placeholder ?? "Ajouter…"} aria-label="Nouvel élément" className={`${field} flex-1`} />
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder={spec.placeholder ?? c.listPlaceholder} aria-label={c.newItem} className={`${field} flex-1`} />
         <button type="submit" disabled={pending} className="mod-chip mod-chip-gold focus-ring">
           <Plus size={13} />
         </button>
       </form>
       {rows.length === 0 ? (
-        <Empty>Rien pour l&apos;instant.</Empty>
+        <Empty>{c.listEmpty}</Empty>
       ) : (
         <ul className="space-y-2">
           {rows.map((r) => (
             <li key={r.id} className={`tile flex items-center gap-3 px-3.5 py-2.5 ${r.done ? "opacity-55" : ""}`}>
               <CheckBox checked={r.done} label={r.text ?? ""} disabled={pending} onChange={() => update(r.id, { done: !r.done })} />
               <span className={`min-w-0 flex-1 text-sm text-[var(--ink)] ${r.done ? "line-through" : ""}`}>{r.text}</span>
-              <IconButton label="Supprimer" onClick={() => remove(r.id)} disabled={pending}>
+              <IconButton label={t.common.delete} onClick={() => remove(r.id)} disabled={pending}>
                 <Trash2 size={13} />
               </IconButton>
             </li>
@@ -161,6 +175,8 @@ function ListBlock({ index, spec, module, entries }: { index: number; spec: Extr
 function NotesBlock({ index, spec, module, today, entries }: { index: number; spec: Extract<BlockSpec, { type: "notes" }>; module: string; today: string; entries: Entry[] }) {
   const kind = `note-${index}`;
   const { add, update, pending } = useEntries(module);
+  const { t } = useModuleText();
+  const c = t.modulesB.custom;
   const row = entries.find((e) => e.kind === kind);
   const [text, setText] = useState(row?.text ?? "");
   const [saved, setSaved] = useState(false);
@@ -170,7 +186,7 @@ function NotesBlock({ index, spec, module, today, entries }: { index: number; sp
       action={
         saved ? (
           <span className="flex items-center gap-1 text-xs text-[#f0cd79]">
-            <Check size={12} /> Enregistré
+            <Check size={12} /> {c.saved}
           </span>
         ) : null
       }
@@ -189,7 +205,7 @@ function NotesBlock({ index, spec, module, today, entries }: { index: number; sp
         }}
         rows={6}
         disabled={pending && !row}
-        placeholder="Écris ici ; c'est enregistré quand tu quittes le champ."
+        placeholder={c.notesPlaceholder}
         aria-label={spec.title}
         className="glass-pill focus-ring w-full resize-y rounded-2xl px-4 py-3 text-sm leading-6 text-[var(--ink)] placeholder:text-[var(--ink-faint)]"
       />

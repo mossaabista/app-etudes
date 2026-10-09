@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/Button";
+import { Bell, BellOff, Send } from "lucide-react";
+import { useI18n } from "@/i18n/client";
+import { enablePush, pushSupported } from "@/lib/push-client";
 
 type State =
   | "loading"
@@ -11,7 +13,12 @@ type State =
   | "enabled"
   | "disabled";
 
+const ERROR = "rounded-xl bg-[rgba(220,60,40,0.18)] px-3 py-2 text-sm text-[#ffd9cf]";
+const SUCCESS = "rounded-xl bg-[rgba(60,160,100,0.16)] px-3 py-2 text-sm text-[#cdf3da]";
+const NOTE = "rounded-xl border border-[rgba(255,220,148,0.16)] bg-[rgba(255,220,148,0.06)] px-3 py-2 text-sm text-[var(--ink)]";
+
 export function PushNotifications({ vapidPublicKey }: { vapidPublicKey: string }) {
+  const t = useI18n().t.settingsUi.push;
   const [state, setState] = useState<State>("loading");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
@@ -23,10 +30,7 @@ export function PushNotifications({ vapidPublicKey }: { vapidPublicKey: string }
         window.matchMedia("(display-mode: standalone)").matches ||
         (navigator as Navigator & { standalone?: boolean }).standalone === true;
 
-      const supported =
-        "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
-
-      if (!supported) {
+      if (!pushSupported()) {
         // iOS exposes PushManager only inside an installed home-screen app, so an
         // unsupported result there means "not installed yet", not "impossible".
         setState(iOS && !standalone ? "needs-install" : "unsupported");
@@ -37,44 +41,28 @@ export function PushNotifications({ vapidPublicKey }: { vapidPublicKey: string }
         return;
       }
 
-      const registration = await navigator.serviceWorker.getRegistration();
-      const existing = await registration?.pushManager.getSubscription();
-      setState(existing ? "enabled" : "disabled");
+      try {
+        const registration = await navigator.serviceWorker.getRegistration();
+        const existing = await registration?.pushManager.getSubscription();
+        setState(existing ? "enabled" : "disabled");
+      } catch {
+        setState("disabled");
+      }
     })();
   }, []);
 
   async function enable() {
     setBusy(true);
     setMessage(null);
-    try {
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
-        setState(permission === "denied" ? "denied" : "disabled");
-        return;
-      }
-
-      const registration = await navigator.serviceWorker.register("/sw.js");
-      await navigator.serviceWorker.ready;
-
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-      });
-
-      const res = await fetch("/api/push/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(subscription),
-      });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Enregistrement échoué");
-
+    const outcome = await enablePush(vapidPublicKey);
+    if (outcome === "enabled") {
       setState("enabled");
-      setMessage({ tone: "ok", text: "Notifications activées sur cet appareil." });
-    } catch (error) {
-      setMessage({ tone: "err", text: error instanceof Error ? error.message : "Échec." });
-    } finally {
-      setBusy(false);
-    }
+      setMessage({ tone: "ok", text: t.enabled });
+    } else if (outcome === "denied") setState("denied");
+    else if (outcome === "dismissed") setState("disabled");
+    else if (outcome === "unsupported") setMessage({ tone: "err", text: vapidPublicKey ? t.unsupported : t.notReady });
+    else setMessage({ tone: "err", text: t.failed });
+    setBusy(false);
   }
 
   async function disable() {
@@ -93,9 +81,9 @@ export function PushNotifications({ vapidPublicKey }: { vapidPublicKey: string }
       });
 
       setState("disabled");
-      setMessage({ tone: "ok", text: "Notifications désactivées sur cet appareil." });
-    } catch (error) {
-      setMessage({ tone: "err", text: error instanceof Error ? error.message : "Échec." });
+      setMessage({ tone: "ok", text: t.disabled });
+    } catch {
+      setMessage({ tone: "err", text: t.disableFailed });
     } finally {
       setBusy(false);
     }
@@ -106,11 +94,10 @@ export function PushNotifications({ vapidPublicKey }: { vapidPublicKey: string }
     setMessage(null);
     try {
       const res = await fetch("/api/push/test", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Envoi échoué");
-      setMessage({ tone: "ok", text: "Envoyée. Elle devrait arriver dans un instant." });
-    } catch (error) {
-      setMessage({ tone: "err", text: error instanceof Error ? error.message : "Échec." });
+      if (!res.ok) throw new Error("test failed");
+      setMessage({ tone: "ok", text: t.sent });
+    } catch {
+      setMessage({ tone: "err", text: t.testFailed });
     } finally {
       setBusy(false);
     }
@@ -118,74 +105,39 @@ export function PushNotifications({ vapidPublicKey }: { vapidPublicKey: string }
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-slate-600">
-        Un résumé chaque matin vers 7 h : tes cours du jour, les devoirs, labos et tâches à rendre.
-        Rien n&apos;est envoyé les jours sans cours ni échéance.
-      </p>
+      <p className="text-sm text-[var(--ink-dim)]">{t.intro}</p>
 
       {message && (
-        <p
-          className={`rounded-md px-3 py-2 text-sm ${
-            message.tone === "err" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"
-          }`}
-        >
+        <p role={message.tone === "err" ? "alert" : "status"} className={message.tone === "err" ? ERROR : SUCCESS}>
           {message.text}
         </p>
       )}
 
-      {state === "loading" && <p className="text-xs text-slate-500">Vérification…</p>}
+      {state === "loading" && <p className="text-xs text-[var(--ink-dim)]">{t.checking}</p>}
 
-      {state === "needs-install" && (
-        <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          Sur iPhone, les notifications ne fonctionnent que depuis l&apos;app installée. Ajoute
-          d&apos;abord la page à ton écran d&apos;accueil (Partager → Sur l&apos;écran
-          d&apos;accueil), puis reviens ici <strong>depuis l&apos;icône</strong>.
-        </p>
-      )}
+      {state === "needs-install" && <p className={NOTE}>{t.needsInstall}</p>}
 
-      {state === "unsupported" && (
-        <p className="rounded-md bg-slate-100 px-3 py-2 text-sm text-slate-600">
-          Ce navigateur ne gère pas les notifications push.
-        </p>
-      )}
+      {state === "unsupported" && <p className={NOTE}>{t.unsupported}</p>}
 
-      {state === "denied" && (
-        <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          Les notifications ont été refusées pour ce site. Réautorise-les dans les réglages du
-          système, puis recharge cette page.
-        </p>
-      )}
+      {state === "denied" && <p className={NOTE}>{t.denied}</p>}
 
       {state === "disabled" && (
-        <Button onClick={enable} disabled={busy}>
-          {busy ? "Activation…" : "Activer les notifications"}
-        </Button>
+        <button type="button" onClick={enable} disabled={busy} className="mod-chip mod-chip-gold focus-ring">
+          <Bell size={13} /> {busy ? t.enabling : t.enable}
+        </button>
       )}
 
       {state === "enabled" && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
-            Activées sur cet appareil
-          </span>
-          <Button onClick={sendTest} variant="secondary" size="sm" disabled={busy}>
-            Envoyer un test
-          </Button>
-          <Button onClick={disable} variant="ghost" size="sm" disabled={busy}>
-            Désactiver
-          </Button>
+          <span className="rounded-full bg-[rgba(60,160,100,0.16)] px-2.5 py-1 text-xs font-medium text-[#cdf3da]">{t.enabledBadge}</span>
+          <button type="button" onClick={sendTest} disabled={busy} className="mod-chip focus-ring">
+            <Send size={13} /> {t.test}
+          </button>
+          <button type="button" onClick={disable} disabled={busy} className="mod-chip focus-ring">
+            <BellOff size={13} /> {t.disable}
+          </button>
         </div>
       )}
     </div>
   );
-}
-
-// The VAPID key travels as base64url; PushManager wants raw bytes. Backing it with
-// an explicit ArrayBuffer keeps the type as BufferSource rather than ArrayBufferLike.
-function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
-  const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
-  const normalised = padded.replace(/-/g, "+").replace(/_/g, "/");
-  const raw = atob(normalised);
-  const bytes = new Uint8Array(new ArrayBuffer(raw.length));
-  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
-  return bytes;
 }

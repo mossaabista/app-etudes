@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { getMessages } from "@/i18n/server";
+import { fmt } from "@/i18n/config";
 
 type CourseWithCounts = {
   id: string;
@@ -11,35 +13,23 @@ type CourseWithCounts = {
   _count: { assessments: number; tasks: number; schedules: number };
 };
 
-export function CourseCard({ course }: { course: CourseWithCounts }) {
+export async function CourseCard({ course }: { course: CourseWithCounts }) {
+  const a = (await getMessages()).academics;
+  const n = course._count;
   return (
-    <Link
-      href={`/courses/${course.id}`}
-      className="group block rounded-lg border border-slate-200 bg-white transition-shadow hover:shadow-md"
-    >
-      <div className="h-2 rounded-t-lg" style={{ backgroundColor: course.color }} />
+    <Link href={`/courses/${course.id}`} className="glass-card focus-ring group block overflow-hidden transition-transform hover:-translate-y-0.5">
+      <div className="h-1.5" style={{ backgroundColor: course.color }} />
       <div className="p-4">
-        <div className="flex items-start justify-between">
-          <div>
-            <span
-              className="inline-block rounded px-1.5 py-0.5 text-xs font-semibold text-white"
-              style={{ backgroundColor: course.color }}
-            >
-              {course.code}
-            </span>
-            <h3 className="mt-2 text-sm font-semibold text-slate-900 group-hover:text-slate-700">
-              {course.name}
-            </h3>
-          </div>
-        </div>
+        <span className="inline-block rounded-md px-1.5 py-0.5 text-xs font-semibold text-white" style={{ backgroundColor: course.color }}>
+          {course.code}
+        </span>
+        <h3 className="mt-2 text-sm font-semibold text-[var(--ink)]">{course.name}</h3>
 
-        {course.professor && (
-          <p className="mt-1.5 text-xs text-slate-500">{course.professor}</p>
-        )}
+        {course.professor && <p className="mt-1.5 text-xs text-[var(--ink-dim)]">{course.professor}</p>}
 
-        <div className="mt-3 flex gap-3 text-xs text-slate-400">
-          <span>{course._count.assessments} assessments</span>
-          <span>{course._count.tasks} tasks</span>
+        <div className="mt-3 flex gap-3 text-xs text-[var(--ink-faint)]">
+          <span>{fmt(n.assessments === 1 ? a.assessmentsOne : a.assessmentsMany, { n: n.assessments })}</span>
+          <span>{fmt(n.tasks === 1 ? a.tasksOne : a.tasksMany, { n: n.tasks })}</span>
         </div>
       </div>
     </Link>

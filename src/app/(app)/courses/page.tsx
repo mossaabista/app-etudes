@@ -1,15 +1,24 @@
 import Link from "next/link";
 import { ClipboardCheck, FlaskConical, Plus, RefreshCw, Upload } from "lucide-react";
 import { StudyPlanner } from "@/components/courses/StudyPlanner";
-import { addDays, toISODate } from "@/lib/dates";
+import { addDays, currentZone, toISODate } from "@/lib/dates";
+import { getLocale, getMessages } from "@/i18n/server";
+import { INTL, fmt } from "@/i18n/config";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/server/auth/current-user";
 import { LiquidLayers } from "@/components/ui/LiquidMetal";
 import { CardDeck } from "@/components/today/CardDeck";
 import { ChromeFolder } from "@/components/courses/ChromeFolder";
 
+export async function generateMetadata() {
+  return { title: (await getMessages()).academics.coursesTitle };
+}
+
 export default async function CoursesPage() {
   const user = await requireUser();
+  const t = await getMessages();
+  const a = t.academics;
+  const locale = await getLocale();
 
   const now = new Date();
   const [courses, upcoming, sync] = await Promise.all([
@@ -33,10 +42,10 @@ export default async function CoursesPage() {
 
       <div className="mb-4 flex items-center justify-between gap-3">
         <h1 className="text-lg font-semibold tracking-tight text-on-gold">
-          Cours
+          {a.coursesTitle}
           {courses.length > 0 && <span className="ml-2 text-sm font-normal text-on-gold">{courses.length}</span>}
         </h1>
-        <Link href="/courses/new" aria-label="Ajouter un cours" className="lm focus-ring h-11 w-11 shrink-0">
+        <Link href="/courses/new" aria-label={a.addCourse} className="lm focus-ring h-11 w-11 shrink-0">
           <LiquidLayers>
             <Plus size={18} />
           </LiquidLayers>
@@ -45,21 +54,24 @@ export default async function CoursesPage() {
 
       {/* Everything that used to be its own page, one tap away. */}
       <div className="mb-6 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-        <Tool href="/syllabus" icon={<Upload size={16} />} title="Syllabus" sub="Tout importer d'un coup" />
+        <Tool href="/syllabus" icon={<Upload size={16} />} title={a.toolSyllabus} sub={a.toolSyllabusSub} />
         <Tool
           href="/sync"
           icon={<RefreshCw size={16} />}
-          title="Brightspace"
-          sub={sync?.lastSyncedAt ? `Synchronisé le ${new Intl.DateTimeFormat("fr-CA", { day: "numeric", month: "short" }).format(sync.lastSyncedAt)}` : "Relier ton calendrier"}
+          title={a.toolBrightspace}
+          sub={sync?.lastSyncedAt ? fmt(a.toolBrightspaceSub, { date: new Intl.DateTimeFormat(INTL[locale], { timeZone: currentZone(), day: "numeric", month: "short" }).format(sync.lastSyncedAt) }) : a.toolBrightspaceConnect}
         />
-        <Tool href="/assessments" icon={<ClipboardCheck size={16} />} title="Évaluations" sub={`${upcoming.length} dans les 3 semaines`} />
-        <Tool href="/labs" icon={<FlaskConical size={16} />} title="Labos" sub="Séances et rapports" />
+        <Tool href="/assessments" icon={<ClipboardCheck size={16} />} title={a.toolAssessments} sub={fmt(a.toolAssessmentsSub, { n: upcoming.length })} />
+        <Tool href="/labs" icon={<FlaskConical size={16} />} title={a.toolLabs} sub={a.toolLabsSub} />
       </div>
 
       {courses.length === 0 ? (
         <div className="glass-card mx-auto max-w-md p-8 text-center">
-          <p className="text-sm font-medium text-[var(--ink)]">Aucun cours pour l&apos;instant</p>
-          <p className="mt-1 text-xs text-[var(--ink-dim)]">Ajoute tes cours avec le bouton + pour organiser ta session.</p>
+          <p className="text-sm font-medium text-[var(--ink)]">{a.noCoursesTitle}</p>
+          <p className="mt-1 text-xs leading-5 text-[var(--ink-dim)]">{a.noCoursesBody}</p>
+          <Link href="/syllabus" className="mod-chip mod-chip-gold focus-ring mt-4">
+            <Upload size={13} /> {a.importSyllabusCta}
+          </Link>
         </div>
       ) : (
         <CardDeck
@@ -81,11 +93,11 @@ export default async function CoursesPage() {
                 <div className="glass-pill mx-auto mt-4 flex max-w-full items-center gap-2 px-4 py-2 text-xs">
                   {c.professor && <span className="truncate text-[var(--ink)]">{c.professor}</span>}
                   {c.professor && <span className="text-[var(--ink-faint)]">·</span>}
-                  <span className="shrink-0">{c._count.assessments} évaluations</span>
+                  <span className="shrink-0">{fmt(c._count.assessments === 1 ? a.assessmentsOne : a.assessmentsMany, { n: c._count.assessments })}</span>
                   {c._count.tasks > 0 && (
                     <>
                       <span className="text-[var(--ink-faint)]">·</span>
-                      <span className="shrink-0">{c._count.tasks} tâches</span>
+                      <span className="shrink-0">{fmt(c._count.tasks === 1 ? a.tasksOne : a.tasksMany, { n: c._count.tasks })}</span>
                     </>
                   )}
                 </div>
@@ -99,8 +111,8 @@ export default async function CoursesPage() {
         <div className="mx-auto mt-8 max-w-3xl">
           <StudyPlanner
             all
-            title="Plan de révision global"
-            targets={upcoming.map((a) => ({ id: a.id, title: a.title, type: a.type, due: toISODate(a.dueDate!), weight: a.weight, code: a.course.code }))}
+            title={a.globalPlan}
+            targets={upcoming.map((u) => ({ id: u.id, title: u.title, type: u.type, due: toISODate(u.dueDate!), weight: u.weight, code: u.course.code }))}
           />
         </div>
       )}

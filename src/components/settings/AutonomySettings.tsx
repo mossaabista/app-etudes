@@ -3,13 +3,17 @@
 import { useState, useTransition } from "react";
 import { ShieldCheck } from "lucide-react";
 import { saveAutonomyAction } from "@/server/actions/autonomy.actions";
-import { GRANTS, MASS_DELETE, MODES, type Autonomy, type Grant } from "@/lib/risk";
+import { BATCH_SIZE, GRANTS, MASS_DELETE, MODES, type Autonomy, type Grant } from "@/lib/risk";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
 
-/** How much the assistant may do on its own: one of three modes, plus explicit grants. */
+/** How much Jarvis may do on its own: one of three modes, plus explicit grants. */
 export function AutonomySettings({ current }: { current: Autonomy }) {
   const [value, setValue] = useState(current);
   const [status, setStatus] = useState<{ text: string; error?: boolean } | null>(null);
   const [pending, start] = useTransition();
+  const { t: all } = useI18n();
+  const t = all.settingsUi.autonomy;
 
   const save = (next: Autonomy) => {
     const before = value;
@@ -19,10 +23,10 @@ export function AutonomySettings({ current }: { current: Autonomy }) {
       const r = await saveAutonomyAction(next);
       if ("error" in r) {
         setValue(before);
-        setStatus({ text: r.error ?? "Erreur.", error: true });
+        setStatus({ text: r.error ?? t.saveError, error: true });
       } else {
         setValue(r.saved);
-        setStatus({ text: "Enregistré." });
+        setStatus({ text: all.common.saved });
       }
     });
   };
@@ -32,35 +36,35 @@ export function AutonomySettings({ current }: { current: Autonomy }) {
   return (
     <fieldset className="space-y-3" disabled={pending}>
       <legend className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-dim)]">
-        <ShieldCheck size={13} className="text-[#f0cd79]" /> Ce que l&apos;assistant peut faire sans te demander
+        <ShieldCheck size={13} className="text-[#f0cd79]" /> {t.legend}
       </legend>
       <div className="grid gap-2 sm:grid-cols-3">
         {MODES.map((m) => (
           <label key={m.mode} className="tile flex cursor-pointer flex-col gap-1 px-4 py-3 has-[:checked]:ring-2 has-[:checked]:ring-[#e8bf63]">
             <span className="flex items-center gap-2">
               <input type="radio" name="autonomy-mode" checked={value.mode === m.mode} onChange={() => save({ ...value, mode: m.mode })} className="h-4 w-4 accent-[#e8bf63]" />
-              <span className="text-sm font-semibold text-[var(--ink)]">{m.label}</span>
+              <span className="text-sm font-semibold text-[var(--ink)]">{t.modes[m.mode].label}</span>
             </span>
-            <span className="text-xs leading-5 text-[var(--ink-dim)]">{m.desc}</span>
+            <span className="text-xs leading-5 text-[var(--ink-dim)]">{fmt(t.modes[m.mode].desc, { n: BATCH_SIZE })}</span>
           </label>
         ))}
       </div>
       {value.mode === "autonome" && (
         <div className="space-y-1.5">
-          <p className="text-xs text-[var(--ink-dim)]">Autorisé sans demander :</p>
+          <p className="text-xs text-[var(--ink-dim)]">{t.allowed}</p>
           {GRANTS.map((g) => (
             <label key={g.grant} className="flex cursor-pointer items-center gap-2 text-sm text-[var(--ink)]">
               <input type="checkbox" checked={value.grants.includes(g.grant)} onChange={() => toggleGrant(g.grant)} className="h-4 w-4 accent-[#e8bf63]" />
-              {g.label}
+              {fmt(t.grants[g.grant], { n: BATCH_SIZE })}
             </label>
           ))}
         </div>
       )}
       <p className="text-xs text-[var(--ink-faint)]">
-        Plus de {MASS_DELETE} suppressions d&apos;un coup, ou une action impossible à annuler, demandent toujours ton accord, quel que soit le mode.
+        {fmt(t.always, { n: MASS_DELETE })}
       </p>
       <p role="status" aria-live="polite" className={`min-h-[1rem] text-xs ${status?.error ? "text-[#ffb3a3]" : "text-[var(--ink-dim)]"}`}>
-        {pending ? "Enregistrement…" : status?.text}
+        {pending ? all.settingsUi.saving : status?.text}
       </p>
     </fieldset>
   );

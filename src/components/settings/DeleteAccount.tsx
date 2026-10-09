@@ -2,6 +2,11 @@
 
 import { useState } from "react";
 import { deleteAccountAction } from "@/server/actions/account.actions";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
+
+/** The word typed out to confirm; the server checks this exact word. */
+const WORD = "SUPPRIMER";
 
 const field = "w-full rounded-xl border border-[rgba(255,220,148,0.16)] bg-[rgba(20,14,6,0.55)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[rgba(255,179,163,0.5)]";
 
@@ -12,10 +17,11 @@ export function DeleteAccount() {
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const t = useI18n().t.settingsUi.deleteAccount;
   if (!open)
     return (
       <button type="button" onClick={() => setOpen(true)} className="text-xs font-semibold text-[#ffb3a3] underline-offset-2 hover:underline">
-        Supprimer mon compte…
+        {t.open}
       </button>
     );
   return (
@@ -29,7 +35,7 @@ export function DeleteAccount() {
           if (r && "error" in r) setError(r.error);
         } catch (err) {
           // The redirect after a successful deletion arrives as a thrown navigation.
-          if (!(err instanceof Error && /NEXT_REDIRECT/.test(err.message))) setError("Je n'ai pas pu joindre le serveur : rien n'a été supprimé.");
+          if (!(err instanceof Error && /NEXT_REDIRECT/.test(err.message))) setError(t.unreachable);
           else throw err;
         }
         setBusy(false);
@@ -37,21 +43,21 @@ export function DeleteAccount() {
       className="space-y-2 rounded-xl border border-[rgba(255,179,163,0.3)] p-3"
     >
       <p className="text-xs leading-5 text-[var(--ink)]">
-        Tout sera effacé définitivement : cours, tâches, agenda, documents, suivis, automatisations et mémoire de l&apos;assistant. Exporte tes données avant si tu veux en garder une copie. Cette action ne peut pas être annulée.
+        {t.warning}
       </p>
-      <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Ton mot de passe" aria-label="Mot de passe" className={field} />
-      <input value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Tape SUPPRIMER" aria-label="Confirmation" className={field} />
+      <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t.password} aria-label={t.passwordLabel} className={field} />
+      <input value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder={fmt(t.confirmPlaceholder, { word: WORD })} aria-label={t.confirmLabel} className={field} />
       {error && (
-        <p role="alert" className="text-xs text-[#ffb3a3]">
+        <p role="alert" className="rounded-xl bg-[rgba(220,60,40,0.18)] px-3 py-2 text-xs text-[#ffd9cf]">
           {error}
         </p>
       )}
       <div className="flex gap-2">
-        <button type="submit" disabled={busy || !password || confirm.trim() !== "SUPPRIMER"} className="mod-chip focus-ring text-[#ffb3a3]">
-          {busy ? "Suppression…" : "Supprimer définitivement"}
+        <button type="submit" disabled={busy || !password || confirm.trim() !== WORD} className="mod-chip focus-ring text-[#ffb3a3]">
+          {busy ? t.deleting : t.submit}
         </button>
         <button type="button" onClick={() => setOpen(false)} className="mod-chip focus-ring">
-          Garder mon compte
+          {t.keep}
         </button>
       </div>
     </form>

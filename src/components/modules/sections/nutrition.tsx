@@ -23,12 +23,24 @@ import {
   DIETS,
   FOODS,
   GOALS,
+  activityText,
+  aisleLabel,
+  allergenLabel,
   dayMenu,
-  foodConflict,
-  gramsLabel,
+  dietLabel,
+  foodConflictText,
+  foodLabel,
+  goalText,
+  gramsLabelFor,
+  recipeName,
+  recipeNameByKey,
+  recipeSteps,
   sanitizeFoodPrefs,
+  slotText,
+  storedSlotLabel,
   shoppingList,
   targets,
+  targetsWhy,
   weekMenu,
   type FoodPrefs,
   type Goal,
@@ -38,18 +50,35 @@ import {
   type Slot,
 } from "@/lib/nutrition";
 import { addGroceriesAction, removeGroceriesAction } from "@/server/actions/nutrition.actions";
+import { useI18n } from "@/i18n/client";
+import { INTL, fmt, type Locale } from "@/i18n/config";
+import type { Messages } from "@/i18n/messages";
 
 const GLASS_ML = 250;
-const n0 = (x: number) => Math.round(x).toLocaleString("fr-CA");
+const n0 = (x: number, locale: Locale) => Math.round(x).toLocaleString(INTL[locale]);
+const dec = (x: number, digits: number, locale: Locale) => x.toLocaleString(INTL[locale], { minimumFractionDigits: digits, maximumFractionDigits: digits });
+/** What a meal row stored as its slot (a French label, or "Autre"), in the reader's language. */
+const slotShown = (stored: unknown, n: Messages["modulesA"]["nutrition"], locale: Locale) => {
+  const s = String(stored ?? "");
+  if (!s) return "";
+  return storedSlotLabel(s, locale) ?? (s === "Autre" ? n.other : s);
+};
+/** The confirmation after sending groceries, or what went wrong. */
+const groceryMessage = (r: Awaited<ReturnType<typeof addGroceriesAction>>, n: Messages["modulesA"]["nutrition"], skippedTemplate: string) => {
+  if ("error" in r) return n.groceryError;
+  if (!r.added) return n.allThere;
+  return `${r.added === 1 ? n.addedOne : fmt(n.addedMany, { n: r.added })}${r.skipped ? fmt(skippedTemplate, { n: r.skipped }) : ""}.`;
+};
 
 function MacroBar({ label, got, goal, unit = "g", tone }: { label: string; got: number; goal: number; unit?: string; tone: string }) {
+  const { locale } = useI18n();
   const pct = goal ? Math.min(100, (got / goal) * 100) : 0;
   return (
     <div>
       <div className="mb-1 flex justify-between text-xs">
         <span className="text-[var(--ink)]">{label}</span>
         <span className="tabular-nums text-[var(--ink-dim)]">
-          {n0(got)} / {n0(goal)} {unit}
+          {n0(got, locale)} / {n0(goal, locale)} {unit}
         </span>
       </div>
       <div className="mod-meter">
@@ -61,6 +90,8 @@ function MacroBar({ label, got, goal, unit = "g", tone }: { label: string; got: 
 
 /** Profile form: the few facts the targets are computed from. Weight and height come from Corps. */
 function Setup({ initial, onSave, onCancel }: { initial: Partial<NutritionProfile>; onSave: (p: NutritionProfile) => void; onCancel?: () => void }) {
+  const { t, locale } = useI18n();
+  const n = t.modulesA.nutrition;
   const [p, setP] = useState({
     sex: (initial.sex ?? "homme") as Sex,
     age: String(initial.age ?? 22),
@@ -80,34 +111,34 @@ function Setup({ initial, onSave, onCancel }: { initial: Partial<NutritionProfil
     >
       <div className="flex flex-wrap gap-1.5">
         {GOALS.map((g) => (
-          <button key={g.key} type="button" data-on={g.key === p.goal || undefined} onClick={() => setP({ ...p, goal: g.key })} className="mod-tab focus-ring" title={g.desc}>
-            {g.label}
+          <button key={g.key} type="button" data-on={g.key === p.goal || undefined} onClick={() => setP({ ...p, goal: g.key })} className="mod-tab focus-ring" title={goalText(g.key, locale).desc}>
+            {goalText(g.key, locale).label}
           </button>
         ))}
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <select value={p.sex} onChange={(e) => setP({ ...p, sex: e.target.value as Sex })} aria-label="Sexe" className={`${field} cursor-pointer appearance-none`}>
-          <option value="homme">Homme</option>
-          <option value="femme">Femme</option>
+        <select value={p.sex} onChange={(e) => setP({ ...p, sex: e.target.value as Sex })} aria-label={n.sex} className={`${field} cursor-pointer appearance-none`}>
+          <option value="homme">{n.male}</option>
+          <option value="femme">{n.female}</option>
         </select>
-        <input type="number" value={p.age} onChange={(e) => setP({ ...p, age: e.target.value })} placeholder="Âge" aria-label="Âge" className={field} />
-        <input type="number" value={p.height} onChange={(e) => setP({ ...p, height: e.target.value })} placeholder="Taille (cm)" aria-label="Taille en cm" className={field} />
-        <input type="number" step="0.1" value={p.weight} onChange={(e) => setP({ ...p, weight: e.target.value })} placeholder="Poids (kg)" aria-label="Poids en kg" className={field} />
+        <input type="number" value={p.age} onChange={(e) => setP({ ...p, age: e.target.value })} placeholder={n.age} aria-label={n.age} className={field} />
+        <input type="number" value={p.height} onChange={(e) => setP({ ...p, height: e.target.value })} placeholder={n.heightPlaceholder} aria-label={n.heightAria} className={field} />
+        <input type="number" step="0.1" value={p.weight} onChange={(e) => setP({ ...p, weight: e.target.value })} placeholder={n.weightPlaceholder} aria-label={n.weightAria} className={field} />
       </div>
-      <select value={p.activity} onChange={(e) => setP({ ...p, activity: e.target.value })} aria-label="Niveau d'activité" className={`${field} w-full cursor-pointer appearance-none`}>
+      <select value={p.activity} onChange={(e) => setP({ ...p, activity: e.target.value })} aria-label={n.activityLevel} className={`${field} w-full cursor-pointer appearance-none`}>
         {ACTIVITY.map((a) => (
           <option key={a.key} value={a.key}>
-            {a.label} — {a.desc}
+            {activityText(a, locale).label} — {activityText(a, locale).desc}
           </option>
         ))}
       </select>
       <div className="flex gap-2">
         <button type="submit" disabled={!ok} className="mod-chip mod-chip-gold focus-ring">
-          <Check size={13} /> Calculer mon plan
+          <Check size={13} /> {n.compute}
         </button>
         {onCancel && (
           <button type="button" onClick={onCancel} className="mod-chip focus-ring">
-            Annuler
+            {t.common.cancel}
           </button>
         )}
       </div>
@@ -116,6 +147,8 @@ function Setup({ initial, onSave, onCancel }: { initial: Partial<NutritionProfil
 }
 
 export function Nutrition({ module, today, entries, related }: ModuleProps) {
+  const { t: i18n, locale } = useI18n();
+  const n = i18n.modulesA.nutrition;
   const { add, update, remove, schedule, pending } = useEntries(module);
   const corps = related["sante:corps"] ?? [];
   const planRow = entries.find((e) => e.kind === "plan");
@@ -123,16 +156,26 @@ export function Nutrition({ module, today, entries, related }: ModuleProps) {
   const [editing, setEditing] = useState(false);
   const [why, setWhy] = useState(false);
   const t = profile ? targets(profile) : null;
+  const whyLines = profile ? targetsWhy(profile, locale) : [];
 
-  const prefs = useMemo(() => sanitizeFoodPrefs((planRow?.data as { prefs?: unknown } | undefined)?.prefs), [planRow?.data]);
+  const prefs = sanitizeFoodPrefs((planRow?.data as { prefs?: unknown } | undefined)?.prefs);
   // Which recipe each slot shows today: rotates with the date, "Changer" steps through;
   // only recipes that respect every restriction are ever offered.
   const [shift, setShift] = useState<Partial<Record<Slot, number>>>({});
-  const plan = useMemo(() => dayMenu(today, t?.kcal ?? 2000, prefs, shift), [today, shift, t?.kcal, prefs]);
+  const plan = dayMenu(today, t?.kcal ?? 2000, prefs, shift).map((p) => ({
+    ...p,
+    st: slotText(p.slot, locale),
+    name: p.recipe ? recipeName(p.recipe, locale) : "",
+    steps: p.recipe ? recipeSteps(p.recipe, locale) : "",
+  }));
   const [groceryNote, setGroceryNote] = useState<string | null>(null);
   const toGroceries = async (items: Record<string, number>) => {
-    const r = await addGroceriesAction(Object.entries(items).map(([food, grams]) => ({ food, grams })));
-    setGroceryNote("error" in r ? r.error : r.added ? `${r.added} article${r.added > 1 ? "s" : ""} ajouté${r.added > 1 ? "s" : ""} aux courses${r.skipped ? ` (${r.skipped} déjà sur la liste)` : ""}.` : "Tout est déjà sur ta liste de courses.");
+    try {
+      const r = await addGroceriesAction(Object.entries(items).map(([food, grams]) => ({ food, grams })));
+      setGroceryNote(groceryMessage(r, n, n.skippedParen));
+    } catch {
+      setGroceryNote(i18n.common.serverDown);
+    }
   };
 
   const meals = entries.filter((e) => e.kind === "meal" && e.day === today);
@@ -152,6 +195,7 @@ export function Nutrition({ module, today, entries, related }: ModuleProps) {
   const [free, setFree] = useState("");
   const [freeKcal, setFreeKcal] = useState("");
   const [estimating, setEstimating] = useState(false);
+  const [estimateFailed, setEstimateFailed] = useState(false);
 
   const save = (p: NutritionProfile) => {
     const tt = targets(p);
@@ -165,8 +209,8 @@ export function Nutrition({ module, today, entries, related }: ModuleProps) {
     const latest = (k: string) => corps.find((e) => e.kind === k)?.value ?? undefined;
     return (
       <Block
-        title={profile ? "Modifier mon profil" : "Ton plan nutritionnel"}
-        hint="Quelques informations, et l'app calcule tes besoins, tes macros et un plan de repas chaque jour — comme le ferait un nutritionniste."
+        title={profile ? n.editProfile : n.yourPlan}
+        hint={n.setupHint}
         wide
       >
         <Setup initial={{ ...profile, height: profile?.height ?? latest("height"), weight: profile?.weight ?? latest("weight") }} onSave={save} onCancel={profile ? () => setEditing(false) : undefined} />
@@ -179,9 +223,9 @@ export function Nutrition({ module, today, entries, related }: ModuleProps) {
   return (
     <>
       <Block
-        title={`Objectif : ${GOALS.find((g) => g.key === profile.goal)?.label.toLowerCase()}`}
+        title={fmt(n.goalTitle, { goal: GOALS.some((g) => g.key === profile.goal) ? goalText(profile.goal, locale).label.toLowerCase() : "" })}
         action={
-          <IconButton label="Modifier le profil" onClick={() => setEditing(true)}>
+          <IconButton label={n.editProfileAria} onClick={() => setEditing(true)}>
             <Pencil size={13} />
           </IconButton>
         }
@@ -189,26 +233,26 @@ export function Nutrition({ module, today, entries, related }: ModuleProps) {
       >
         <div className="grid gap-5 md:grid-cols-[auto_1fr] md:items-center">
           <div className="text-center md:text-left">
-            <p className="text-4xl font-semibold tabular-nums text-[#f0cd79]">{n0(t!.kcal)}</p>
-            <p className="text-xs text-[var(--ink-dim)]">kcal par jour</p>
+            <p className="text-4xl font-semibold tabular-nums text-[#f0cd79]">{n0(t!.kcal, locale)}</p>
+            <p className="text-xs text-[var(--ink-dim)]">{n.kcalPerDay}</p>
             <p className="mt-2 text-sm text-[var(--ink)]">
-              {left >= 0 ? `Il te reste ${n0(left)} kcal aujourd'hui` : `${n0(-left)} kcal au-dessus de l'objectif`}
+              {left >= 0 ? fmt(n.left, { n: n0(left, locale) }) : fmt(n.over, { n: n0(-left, locale) })}
             </p>
           </div>
           <div className="space-y-2.5">
-            <MacroBar label="Calories" got={eaten.kcal} goal={t!.kcal} unit="kcal" tone="linear-gradient(90deg,#a6761f,#ffe9a0)" />
-            <MacroBar label="Protéines" got={eaten.p} goal={t!.protein} tone="linear-gradient(90deg,#b4472b,#f2876a)" />
-            <MacroBar label="Glucides" got={eaten.c} goal={t!.carbs} tone="linear-gradient(90deg,#3a6fb0,#8ab8f0)" />
-            <MacroBar label="Lipides" got={eaten.f} goal={t!.fat} tone="linear-gradient(90deg,#7d5bb5,#c3a6f2)" />
-            <MacroBar label="Fibres" got={eaten.fib} goal={t!.fiber} tone="linear-gradient(90deg,#2f8a55,#86d6a4)" />
+            <MacroBar label={n.calories} got={eaten.kcal} goal={t!.kcal} unit="kcal" tone="linear-gradient(90deg,#a6761f,#ffe9a0)" />
+            <MacroBar label={n.protein} got={eaten.p} goal={t!.protein} tone="linear-gradient(90deg,#b4472b,#f2876a)" />
+            <MacroBar label={n.carbs} got={eaten.c} goal={t!.carbs} tone="linear-gradient(90deg,#3a6fb0,#8ab8f0)" />
+            <MacroBar label={n.fat} got={eaten.f} goal={t!.fat} tone="linear-gradient(90deg,#7d5bb5,#c3a6f2)" />
+            <MacroBar label={n.fiber} got={eaten.fib} goal={t!.fiber} tone="linear-gradient(90deg,#2f8a55,#86d6a4)" />
           </div>
         </div>
         <button type="button" onClick={() => setWhy(!why)} className="mt-4 flex items-center gap-1.5 text-xs font-semibold text-[#f0cd79]">
-          <ChevronDown size={14} className={`transition-transform ${why ? "rotate-180" : ""}`} /> Pourquoi ces chiffres ?
+          <ChevronDown size={14} className={`transition-transform ${why ? "rotate-180" : ""}`} /> {n.why}
         </button>
         {why && (
           <ol className="mt-2 space-y-1.5 text-xs leading-5 text-[var(--ink-dim)]">
-            {t!.why.map((w, i) => (
+            {whyLines.map((w, i) => (
               <li key={i} className="flex gap-2">
                 <span className="tabular-nums text-[var(--ink-faint)]">{i + 1}.</span>
                 {w}
@@ -218,16 +262,16 @@ export function Nutrition({ module, today, entries, related }: ModuleProps) {
         )}
       </Block>
 
-      <Block title="Ton menu du jour" hint="Les portions sont calculées pour ton objectif. Change un repas s'il ne te tente pas, planifie-le, ou envoie ses ingrédients aux courses." wide>
+      <Block title={n.menuTitle} hint={n.menuHint} wide>
         <ul className="grid gap-3 md:grid-cols-2">
-          {plan.map(({ slot, recipe, items, macros }) => {
+          {plan.map(({ slot, recipe, items, macros, st, name, steps }) => {
             if (!recipe)
               return (
                 <li key={slot.key} className="tile flex flex-col gap-1.5 px-4 py-3.5">
                   <p className="text-[0.7rem] font-semibold uppercase tracking-wide text-[#f0cd79]">
-                    {slot.label} · {slot.time}
+                    {st.label} · {slot.time}
                   </p>
-                  <p className="text-xs leading-5 text-[var(--ink-dim)]">Aucune recette de la bibliothèque ne respecte toutes tes restrictions pour ce repas : je préfère ne rien proposer plutôt que de risquer un aliment exclu.</p>
+                  <p className="text-xs leading-5 text-[var(--ink-dim)]">{n.noRecipe}</p>
                 </li>
               );
             const logged = meals.some((m) => m.data.recipe === recipe.key);
@@ -236,21 +280,21 @@ export function Nutrition({ module, today, entries, related }: ModuleProps) {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="text-[0.7rem] font-semibold uppercase tracking-wide text-[#f0cd79]">
-                      {slot.label} · {slot.time}
+                      {st.label} · {slot.time}
                     </p>
-                    <p className="mt-0.5 text-sm font-semibold text-[var(--ink)]">{recipe.name}</p>
+                    <p className="mt-0.5 text-sm font-semibold text-[var(--ink)]">{name}</p>
                   </div>
-                  <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)]">{n0(macros.kcal)} kcal</span>
+                  <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)]">{n0(macros.kcal, locale)} kcal</span>
                 </div>
                 <p className="text-xs leading-5 text-[var(--ink-dim)]">
                   {Object.entries(items)
-                    .map(([f, g]) => `${FOODS[f].label} ${g} g`)
+                    .map(([f, g]) => fmt(n.ingredient, { food: foodLabel(f, locale), g }))
                     .join(" · ")}
                 </p>
                 <p className="text-xs text-[var(--ink-faint)]">
-                  P {n0(macros.p)} g · G {n0(macros.c)} g · L {n0(macros.f)} g · fibres {n0(macros.fib)} g · {recipe.minutes} min — {recipe.steps}
+                  {fmt(n.macroLine, { p: n0(macros.p, locale), c: n0(macros.c, locale), f: n0(macros.f, locale), fib: n0(macros.fib, locale), min: recipe.minutes, steps })}
                 </p>
-                <p className="text-[0.7rem] italic text-[var(--ink-faint)]">Quand : {slot.when}.</p>
+                <p className="text-[0.7rem] italic text-[var(--ink-faint)]">{fmt(n.when, { when: st.when })}</p>
                 <div className="flex flex-wrap gap-1.5">
                   <button
                     type="button"
@@ -258,14 +302,14 @@ export function Nutrition({ module, today, entries, related }: ModuleProps) {
                     onClick={() => add("meal", { day: today, text: recipe.name, value: Math.round(macros.kcal), data: { slot: slot.label, recipe: recipe.key, macros } })}
                     className="mod-chip mod-chip-gold focus-ring"
                   >
-                    <Utensils size={12} /> {logged ? "Mangé" : "Je l'ai mangé"}
+                    <Utensils size={12} /> {logged ? n.eaten : n.ate}
                   </button>
-                  <button type="button" onClick={() => setShift({ ...shift, [slot.key]: (shift[slot.key] ?? 0) + 1 })} className="mod-chip focus-ring" aria-label={`Changer ${slot.label.toLowerCase()}`}>
-                    <RefreshCw size={12} /> Changer
+                  <button type="button" onClick={() => setShift({ ...shift, [slot.key]: (shift[slot.key] ?? 0) + 1 })} className="mod-chip focus-ring" aria-label={fmt(n.changeAria, { slot: st.label.toLowerCase() })}>
+                    <RefreshCw size={12} /> {n.change}
                   </button>
-                  <ScheduleButton title={`${slot.label} : ${recipe.name}`} minutes={30} today={today} defaultTime={slot.time} onSchedule={(x) => schedule(x)} />
+                  <ScheduleButton title={fmt(n.mealEvent, { slot: st.label, name })} minutes={30} today={today} defaultTime={slot.time} onSchedule={(x) => schedule(x)} />
                   <button type="button" disabled={pending} onClick={() => toGroceries(items)} className="mod-chip focus-ring">
-                    <ShoppingCart size={12} /> Courses
+                    <ShoppingCart size={12} /> {n.groceries}
                   </button>
                 </div>
               </li>
@@ -283,7 +327,7 @@ export function Nutrition({ module, today, entries, related }: ModuleProps) {
 
       <WeekBlock today={today} kcal={t!.kcal} prefs={prefs} />
 
-      <Block title="Journal du jour" hint="Ce qui sort du menu : décris-le en mots (« un bol de riz au poulet et une pomme ») et l'assistant estime les calories et les macros.">
+      <Block title={n.journalTitle} hint={n.journalHint}>
         <form
           onSubmit={async (e) => {
             e.preventDefault();
@@ -294,9 +338,13 @@ export function Nutrition({ module, today, entries, related }: ModuleProps) {
               add("meal", { day: today, text, value: Number(freeKcal), data: { slot: "Autre" } });
             } else {
               setEstimating(true);
-              const res = await aiHelperAction({ kind: "meal", text });
+              setEstimateFailed(false);
+              const res = await aiHelperAction({ kind: "meal", text }).catch(() => ({ error: "unreachable" }) as const);
               setEstimating(false);
-              if ("error" in res) add("meal", { day: today, text, value: null, data: { slot: "Autre" } });
+              if ("error" in res) {
+                add("meal", { day: today, text, value: null, data: { slot: "Autre" } });
+                setEstimateFailed(true);
+              }
               else {
                 const r = res.result as { kcal: number; protein: number; carbs: number; fat: number; fiber?: number; note?: string };
                 add("meal", { day: today, text, value: Math.round(r.kcal), data: { slot: "Autre", estimated: true, note: r.note ?? "", macros: { kcal: r.kcal, p: r.protein, c: r.carbs, f: r.fat, fib: r.fiber ?? 0 } } });
@@ -307,30 +355,35 @@ export function Nutrition({ module, today, entries, related }: ModuleProps) {
           }}
           className="mb-3 flex flex-wrap gap-2"
         >
-          <input value={free} onChange={(e) => setFree(e.target.value)} placeholder="Ce que tu as mangé" aria-label="Aliment" className={`${field} flex-1 basis-40`} />
-          <input type="number" value={freeKcal} onChange={(e) => setFreeKcal(e.target.value)} placeholder="kcal" aria-label="Calories" className={`${field} w-24`} />
+          <input value={free} onChange={(e) => setFree(e.target.value)} placeholder={n.foodPlaceholder} aria-label={n.foodAria} className={`${field} flex-1 basis-40`} />
+          <input type="number" value={freeKcal} onChange={(e) => setFreeKcal(e.target.value)} placeholder="kcal" aria-label={n.calories} className={`${field} w-24`} />
           <button type="submit" disabled={pending || estimating} className="mod-chip mod-chip-gold focus-ring">
-            {freeKcal ? <Plus size={13} /> : <Sparkles size={13} />} {estimating ? "Estimation…" : freeKcal ? "Ajouter" : "Analyser et ajouter"}
+            {freeKcal ? <Plus size={13} /> : <Sparkles size={13} />} {estimating ? n.estimating : freeKcal ? n.add : n.analyze}
           </button>
         </form>
+        {estimateFailed && (
+          <p role="status" className="mb-3 rounded-xl bg-[rgba(220,60,40,0.18)] px-3 py-2 text-xs text-[#ffd9cf]">
+            {n.notEstimated}
+          </p>
+        )}
         {meals.length === 0 ? (
-          <Empty>Rien de noté aujourd&apos;hui.</Empty>
+          <Empty>{n.journalEmpty}</Empty>
         ) : (
           <ul className="space-y-1.5">
             {meals.map((m) => (
               <li key={m.id} className="flex items-center justify-between gap-2 text-sm">
                 <span className="min-w-0 text-[var(--ink)]">
-                  <span className="text-xs text-[var(--ink-faint)]">{String(m.data.slot ?? "")} · </span>
-                  {m.text}
+                  <span className="text-xs text-[var(--ink-faint)]">{slotShown(m.data.slot, n, locale)} · </span>
+                  {(typeof m.data.recipe === "string" && recipeNameByKey(m.data.recipe, locale)) || m.text}
                   {Boolean(m.data.estimated) && (m.data.macros as Macros | undefined) && (
                     <span className="block text-[0.7rem] text-[var(--ink-faint)]">
-                      estimé · P {n0((m.data.macros as Macros).p)} g · G {n0((m.data.macros as Macros).c)} g · L {n0((m.data.macros as Macros).f)} g
+                      {fmt(n.estimated, { p: n0((m.data.macros as Macros).p, locale), c: n0((m.data.macros as Macros).c, locale), f: n0((m.data.macros as Macros).f, locale) })}
                     </span>
                   )}
                 </span>
                 <span className="flex shrink-0 items-center gap-2 text-xs tabular-nums text-[var(--ink-dim)]">
-                  {m.value ? `${n0(m.value)} kcal` : "—"}
-                  <button type="button" onClick={() => remove(m.id)} aria-label="Supprimer" className="text-[var(--ink-faint)] hover:text-[var(--ink)]">
+                  {m.value ? `${n0(m.value, locale)} kcal` : "—"}
+                  <button type="button" onClick={() => remove(m.id)} aria-label={i18n.common.delete} className="text-[var(--ink-faint)] hover:text-[var(--ink)]">
                     <Trash2 size={12} />
                   </button>
                 </span>
@@ -340,27 +393,27 @@ export function Nutrition({ module, today, entries, related }: ModuleProps) {
         )}
       </Block>
 
-      <Block title="Hydratation" hint={`Environ ${(t!.water / 1000).toFixed(1).replace(".", ",")} L d'eau par jour au total ; les boissons en apportent les trois quarts.`}>
+      <Block title={n.hydrationTitle} hint={fmt(n.hydrationHint, { l: dec(t!.water / 1000, 1, locale) })}>
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Droplet className="text-[#f0cd79]" size={28} />
             <div>
-              <p className="text-2xl font-semibold tabular-nums text-[var(--ink)]">{((glasses * GLASS_ML) / 1000).toFixed(2).replace(".", ",")} L</p>
+              <p className="text-2xl font-semibold tabular-nums text-[var(--ink)]">{dec((glasses * GLASS_ML) / 1000, 2, locale)} L</p>
               <p className="text-xs text-[var(--ink-dim)]">
-                {glasses} / {waterTarget} verres de 250 ml
+                {fmt(n.glasses, { n: glasses, target: waterTarget })}
               </p>
             </div>
           </div>
           <Counter value={glasses} onChange={setGlasses} max={24} />
         </div>
         <div className="mt-4">
-          <DayBars days={lastDays(today, 7)} value={(d) => water.find((w) => w.day === d)?.value ?? 0} target={waterTarget} unit="verres" />
+          <DayBars days={lastDays(today, 7)} value={(d) => water.find((w) => w.day === d)?.value ?? 0} target={waterTarget} unit={n.glassesUnit} />
         </div>
       </Block>
 
-      <Block title="Les conseils de ton nutritionniste" wide>
+      <Block title={n.adviceTitle} wide>
         <ul className="grid gap-2 sm:grid-cols-2">
-          {(ADVICE[profile.goal] ?? []).concat(ADVICE.all).map(([title, text]) => (
+          {[...(profile.goal in n.advice ? Object.values(n.advice[profile.goal]) : []), ...Object.values(n.advice.all)].map(({ title, text }) => (
             <li key={title} className="tile px-3.5 py-3">
               <p className="text-sm font-semibold text-[var(--ink)]">{title}</p>
               <p className="mt-1 text-xs leading-5 text-[var(--ink-dim)]">{text}</p>
@@ -370,15 +423,15 @@ export function Nutrition({ module, today, entries, related }: ModuleProps) {
         <div className="mt-4">
           <Stats
             items={[
-              { label: "Métabolisme de base", value: `${n0(t!.bmr)} kcal` },
-              { label: "Dépense totale", value: `${n0(t!.tdee)} kcal` },
-              { label: "Protéines / repas", value: `${n0(t!.protein / 4)} g`, sub: "sur 4 prises" },
-              { label: "Eau", value: `${(t!.water / 1000).toFixed(1).replace(".", ",")} L` },
+              { label: n.bmr, value: `${n0(t!.bmr, locale)} kcal` },
+              { label: n.tdee, value: `${n0(t!.tdee, locale)} kcal` },
+              { label: n.proteinPerMeal, value: `${n0(t!.protein / 4, locale)} g`, sub: n.over4 },
+              { label: n.water, value: `${dec(t!.water / 1000, 1, locale)} L` },
             ]}
           />
         </div>
         <div className="mt-3">
-          <Meter value={eaten.p} max={t!.protein} label="Protéines du jour" />
+          <Meter value={eaten.p} max={t!.protein} label={n.proteinToday} />
         </div>
       </Block>
     </>
@@ -387,22 +440,24 @@ export function Nutrition({ module, today, entries, related }: ModuleProps) {
 
 /** Diet, allergies and foods to avoid: every menu and grocery list respects them. */
 function FoodPrefsBlock({ prefs, pending, onSave }: { prefs: FoodPrefs; pending: boolean; onSave: (p: FoodPrefs) => void }) {
+  const { t, locale } = useI18n();
+  const n = t.modulesA.nutrition;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(prefs);
   const toggle = <T extends string>(list: T[], x: T) => (list.includes(x) ? list.filter((y) => y !== x) : [...list, x]);
   const summary = [
-    DIETS.find((d) => d.key === prefs.diet)!.label,
-    prefs.allergens.length ? `allergies : ${prefs.allergens.map((a) => ALLERGENS.find((k) => k.key === a)!.label.toLowerCase()).join(", ")}` : "aucune allergie indiquée",
-    prefs.avoid.length ? `sans ${prefs.avoid.map((f) => FOODS[f].label.toLowerCase()).join(", ")}` : null,
+    dietLabel(prefs.diet, locale),
+    prefs.allergens.length ? fmt(n.allergiesList, { list: prefs.allergens.map((a) => allergenLabel(a, locale).toLowerCase()).join(", ") }) : n.noAllergy,
+    prefs.avoid.length ? fmt(n.without, { list: prefs.avoid.map((f) => foodLabel(f, locale).toLowerCase()).join(", ") }) : null,
   ].filter(Boolean);
   return (
     <Block
-      title="Mes restrictions alimentaires"
-      hint="Les menus, la semaine et la liste de courses n'utilisent jamais un aliment exclu. Ce n'est pas un avis médical : en cas d'allergie sévère, vérifie toujours les étiquettes."
+      title={n.prefsTitle}
+      hint={n.prefsHint}
       action={
         !editing && (
           <IconButton
-            label="Modifier les restrictions"
+            label={n.prefsEdit}
             onClick={() => {
               setDraft(prefs);
               setEditing(true);
@@ -422,17 +477,17 @@ function FoodPrefsBlock({ prefs, pending, onSave }: { prefs: FoodPrefs; pending:
       ) : (
         <div className="space-y-4">
           <fieldset>
-            <legend className="mb-1.5 text-xs font-semibold text-[var(--ink-dim)]">Régime</legend>
+            <legend className="mb-1.5 text-xs font-semibold text-[var(--ink-dim)]">{n.diet}</legend>
             <div className="flex flex-wrap gap-1.5">
               {DIETS.map((d) => (
                 <button key={d.key} type="button" aria-pressed={draft.diet === d.key} data-on={draft.diet === d.key || undefined} onClick={() => setDraft({ ...draft, diet: d.key })} className="mod-tab focus-ring">
-                  {d.label}
+                  {dietLabel(d.key, locale)}
                 </button>
               ))}
             </div>
           </fieldset>
           <fieldset>
-            <legend className="mb-1.5 text-xs font-semibold text-[var(--ink-dim)]">Allergies et intolérances</legend>
+            <legend className="mb-1.5 text-xs font-semibold text-[var(--ink-dim)]">{n.allergies}</legend>
             <div className="flex flex-wrap gap-1.5">
               {ALLERGENS.map((a) => (
                 <button
@@ -443,16 +498,16 @@ function FoodPrefsBlock({ prefs, pending, onSave }: { prefs: FoodPrefs; pending:
                   onClick={() => setDraft({ ...draft, allergens: toggle(draft.allergens, a.key) })}
                   className="mod-tab focus-ring"
                 >
-                  {a.label}
+                  {allergenLabel(a.key, locale)}
                 </button>
               ))}
             </div>
           </fieldset>
           <fieldset>
-            <legend className="mb-1.5 text-xs font-semibold text-[var(--ink-dim)]">Aliments que tu ne veux pas</legend>
+            <legend className="mb-1.5 text-xs font-semibold text-[var(--ink-dim)]">{n.avoid}</legend>
             <div className="flex flex-wrap gap-1.5">
-              {Object.entries(FOODS).map(([k, f]) => {
-                const blocked = foodConflict(k, { ...draft, avoid: [] });
+              {Object.keys(FOODS).map((k) => {
+                const blocked = foodConflictText(k, { ...draft, avoid: [] }, locale);
                 return (
                   <button
                     key={k}
@@ -464,7 +519,7 @@ function FoodPrefsBlock({ prefs, pending, onSave }: { prefs: FoodPrefs; pending:
                     onClick={() => setDraft({ ...draft, avoid: toggle(draft.avoid, k) })}
                     className="mod-tab focus-ring text-xs disabled:opacity-40"
                   >
-                    {f.label}
+                    {foodLabel(k, locale)}
                   </button>
                 );
               })}
@@ -480,10 +535,10 @@ function FoodPrefsBlock({ prefs, pending, onSave }: { prefs: FoodPrefs; pending:
               }}
               className="mod-chip mod-chip-gold focus-ring"
             >
-              <Check size={13} /> Enregistrer
+              <Check size={13} /> {t.common.save}
             </button>
             <button type="button" onClick={() => setEditing(false)} className="mod-chip focus-ring">
-              Annuler
+              {t.common.cancel}
             </button>
           </div>
         </div>
@@ -492,50 +547,62 @@ function FoodPrefsBlock({ prefs, pending, onSave }: { prefs: FoodPrefs; pending:
   );
 }
 
-const WEEKDAY = new Intl.DateTimeFormat("fr-CA", { weekday: "short", day: "numeric", timeZone: "UTC" });
-
 /** Seven days of menus and what they need from the store, added up. */
 function WeekBlock({ today, kcal, prefs }: { today: string; kcal: number; prefs: FoodPrefs }) {
+  const { t, locale } = useI18n();
+  const n = t.modulesA.nutrition;
+  // A calendar day with no time of its own: read in UTC so it never shifts.
+  const weekday = new Intl.DateTimeFormat(INTL[locale], { weekday: "short", day: "numeric", timeZone: "UTC" });
   const week = useMemo(() => weekMenu(today, kcal, prefs), [today, kcal, prefs]);
-  const list = useMemo(() => shoppingList(week), [week]);
+  const list = useMemo(
+    () =>
+      shoppingList(week)
+        .map((i) => ({ ...i, label: foodLabel(i.food, locale), aisle: aisleLabel(i.aisle, locale) }))
+        .sort((a, b) => a.aisle.localeCompare(b.aisle, locale) || a.label.localeCompare(b.label, locale)),
+    [week, locale]
+  );
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<{ text: string; ids: string[] } | null>(null);
   const missing = week.reduce((n, d) => n + d.meals.filter((m) => !m.recipe).length, 0);
   return (
-    <Block title="Ma semaine de repas" hint="Sept jours à partir d'aujourd'hui, avec les mêmes portions que le menu du jour, et la liste de courses qui va avec." wide>
+    <Block title={n.weekTitle} hint={n.weekHint} wide>
       <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         {week.map((d) => (
           <li key={d.day} className="tile px-3.5 py-3">
-            <p className="text-[0.7rem] font-semibold uppercase tracking-wide text-[#f0cd79]">{WEEKDAY.format(new Date(`${d.day}T12:00:00Z`))}</p>
+            <p className="text-[0.7rem] font-semibold uppercase tracking-wide text-[#f0cd79]">{weekday.format(new Date(`${d.day}T12:00:00Z`))}</p>
             <ul className="mt-1 space-y-0.5 text-xs leading-5 text-[var(--ink-dim)]">
               {d.meals.map((m) => (
                 <li key={m.slot.key}>
-                  <span className="text-[var(--ink-faint)]">{m.slot.label} : </span>
-                  {m.recipe ? m.recipe.name : "—"}
+                  <span className="text-[var(--ink-faint)]">{fmt(n.mealEvent, { slot: slotText(m.slot, locale).label, name: "" })}</span>
+                  {m.recipe ? recipeName(m.recipe, locale) : "—"}
                 </li>
               ))}
             </ul>
           </li>
         ))}
       </ul>
-      {missing > 0 && <p className="mt-2 text-xs text-[var(--ink-faint)]">{missing} repas sans recette compatible avec tes restrictions : à compléter toi-même.</p>}
+      {missing > 0 && <p className="mt-2 text-xs text-[var(--ink-faint)]">{fmt(n.weekMissing, { n: missing })}</p>}
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="mod-chip focus-ring">
-          <ChevronDown size={13} className={`transition-transform ${open ? "rotate-180" : ""}`} /> Liste de la semaine ({list.length})
+          <ChevronDown size={13} className={`transition-transform ${open ? "rotate-180" : ""}`} /> {fmt(n.weekList, { n: list.length })}
         </button>
         <button
           type="button"
           disabled={busy || !list.length}
           onClick={async () => {
             setBusy(true);
-            const r = await addGroceriesAction(list.map((i) => ({ food: i.food, grams: i.grams })));
+            try {
+              const r = await addGroceriesAction(list.map((i) => ({ food: i.food, grams: i.grams })));
+              setDone({ text: groceryMessage(r, n, n.skippedComma), ids: "error" in r ? [] : r.ids });
+            } catch {
+              setDone({ text: t.common.serverDown, ids: [] });
+            }
             setBusy(false);
-            setDone("error" in r ? { text: r.error, ids: [] } : { text: r.added ? `${r.added} article${r.added > 1 ? "s" : ""} ajouté${r.added > 1 ? "s" : ""} aux courses${r.skipped ? `, ${r.skipped} déjà sur la liste` : ""}.` : "Tout est déjà sur ta liste de courses.", ids: r.ids });
           }}
           className="mod-chip mod-chip-gold focus-ring"
         >
-          <ShoppingCart size={13} /> {busy ? "Ajout…" : "Tout ajouter aux courses"}
+          <ShoppingCart size={13} /> {busy ? n.adding : n.addAll}
         </button>
         {done && (
           <span role="status" className="flex items-center gap-2 text-xs text-[var(--ink-dim)]">
@@ -544,12 +611,16 @@ function WeekBlock({ today, kcal, prefs }: { today: string; kcal: number; prefs:
               <button
                 type="button"
                 onClick={async () => {
-                  const r = await removeGroceriesAction(done.ids);
-                  setDone({ text: `Annulé : ${r.removed} article${r.removed > 1 ? "s" : ""} retiré${r.removed > 1 ? "s" : ""}.`, ids: [] });
+                  try {
+                    const r = await removeGroceriesAction(done.ids);
+                    setDone({ text: fmt((locale === "fr" ? r.removed <= 1 : r.removed === 1) ? n.removedOne : n.removedMany, { n: r.removed }), ids: [] });
+                  } catch {
+                    setDone({ text: t.common.serverDown, ids: done.ids });
+                  }
                 }}
                 className="mod-chip focus-ring"
               >
-                <Undo2 size={12} /> Annuler
+                <Undo2 size={12} /> {t.common.undo}
               </button>
             )}
           </span>
@@ -562,7 +633,7 @@ function WeekBlock({ today, kcal, prefs }: { today: string; kcal: number; prefs:
               <span className="text-[var(--ink)]">
                 {i.label} <span className="text-[var(--ink-faint)]">· {i.aisle}</span>
               </span>
-              <span className="tabular-nums text-[var(--ink-dim)]">{gramsLabel(i.grams)}</span>
+              <span className="tabular-nums text-[var(--ink-dim)]">{gramsLabelFor(i.grams, locale)}</span>
             </li>
           ))}
         </ul>
@@ -570,28 +641,6 @@ function WeekBlock({ today, kcal, prefs }: { today: string; kcal: number; prefs:
     </Block>
   );
 }
-
-const ADVICE: Record<string, [string, string][]> = {
-  perdre: [
-    ["Des protéines à chaque repas", "Elles rassasient le plus et protègent ta masse musculaire pendant le déficit : vise un quart de l'assiette."],
-    ["Le volume avant tout", "Légumes, soupes, fruits entiers : beaucoup de volume pour peu de calories, la faim recule."],
-    ["Attention aux calories liquides", "Jus, sodas, cafés sucrés et alcool s'additionnent vite sans rassasier."],
-    ["Pèse-toi sur la moyenne", "Le poids varie de 1 à 2 kg d'un jour à l'autre (eau, sel). Compare les moyennes d'une semaine à l'autre."],
-  ],
-  maintenir: [
-    ["Varie les couleurs", "Plus l'assiette est colorée, plus les vitamines et les fibres sont variées."],
-    ["Écoute ta faim", "Mange à heures régulières et arrête-toi à satiété, sans écran si possible."],
-  ],
-  prendre: [
-    ["Répartis les protéines", "Environ 0,4 g/kg à chaque repas, sur 4 prises, maximise la construction musculaire (Schoenfeld & Aragon, 2018)."],
-    ["Glucides autour de l'entraînement", "Un repas avec des glucides 1 à 3 h avant, et protéines + glucides dans les heures qui suivent."],
-    ["Un surplus modéré", "Au-delà de +300 kcal, le gain se fait surtout en gras. Vise +0,25 à 0,5 % du poids par semaine."],
-  ],
-  all: [
-    ["Le dernier repas", "2 à 3 heures avant le coucher : la digestion perturbe moins le sommeil."],
-    ["Des grains entiers", "Avoine, quinoa, riz brun, pain complet : plus de fibres, une énergie plus stable."],
-  ],
-};
 
 export const NUTRITION_SOURCES = [
   "Mifflin M.D. et al., A new predictive equation for resting energy expenditure, Am J Clin Nutr 51(2) (1990).",

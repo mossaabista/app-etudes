@@ -343,3 +343,175 @@ export function shoppingList(days: { meals: PlannedMeal[] }[]): ShoppingItem[] {
 }
 
 export const gramsLabel = (g: number) => (g >= 1000 ? `${(g / 1000).toFixed(1).replace(".", ",")} kg` : `${g} g`);
+
+// --------------------------------------------------------------------------- English
+//
+// The French names above are the reference (stored rows and tests rely on them); these are
+// the English names shown when the app speaks English. Same keys, nothing else changes.
+
+type Lang = "fr" | "en";
+
+const FOODS_EN: Record<string, string> = {
+  avoine: "Rolled oats",
+  boissonsoja: "Unsweetened soy beverage",
+  lait: "2% milk",
+  yogourt: "Plain Greek yogurt 2%",
+  cottage: "Cottage cheese 2%",
+  feta: "Feta",
+  oeuf: "Eggs",
+  pain: "Whole-grain bread",
+  tortilla: "Whole-wheat tortilla",
+  poulet: "Chicken breast",
+  saumon: "Salmon",
+  thon: "Canned tuna (in water)",
+  boeuf: "Extra-lean ground beef",
+  tofu: "Firm tofu",
+  lentilles: "Cooked lentils",
+  poischiches: "Cooked chickpeas",
+  haricotsrouges: "Cooked kidney beans",
+  riz: "Cooked brown rice",
+  quinoa: "Cooked quinoa",
+  pates: "Cooked whole-wheat pasta",
+  patatedouce: "Sweet potato",
+  brocoli: "Broccoli",
+  epinards: "Spinach",
+  poivron: "Bell pepper",
+  tomate: "Tomatoes",
+  concombre: "Cucumber",
+  carotte: "Carrots",
+  haricotsverts: "Green beans",
+  avocat: "Avocado",
+  fruits: "Berries",
+  banane: "Banana",
+  pomme: "Apple",
+  amandes: "Almonds",
+  arachide: "Natural peanut butter",
+  chia: "Chia seeds",
+  hummus: "Hummus",
+  sauce: "Tomato sauce",
+  huile: "Olive oil",
+  miel: "Honey",
+};
+
+const AISLES_EN: Record<string, string> = {
+  "Épicerie": "Pantry",
+  "Produits laitiers": "Dairy",
+  "Boulangerie": "Bakery",
+  "Viandes & poissons": "Meat & fish",
+  "Fruits & légumes": "Produce",
+};
+
+const RECIPES_EN: Record<string, { name: string; steps: string }> = {
+  gruau: { name: "Protein oatmeal with berries", steps: "Cook the oats in the milk for 4 min, take off the heat and stir in the yogurt, top with berries and chia." },
+  omelette: { name: "Spinach omelette with whole-grain toast", steps: "Wilt the vegetables in the oil, add the beaten eggs, cook over medium heat; serve with the toasted bread." },
+  toast: { name: "Avocado and egg toast", steps: "Mash the avocado on the toast, add two poached or fried eggs, salt, pepper, lemon." },
+  "bol-yogourt": { name: "Greek yogurt bowl with berries and almonds", steps: "Layer yogurt, berries and crushed almonds; a drizzle of honey." },
+  "gruau-soja": { name: "Soy-milk oatmeal with banana and chia", steps: "Cook the oats in the soy beverage for 4 min, add the sliced banana and the chia." },
+  "tofu-brouille": { name: "Tofu scramble with vegetables", steps: "Crumble the tofu into the oil with turmeric and pepper, add the pepper and spinach; serve with roasted sweet potato." },
+  "bol-quinoa": { name: "Quinoa bowl with chicken and roasted vegetables", steps: "Roast sweet potato and broccoli for 20 min at 220 °C, grill the chicken, serve over the quinoa." },
+  "salade-pc": { name: "Chickpea and feta salad", steps: "Dice everything, dress with olive oil, lemon and oregano." },
+  "wrap-thon": { name: "Tuna and hummus wrap", steps: "Spread the hummus, add drained tuna, spinach and tomatoes, roll tightly." },
+  "bowl-tofu": { name: "Crispy tofu bowl", steps: "Pan-fry the cubed tofu until golden, serve over the rice with grated carrots and spinach." },
+  "salade-lentilles": { name: "Lentil, quinoa and crunchy vegetable salad", steps: "Toss the cooked lentils and quinoa with the diced vegetables; olive oil, lemon and mustard dressing." },
+  "pomme-arachide": { name: "Apple and peanut butter", steps: "Slice the apple, dip in the peanut butter." },
+  cottage: { name: "Cottage cheese and berries", steps: "Mix, and it's ready." },
+  houmous: { name: "Hummus and crudités", steps: "Cut the vegetables into sticks." },
+  banane: { name: "Banana and almonds", steps: "Easy to take anywhere." },
+  saumon: { name: "Salmon, brown rice and green beans", steps: "Bake the salmon 12 min at 200 °C, steam the beans 6 min, serve with the rice." },
+  chili: { name: "Lentil chili", steps: "Sauté the pepper, add sauce, lentils, beans and chili spices, simmer 20 min." },
+  bolognaise: { name: "Whole-wheat pasta with lean bolognese", steps: "Brown the meat, add the sauce, simmer 10 min, serve over the pasta." },
+  "curry-pc": { name: "Chickpea curry with brown rice", steps: "Toast the curry spices in the oil, add sauce and chickpeas, simmer 10 min, spinach at the end; serve over the rice." },
+  "poulet-patate": { name: "Chicken, sweet potato and broccoli", steps: "Everything on one sheet pan, 25 min at 210 °C, paprika and garlic." },
+};
+
+const SLOTS_EN: Record<Slot, { label: string; when: string }> = {
+  matin: { label: "Breakfast", when: "within an hour of waking up" },
+  midi: { label: "Lunch", when: "4 to 5 h after breakfast" },
+  collation: { label: "Snack", when: "mid-afternoon, or 1 to 2 h before training" },
+  soir: { label: "Dinner", when: "2 to 3 h before bed" },
+};
+
+const DIETS_EN: Record<Diet, string> = { omnivore: "I eat everything", pescetarien: "Pescatarian", vegetarien: "Vegetarian", vegetalien: "Vegan" };
+
+const ALLERGENS_EN: Record<Allergen, string> = {
+  lait: "Milk",
+  oeufs: "Eggs",
+  arachides: "Peanuts",
+  noix: "Tree nuts",
+  gluten: "Gluten (wheat, oats)",
+  poisson: "Fish",
+  soja: "Soy",
+  sesame: "Sesame",
+};
+
+const GOALS_EN: Record<Goal, { label: string; desc: string }> = {
+  perdre: { label: "Lose weight", desc: "≈ 0.5 kg a week, keeping muscle" },
+  maintenir: { label: "Maintain", desc: "Stability, energy, health" },
+  prendre: { label: "Build muscle", desc: "Small surplus + training" },
+};
+
+const ACTIVITY_EN: Record<number, { label: string; desc: string }> = {
+  1.2: { label: "Sedentary", desc: "Desk work, little or no exercise" },
+  1.375: { label: "Lightly active", desc: "Exercise 1 to 3 times a week" },
+  1.55: { label: "Active", desc: "Exercise 3 to 5 times a week" },
+  1.725: { label: "Very active", desc: "Exercise 6 to 7 times a week" },
+  1.9: { label: "Extremely active", desc: "Physical job and daily training" },
+};
+
+export const foodLabel = (key: string, lang: Lang) => (lang === "en" ? FOODS_EN[key] : undefined) ?? FOODS[key]?.label ?? key;
+export const aisleLabel = (aisle: string, lang: Lang) => (lang === "en" ? AISLES_EN[aisle] : undefined) ?? aisle;
+export const recipeName = (r: Pick<Recipe, "key" | "name">, lang: Lang) => (lang === "en" ? RECIPES_EN[r.key]?.name : undefined) ?? r.name;
+export const recipeSteps = (r: Pick<Recipe, "key" | "steps">, lang: Lang) => (lang === "en" ? RECIPES_EN[r.key]?.steps : undefined) ?? r.steps;
+/** A recipe's name from its key alone (as stored on a logged meal), or null when unknown. */
+export const recipeNameByKey = (key: string, lang: Lang) => {
+  const r = RECIPES.find((x) => x.key === key);
+  return r ? recipeName(r, lang) : null;
+};
+export const slotText = (slot: (typeof SLOTS)[number], lang: Lang) => (lang === "en" ? SLOTS_EN[slot.key] : { label: slot.label, when: slot.when });
+/** The meal name for a slot label as stored on a meal row (always the French label). */
+export const storedSlotLabel = (stored: string, lang: Lang) => {
+  const slot = SLOTS.find((s) => s.label === stored);
+  return slot ? slotText(slot, lang).label : null;
+};
+export const dietLabel = (d: Diet, lang: Lang) => (lang === "en" ? DIETS_EN[d] : DIETS.find((x) => x.key === d)!.label);
+export const allergenLabel = (a: Allergen, lang: Lang) => (lang === "en" ? ALLERGENS_EN[a] : ALLERGENS.find((x) => x.key === a)!.label);
+export const goalText = (g: Goal, lang: Lang) => (lang === "en" ? GOALS_EN[g] : GOALS.find((x) => x.key === g)!);
+export const activityText = (a: (typeof ACTIVITY)[number], lang: Lang) => (lang === "en" ? (ACTIVITY_EN[a.key] ?? a) : a);
+
+/** `foodConflict`, said in the reader's language. */
+export function foodConflictText(key: string, prefs: FoodPrefs, lang: Lang): string | null {
+  if (lang === "fr") return foodConflict(key, prefs);
+  const c = CONTAINS[key];
+  const allergen = c?.allergens?.find((a) => prefs.allergens.includes(a));
+  if (allergen) return `allergy: ${ALLERGENS_EN[allergen].toLowerCase()}`;
+  if (c?.animal && EXCLUDED_BY_DIET[prefs.diet].includes(c.animal)) return DIETS_EN[prefs.diet].toLowerCase();
+  if (prefs.avoid.includes(key)) return "you don't want to eat it";
+  return null;
+}
+
+/** `gramsLabel`, with the reader's decimal separator. */
+export const gramsLabelFor = (g: number, lang: Lang) => (lang === "en" ? (g >= 1000 ? `${(g / 1000).toFixed(1)} kg` : `${g} g`) : gramsLabel(g));
+
+/** The "why these numbers" reasoning of `targets`, in the reader's language. */
+export function targetsWhy(p: NutritionProfile, lang: Lang): string[] {
+  const t = targets(p);
+  if (lang === "fr") return t.why;
+  // Same arithmetic as `targets`, unrounded, so both languages say exactly the same thing.
+  const tdee = (10 * p.weight + 6.25 * p.height - 5 * p.age + (p.sex === "homme" ? 5 : -161)) * p.activity;
+  const floor = p.sex === "homme" ? 1500 : 1200;
+  const kcal = p.goal === "perdre" ? Math.max(floor, tdee - 550) : p.goal === "prendre" ? tdee + 300 : tdee;
+  const perKg = p.goal === "maintenir" ? 1.4 : 1.8;
+  const deficit = p.goal === "perdre" ? round(tdee - kcal, 10) : 0;
+  return [
+    `Basal metabolic rate (Mifflin–St Jeor): ${t.bmr} kcal — the energy you burn at rest.`,
+    `× ${p.activity} for your activity = ${t.tdee} kcal to stay stable.`,
+    p.goal === "perdre"
+      ? `− ${deficit} kcal a day ≈ ${((deficit * 7) / 7700).toFixed(2)} kg a week${kcal === floor ? ` (safety floor of ${floor} kcal reached)` : ""}.`
+      : p.goal === "prendre"
+        ? "+ 300 kcal: a small surplus is enough to build muscle without too much fat."
+        : "Maintenance goal: we aim for what you burn, with no deficit or surplus.",
+    `Protein ${perKg} g/kg (${t.protein} g): ${p.goal === "maintenir" ? "comfortably covers the needs of an active person" : p.goal === "perdre" ? "preserves muscle during the deficit" : "supports muscle building"}.`,
+    `Fat ≈ 30% of calories (${t.fat} g) for hormones and vitamins A, D, E, K; the rest as carbohydrates (${t.carbs} g) for energy.`,
+    `Fiber 14 g per 1,000 kcal (${t.fiber} g), water ≈ 35 ml/kg (${(t.water / 1000).toFixed(1)} L, drinks and food included).`,
+  ];
+}

@@ -3,6 +3,14 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/server/auth/current-user";
 import { AreaView, type AreaTask } from "@/components/tasks/AreaView";
 import { getLayout, findArea } from "@/server/layout";
+import { getMessages } from "@/i18n/server";
+
+export async function generateMetadata({ params }: { params: Promise<{ area: string }> }) {
+  const { area: key } = await params;
+  const user = await requireUser();
+  const area = findArea(await getLayout(user.id), key);
+  return { title: area?.label ?? (await getMessages()).nav.sectors };
+}
 
 export default async function TaskAreaPage({
   params,

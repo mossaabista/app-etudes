@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { Plus, Repeat, Trash2 } from "lucide-react";
-import { Block, Empty, IconButton, Meter, field, useEntries, type Entry } from "@/components/modules/kit";
+import { Block, Empty, IconButton, Meter, field, useEntries, useModuleText, type Entry } from "@/components/modules/kit";
+import { fmt } from "@/i18n/config";
 
-const money = (n: number) => n.toLocaleString("fr-CA", { style: "currency", currency: "CAD" });
-
-// The category from the label, as banking apps do: instant, offline, and free.
+// The category from the label, as banking apps do: instant, offline, and free. Returns the
+// stored (French) category name; pages show it in the reader's language.
 const RULES: [RegExp, string][] = [
   [/loyer|bail|colocation|hypoth/i, "Logement"],
   [/[ée]picerie|metro|iga|maxi|provigo|walmart|costco|super ?c|loblaws|food basics|marché|boulangerie/i, "Alimentation"],
@@ -28,6 +28,8 @@ export const guessCategory = (label: string) => RULES.find(([re]) => re.test(lab
 /** A monthly budget per category, with what is left and an alert once it is passed. */
 export function Budgets({ module, entries, month, spentBy, categories }: { module: string; entries: Entry[]; month: string; spentBy: Map<string, number>; categories: string[] }) {
   const { add, update, remove, pending } = useEntries(module);
+  const { t, money, value: valueLabel } = useModuleText();
+  const b_ = t.modulesB.budgets;
   const budgets = entries.filter((e) => e.kind === "budget");
   const [cat, setCat] = useState(categories.find((c) => !budgets.some((b) => b.text === c)) ?? categories[0]);
   const [amount, setAmount] = useState("");
@@ -37,9 +39,9 @@ export function Budgets({ module, entries, month, spentBy, categories }: { modul
   const daysIn = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
 
   return (
-    <Block title="Budgets du mois" hint="Un plafond par catégorie. La barre passe au rouge au-delà, et le rythme t'indique si tu dépenses trop vite pour le jour du mois.">
+    <Block title={b_.title} hint={b_.hint}>
       {budgets.length === 0 ? (
-        <Empty>Fixe un budget pour tes postes principaux (Alimentation, Restaurants, Loisirs…).</Empty>
+        <Empty>{b_.empty}</Empty>
       ) : (
         <div className="space-y-3">
           {budgets.map((b) => {
@@ -50,17 +52,17 @@ export function Budgets({ module, entries, month, spentBy, categories }: { modul
             return (
               <div key={b.id}>
                 <div className="mb-1 flex items-center justify-between gap-2 text-xs">
-                  <span className="text-[var(--ink)]">{b.text}</span>
+                  <span className="text-[var(--ink)]">{valueLabel(b.text)}</span>
                   <span className={`tabular-nums ${over ? "font-semibold text-[#ff9f8c]" : "text-[var(--ink-dim)]"}`}>
                     {money(spent)} / {money(cap)}
-                    {!over && spent > pace * 1.15 && <span className="ml-1.5 text-[#f0cd79]">· rythme élevé</span>}
+                    {!over && spent > pace * 1.15 && <span className="ml-1.5 text-[#f0cd79]">{b_.fastPace}</span>}
                   </span>
                 </div>
                 <div className={over ? "[&_div>div]:!bg-[#f07a6a]" : ""}>
                   <Meter value={Math.min(spent, cap)} max={cap || 1} />
                 </div>
                 <div className="mt-1 flex items-center justify-between text-[0.68rem] text-[var(--ink-faint)]">
-                  <span>{over ? `Dépassé de ${money(spent - cap)}` : `Reste ${money(cap - spent)}`}</span>
+                  <span>{over ? fmt(b_.over, { amount: money(spent - cap) }) : fmt(b_.left, { amount: money(cap - spent) })}</span>
                   <span className="flex gap-1">
                     <input
                       defaultValue={cap}
@@ -69,10 +71,10 @@ export function Budgets({ module, entries, month, spentBy, categories }: { modul
                         if (Number.isFinite(v) && v !== cap) update(b.id, { value: v });
                       }}
                       inputMode="decimal"
-                      aria-label={`Budget ${b.text}`}
+                      aria-label={fmt(b_.budgetFor, { name: valueLabel(b.text) })}
                       className="w-16 rounded bg-transparent text-right text-[var(--ink-dim)] outline-none"
                     />
-                    <IconButton label="Supprimer" onClick={() => remove(b.id)} disabled={pending}>
+                    <IconButton label={t.common.delete} onClick={() => remove(b.id)} disabled={pending}>
                       <Trash2 size={11} />
                     </IconButton>
                   </span>
@@ -81,7 +83,7 @@ export function Budgets({ module, entries, month, spentBy, categories }: { modul
             );
           })}
           <p className="text-xs text-[var(--ink-dim)]">
-            Total : {money(used)} dépensés sur {money(total)} budgétés.
+            {fmt(b_.total, { used: money(used), total: money(total) })}
           </p>
         </div>
       )}
@@ -95,16 +97,16 @@ export function Budgets({ module, entries, month, spentBy, categories }: { modul
         }}
         className="mt-4 flex flex-wrap gap-2"
       >
-        <select value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Catégorie" className={`${field} flex-1 basis-36 cursor-pointer appearance-none`}>
+        <select value={cat} onChange={(e) => setCat(e.target.value)} aria-label={t.modulesB.finance.category} className={`${field} flex-1 basis-36 cursor-pointer appearance-none`}>
           {categories.map((c) => (
-            <option key={c} disabled={budgets.some((b) => b.text === c)}>
-              {c}
+            <option key={c} value={c} disabled={budgets.some((b) => b.text === c)}>
+              {valueLabel(c)}
             </option>
           ))}
         </select>
-        <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="$ / mois" aria-label="Montant mensuel" className={`${field} w-28`} />
+        <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder={b_.perMonth} aria-label={b_.monthly} className={`${field} w-28`} />
         <button type="submit" disabled={pending} className="mod-chip mod-chip-gold focus-ring">
-          <Plus size={13} /> Budget
+          <Plus size={13} /> {b_.add}
         </button>
       </form>
     </Block>
@@ -114,6 +116,8 @@ export function Budgets({ module, entries, month, spentBy, categories }: { modul
 /** Subscriptions: what they cost a month and a year, and when each one bills next. */
 export function Subscriptions({ module, entries, today }: { module: string; entries: Entry[]; today: string }) {
   const { add, remove, pending } = useEntries(module);
+  const { t, money } = useModuleText();
+  const s_ = t.modulesB.subs;
   const subs = entries.filter((e) => e.kind === "sub");
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
@@ -126,9 +130,9 @@ export function Subscriptions({ module, entries, today }: { module: string; entr
   };
 
   return (
-    <Block title="Abonnements" hint={subs.length ? `${money(monthly)} par mois, soit ${money(monthly * 12)} par an. Un abonnement oublié coûte en moyenne plus de 200 $ par an : fais le tri.` : "Liste tes abonnements pour voir ce qu'ils coûtent vraiment sur un an."}>
+    <Block title={s_.title} hint={subs.length ? fmt(s_.hint, { month: money(monthly), year: money(monthly * 12) }) : s_.hintEmpty}>
       {subs.length === 0 ? (
-        <Empty>Aucun abonnement noté.</Empty>
+        <Empty>{s_.empty}</Empty>
       ) : (
         <ul className="space-y-1.5">
           {subs
@@ -140,11 +144,12 @@ export function Subscriptions({ module, entries, today }: { module: string; entr
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm text-[var(--ink)]">{x.text}</p>
                   <p className="text-xs text-[var(--ink-dim)]">
-                    le {String(x.data.day ?? 1)} du mois · {n === 0 ? "aujourd'hui" : n === 1 ? "demain" : `dans ${n} j`} · {money((x.value ?? 0) * 12)} / an
+                    {fmt(s_.billing, { day: String(x.data.day ?? 1) })} · {n === 0 ? s_.today : n === 1 ? s_.tomorrow : fmt(s_.inDays, { n })} ·{" "}
+                    {fmt(s_.perYear, { amount: money((x.value ?? 0) * 12) })}
                   </p>
                 </div>
                 <span className="text-sm font-semibold tabular-nums text-[var(--ink)]">{money(x.value ?? 0)}</span>
-                <IconButton label="Supprimer" onClick={() => remove(x.id)} disabled={pending}>
+                <IconButton label={t.common.delete} onClick={() => remove(x.id)} disabled={pending}>
                   <Trash2 size={13} />
                 </IconButton>
               </li>
@@ -162,10 +167,10 @@ export function Subscriptions({ module, entries, today }: { module: string; entr
         }}
         className="mt-3 flex flex-wrap gap-2"
       >
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Netflix, Spotify, salle…" aria-label="Abonnement" className={`${field} flex-1 basis-36`} />
-        <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="$ / mois" aria-label="Prix mensuel" className={`${field} w-24`} />
-        <input value={day} onChange={(e) => setDay(e.target.value.replace(/\D/g, ""))} inputMode="numeric" aria-label="Jour de prélèvement" placeholder="jour" className={`${field} w-16`} />
-        <button type="submit" disabled={pending} className="mod-chip mod-chip-gold focus-ring">
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder={s_.placeholder} aria-label={s_.name} className={`${field} flex-1 basis-36`} />
+        <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder={t.modulesB.budgets.perMonth} aria-label={s_.price} className={`${field} w-24`} />
+        <input value={day} onChange={(e) => setDay(e.target.value.replace(/\D/g, ""))} inputMode="numeric" aria-label={s_.billingDay} placeholder={s_.dayPlaceholder} className={`${field} w-16`} />
+        <button type="submit" disabled={pending} aria-label={s_.add} title={s_.add} className="mod-chip mod-chip-gold focus-ring">
           <Plus size={13} />
         </button>
       </form>

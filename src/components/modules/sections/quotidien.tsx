@@ -12,30 +12,32 @@ import {
   RecurringList,
   ScheduleButton,
   Stats,
-  dayLabel,
   daysBetween,
   field,
   useEntries,
+  useModuleText,
   type ModuleProps,
 } from "@/components/modules/kit";
+import { INTL, fmt } from "@/i18n/config";
 import { guessAisle } from "@/lib/grocery";
 import { Budgets, Subscriptions, guessCategory } from "@/components/modules/sections/finance-extra";
 
 // =========================================================================== Courses
 
+// Stored as written here (and by the assistant); shown in the reader's language.
 const AISLES = ["Fruits & légumes", "Boulangerie", "Produits laitiers", "Viandes & poissons", "Épicerie", "Surgelés", "Boissons", "Hygiène & maison", "Autre"];
 
 
-const STAPLES = ["Lait", "Œufs", "Pain", "Bananes", "Riz", "Pâtes", "Poulet", "Yogourt", "Tomates", "Oignons", "Fromage", "Café"];
-
 export function Courses({ module, entries }: ModuleProps) {
   const { add, update, remove, pending } = useEntries(module);
+  const { t, value: valueLabel } = useModuleText();
+  const g = t.modulesB.groceries;
   const [text, setText] = useState("");
   const [aisle, setAisle] = useState<string | null>(null);
   const items = entries.filter((e) => e.kind === "item");
   const left = items.filter((i) => !i.done);
   const done = items.filter((i) => i.done);
-  const missingStaples = STAPLES.filter((s) => !left.some((i) => i.text?.toLowerCase() === s.toLowerCase()));
+  const missingStaples = g.staples.filter((s) => !left.some((i) => i.text?.toLowerCase() === s.toLowerCase()));
 
   const submit = (name: string, where?: string) => {
     if (!name.trim()) return;
@@ -44,7 +46,7 @@ export function Courses({ module, entries }: ModuleProps) {
 
   return (
     <>
-      <Block title="Liste de courses" hint="Les articles se rangent par rayon pour faire le tour du magasin une seule fois." wide>
+      <Block title={g.title} hint={g.hint} wide>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -54,14 +56,16 @@ export function Courses({ module, entries }: ModuleProps) {
           }}
           className="mb-3 flex flex-wrap items-center gap-2"
         >
-          <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Ajouter un article" aria-label="Article" className={`${field} flex-1 basis-48`} />
-          <select value={aisle ?? (text ? guessAisle(text) : AISLES[0])} onChange={(e) => setAisle(e.target.value)} aria-label="Rayon" className={`${field} w-48 cursor-pointer appearance-none`}>
+          <input value={text} onChange={(e) => setText(e.target.value)} placeholder={g.placeholder} aria-label={g.item} className={`${field} flex-1 basis-48`} />
+          <select value={aisle ?? (text ? guessAisle(text) : AISLES[0])} onChange={(e) => setAisle(e.target.value)} aria-label={g.aisle} className={`${field} w-48 cursor-pointer appearance-none`}>
             {AISLES.map((a) => (
-              <option key={a}>{a}</option>
+              <option key={a} value={a}>
+                {valueLabel(a)}
+              </option>
             ))}
           </select>
           <button type="submit" disabled={pending} className="mod-chip mod-chip-gold focus-ring">
-            <Plus size={13} /> Ajouter
+            <Plus size={13} /> {t.modulesB.kit.add}
           </button>
         </form>
         {missingStaples.length > 0 && (
@@ -75,7 +79,7 @@ export function Courses({ module, entries }: ModuleProps) {
         )}
 
         {left.length === 0 ? (
-          <Empty>Liste vide. Ajoute des articles, ou des repas depuis Nutrition.</Empty>
+          <Empty>{g.empty}</Empty>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             {AISLES.map((a) => {
@@ -84,14 +88,14 @@ export function Courses({ module, entries }: ModuleProps) {
               return (
                 <div key={a}>
                   <p className="mb-1.5 text-[0.7rem] font-semibold uppercase tracking-wide text-[var(--ink-faint)]">
-                    {a} · {rows.length}
+                    {valueLabel(a)} · {rows.length}
                   </p>
                   <ul className="space-y-1.5">
                     {rows.map((i) => (
                       <li key={i.id} className="tile flex items-center gap-3 px-3.5 py-2">
-                        <CheckBox checked={false} label="Pris" disabled={pending} onChange={() => update(i.id, { done: true })} />
+                        <CheckBox checked={false} label={g.got} disabled={pending} onChange={() => update(i.id, { done: true })} />
                         <span className="min-w-0 flex-1 text-sm text-[var(--ink)]">{i.text}</span>
-                        <IconButton label="Supprimer" onClick={() => remove(i.id)} disabled={pending}>
+                        <IconButton label={t.common.delete} onClick={() => remove(i.id)} disabled={pending}>
                           <Trash2 size={13} />
                         </IconButton>
                       </li>
@@ -106,9 +110,9 @@ export function Courses({ module, entries }: ModuleProps) {
         {done.length > 0 && (
           <div className="mt-5">
             <div className="mb-1.5 flex items-center justify-between">
-              <p className="text-[0.7rem] font-semibold uppercase tracking-wide text-[var(--ink-faint)]">Dans le panier · {done.length}</p>
+              <p className="text-[0.7rem] font-semibold uppercase tracking-wide text-[var(--ink-faint)]">{fmt(g.basket, { n: done.length })}</p>
               <button type="button" disabled={pending} onClick={() => done.forEach((d) => remove(d.id))} className="text-xs text-[var(--ink-dim)] hover:text-[var(--ink)]">
-                Vider le panier
+                {g.clear}
               </button>
             </div>
             <ul className="flex flex-wrap gap-1.5">
@@ -129,38 +133,33 @@ export function Courses({ module, entries }: ModuleProps) {
 
 // =========================================================================== Maison
 
+const UPKEEP_PERIODS = [7, 7, 7, 7, 30, 30, 91, 91];
+
 export function Maison({ module, today, entries }: ModuleProps) {
+  const { t, value: valueLabel } = useModuleText();
+  const h = t.modulesB.home;
   return (
     <>
-      <Block title="Entretien régulier" hint="Chaque tâche réapparaît quand elle est due, selon sa fréquence." wide>
+      <Block title={h.upkeep} hint={h.upkeepHint} wide>
         <RecurringList
           module={module}
           entries={entries}
           today={today}
-          suggestions={[
-            { text: "Passer l'aspirateur", period: 7 },
-            { text: "Nettoyer la salle de bain", period: 7 },
-            { text: "Lessive", period: 7 },
-            { text: "Sortir les poubelles et le recyclage", period: 7 },
-            { text: "Nettoyer le réfrigérateur", period: 30 },
-            { text: "Tester les détecteurs de fumée", period: 30 },
-            { text: "Nettoyer le four", period: 91 },
-            { text: "Changer le filtre de la hotte ou de la fournaise", period: 91 },
-          ]}
+          suggestions={h.suggestions.map((text, i) => ({ text, period: UPKEEP_PERIODS[i] ?? 30 }))}
         />
       </Block>
-      <Block title="Petits travaux" hint="Réparations, achats pour la maison, choses à régler." wide>
+      <Block title={h.repairs} hint={h.repairsHint} wide>
         <EntryList
           module={module}
           kind="todo"
           entries={entries}
           today={today}
           fields={[
-            { key: "text", label: "À faire", type: "text", to: "text", required: true },
-            { key: "room", label: "Pièce", type: "select", options: ["Cuisine", "Salon", "Chambre", "Salle de bain", "Entrée", "Extérieur", "Autre"], width: "w-36" },
+            { key: "text", label: h.todo, type: "text", to: "text", required: true },
+            { key: "room", label: h.room, type: "select", options: ["Cuisine", "Salon", "Chambre", "Salle de bain", "Entrée", "Extérieur", "Autre"], width: "w-36" },
           ]}
-          render={(e) => ({ title: e.text, sub: e.data.room ? String(e.data.room) : undefined })}
-          empty="Rien à réparer pour l'instant."
+          render={(e) => ({ title: e.text, sub: e.data.room ? valueLabel(e.data.room) : undefined })}
+          empty={h.repairsEmpty}
         />
       </Block>
     </>
@@ -173,10 +172,11 @@ const NEEDS = ["Logement", "Alimentation", "Transport", "Santé", "Factures", "�
 const WANTS = ["Restaurants", "Loisirs", "Shopping", "Abonnements", "Voyages", "Cadeaux"];
 const SAVINGS = ["Épargne", "Investissement", "Remboursement de dette"];
 const INCOME = ["Salaire", "Bourse", "Aide familiale", "Autre revenu"];
-const money = (n: number) => n.toLocaleString("fr-CA", { style: "currency", currency: "CAD" });
 
 export function Finances({ module, today, entries }: ModuleProps) {
   const { add, remove, pending } = useEntries(module);
+  const { t: tr, locale, money, pct, day: dayLabel, value: valueLabel } = useModuleText();
+  const f = tr.modulesB.finance;
   const [month, setMonth] = useState(today.slice(0, 7));
   const [type, setType] = useState<"Dépense" | "Revenu">("Dépense");
   const [label, setLabel] = useState("");
@@ -191,9 +191,9 @@ export function Finances({ module, today, entries }: ModuleProps) {
   const spent = out.reduce((s, t) => s + (t.value ?? 0), 0);
   const sum = (cats: string[]) => out.filter((t) => cats.includes(String(t.data.category))).reduce((s, t) => s + (t.value ?? 0), 0);
   const split = [
-    { name: "Besoins", got: sum(NEEDS), target: 0.5 },
-    { name: "Envies", got: sum(WANTS), target: 0.3 },
-    { name: "Épargne", got: sum(SAVINGS), target: 0.2 },
+    { name: f.needs, got: sum(NEEDS), target: 0.5 },
+    { name: f.wants, got: sum(WANTS), target: 0.3 },
+    { name: f.savings, got: sum(SAVINGS), target: 0.2 },
   ];
   const totals = new Map<string, number>();
   for (const t of out) totals.set(String(t.data.category), (totals.get(String(t.data.category)) ?? 0) + (t.value ?? 0));
@@ -203,7 +203,7 @@ export function Finances({ module, today, entries }: ModuleProps) {
     const d = new Date(Date.UTC(y, m - 1 + n, 1));
     setMonth(d.toISOString().slice(0, 7));
   };
-  const monthName = new Intl.DateTimeFormat("fr-CA", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${month}-15T12:00:00Z`));
+  const monthName = new Intl.DateTimeFormat(INTL[locale], { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${month}-15T12:00:00Z`));
 
   return (
     <>
@@ -211,10 +211,10 @@ export function Finances({ module, today, entries }: ModuleProps) {
         title={monthName.charAt(0).toUpperCase() + monthName.slice(1)}
         action={
           <div className="flex gap-1.5">
-            <IconButton label="Mois précédent" onClick={() => shift(-1)}>
+            <IconButton label={f.prevMonth} onClick={() => shift(-1)}>
               <ChevronLeft size={14} />
             </IconButton>
-            <IconButton label="Mois suivant" onClick={() => shift(1)}>
+            <IconButton label={f.nextMonth} onClick={() => shift(1)}>
               <ChevronRight size={14} />
             </IconButton>
           </div>
@@ -223,15 +223,15 @@ export function Finances({ module, today, entries }: ModuleProps) {
       >
         <Stats
           items={[
-            { label: "Revenus", value: money(income) },
-            { label: "Dépenses", value: money(spent) },
-            { label: "Solde", value: money(income - spent), tone: "gold" },
-            { label: "Taux d'épargne", value: income ? `${Math.round((sum(SAVINGS) / income) * 100)} %` : "—" },
+            { label: f.income, value: money(income) },
+            { label: f.spending, value: money(spent) },
+            { label: f.balance, value: money(income - spent), tone: "gold" },
+            { label: f.savingsRate, value: income ? pct(Math.round((sum(SAVINGS) / income) * 100)) : "—" },
           ]}
         />
       </Block>
 
-      <Block title="Ajouter une opération">
+      <Block title={f.addTitle}>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -256,38 +256,42 @@ export function Finances({ module, today, entries }: ModuleProps) {
                 }}
                 className="mod-tab focus-ring"
               >
-                {t}
+                {valueLabel(t)}
               </button>
             ))}
           </div>
           <div className="flex flex-wrap gap-2">
-            <input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Montant ($)" aria-label="Montant" className={`${field} w-32`} required />
+            <input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={f.amount} aria-label={f.amountAria} className={`${field} w-32`} required />
             <select
               value={category}
               onChange={(e) => {
                 setCategory(e.target.value);
                 setPicked(true);
               }}
-              aria-label="Catégorie" className={`${field} flex-1 basis-40 cursor-pointer appearance-none`}>
+              aria-label={f.category} className={`${field} flex-1 basis-40 cursor-pointer appearance-none`}>
               {type === "Revenu" ? (
-                INCOME.map((c) => <option key={c}>{c}</option>)
+                INCOME.map((c) => (
+                  <option key={c} value={c}>
+                    {valueLabel(c)}
+                  </option>
+                ))
               ) : (
                 <>
-                  <optgroup label="Besoins">
-                    {NEEDS.map((c) => (
-                      <option key={c}>{c}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Envies">
-                    {WANTS.map((c) => (
-                      <option key={c}>{c}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Épargne">
-                    {SAVINGS.map((c) => (
-                      <option key={c}>{c}</option>
-                    ))}
-                  </optgroup>
+                  {(
+                    [
+                      [f.needs, NEEDS],
+                      [f.wants, WANTS],
+                      [f.savings, SAVINGS],
+                    ] as const
+                  ).map(([group, cats]) => (
+                    <optgroup key={group} label={group}>
+                      {cats.map((c) => (
+                        <option key={c} value={c}>
+                          {valueLabel(c)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
                 </>
               )}
             </select>
@@ -301,13 +305,13 @@ export function Finances({ module, today, entries }: ModuleProps) {
                 const g = type === "Dépense" && !picked ? guessCategory(e.target.value) : null;
                 if (g) setCategory(g);
               }}
-              placeholder="Libellé (ex. Tim Hortons, loyer…)"
-              aria-label="Libellé"
+              placeholder={f.labelPlaceholder}
+              aria-label={f.label}
               className={`${field} flex-1 basis-40`}
             />
-            <input type="date" value={day} onChange={(e) => setDay(e.target.value)} aria-label="Date" className={`${field} w-36`} />
+            <input type="date" value={day} onChange={(e) => setDay(e.target.value)} aria-label={f.date} className={`${field} w-36`} />
             <button type="submit" disabled={pending} className="mod-chip mod-chip-gold focus-ring">
-              <Plus size={13} /> Ajouter
+              <Plus size={13} /> {tr.modulesB.kit.add}
             </button>
           </div>
         </form>
@@ -316,7 +320,7 @@ export function Finances({ module, today, entries }: ModuleProps) {
       <Budgets module={module} entries={entries} month={month} spentBy={totals} categories={[...NEEDS, ...WANTS]} />
       <Subscriptions module={module} entries={entries} today={today} />
 
-      <Block title="Règle 50 / 30 / 20" hint="Repère courant de budget : 50 % des revenus aux besoins, 30 % aux envies, 20 % à l'épargne.">
+      <Block title={f.rule} hint={f.ruleHint}>
         <div className="space-y-3">
           {split.map((s) => (
             <div key={s.name}>
@@ -325,25 +329,25 @@ export function Finances({ module, today, entries }: ModuleProps) {
                   {s.name} · {money(s.got)}
                 </span>
                 <span className="tabular-nums">
-                  {income ? `${Math.round((s.got / income) * 100)} %` : "—"} / {s.target * 100} %
+                  {income ? pct(Math.round((s.got / income) * 100)) : "—"} / {pct(s.target * 100)}
                 </span>
               </div>
               <Meter value={s.got} max={income * s.target || 1} />
             </div>
           ))}
         </div>
-        {!income && <p className="mt-3 text-xs text-[var(--ink-faint)]">Ajoute tes revenus du mois pour comparer.</p>}
+        {!income && <p className="mt-3 text-xs text-[var(--ink-faint)]">{f.ruleEmpty}</p>}
       </Block>
 
-      <Block title="Par catégorie">
+      <Block title={f.byCategory}>
         {byCat.length === 0 ? (
-          <Empty>Aucune dépense ce mois-ci.</Empty>
+          <Empty>{f.byCategoryEmpty}</Empty>
         ) : (
           <div className="space-y-2.5">
             {byCat.map(([c, v]) => (
               <div key={c}>
                 <div className="mb-1 flex justify-between text-xs">
-                  <span className="text-[var(--ink)]">{c}</span>
+                  <span className="text-[var(--ink)]">{valueLabel(c)}</span>
                   <span className="tabular-nums text-[var(--ink-dim)]">{money(v)}</span>
                 </div>
                 <Meter value={v} max={byCat[0][1]} />
@@ -353,9 +357,9 @@ export function Finances({ module, today, entries }: ModuleProps) {
         )}
       </Block>
 
-      <Block title="Opérations du mois">
+      <Block title={f.ops}>
         {tx.length === 0 ? (
-          <Empty>Rien d&apos;enregistré pour ce mois.</Empty>
+          <Empty>{f.opsEmpty}</Empty>
         ) : (
           <ul className="space-y-1.5">
             {tx.map((t) => (
@@ -363,14 +367,14 @@ export function Finances({ module, today, entries }: ModuleProps) {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-[var(--ink)]">{t.text}</p>
                   <p className="text-xs text-[var(--ink-dim)]">
-                    {dayLabel(t.day)} · {String(t.data.category)}
+                    {dayLabel(t.day)} · {valueLabel(t.data.category)}
                   </p>
                 </div>
                 <span className={`text-sm font-semibold tabular-nums ${t.data.type === "Revenu" ? "text-[#f0cd79]" : "text-[var(--ink)]"}`}>
                   {t.data.type === "Revenu" ? "+" : "−"}
                   {money(t.value ?? 0)}
                 </span>
-                <IconButton label="Supprimer" onClick={() => remove(t.id)} disabled={pending}>
+                <IconButton label={tr.common.delete} onClick={() => remove(t.id)} disabled={pending}>
                   <Trash2 size={13} />
                 </IconButton>
               </li>
@@ -386,6 +390,9 @@ export function Finances({ module, today, entries }: ModuleProps) {
 
 export function RendezVous({ module, today, entries }: ModuleProps) {
   const { add, remove, schedule, pending } = useEntries(module);
+  const { t, day: dayLabel } = useModuleText();
+  const r = t.modulesB.appts;
+  const k = t.modulesB.kit;
   const [text, setText] = useState("");
   const [day, setDay] = useState(today);
   const [time, setTime] = useState("10:00");
@@ -397,7 +404,7 @@ export function RendezVous({ module, today, entries }: ModuleProps) {
 
   return (
     <>
-      <Block title="Nouveau rendez-vous" hint="Médecin, administration, banque… Il peut aller directement dans ton calendrier." wide>
+      <Block title={r.newTitle} hint={r.newHint} wide>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -413,23 +420,23 @@ export function RendezVous({ module, today, entries }: ModuleProps) {
           }}
           className="flex flex-wrap items-center gap-2"
         >
-          <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Objet du rendez-vous" aria-label="Objet" className={`${field} flex-1 basis-48`} required />
-          <input type="date" value={day} onChange={(e) => setDay(e.target.value)} aria-label="Jour" className={`${field} w-36`} />
-          <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Heure" className={`${field} w-24`} />
-          <input value={place} onChange={(e) => setPlace(e.target.value)} placeholder="Lieu" aria-label="Lieu" className={`${field} w-40`} />
+          <input value={text} onChange={(e) => setText(e.target.value)} placeholder={r.subject} aria-label={r.subjectAria} className={`${field} flex-1 basis-48`} required />
+          <input type="date" value={day} onChange={(e) => setDay(e.target.value)} aria-label={k.day} className={`${field} w-36`} />
+          <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label={k.time} className={`${field} w-24`} />
+          <input value={place} onChange={(e) => setPlace(e.target.value)} placeholder={r.place} aria-label={r.place} className={`${field} w-40`} />
           <label className="flex items-center gap-2 text-xs text-[var(--ink-dim)]">
-            <CheckBox checked={toCal} label="Ajouter au calendrier" onChange={() => setToCal(!toCal)} />
-            Calendrier
+            <CheckBox checked={toCal} label={k.addToCalendar} onChange={() => setToCal(!toCal)} />
+            {r.calendar}
           </label>
           <button type="submit" disabled={pending} className="mod-chip mod-chip-gold focus-ring">
-            <Plus size={13} /> Ajouter
+            <Plus size={13} /> {k.add}
           </button>
         </form>
       </Block>
 
-      <Block title="À venir">
+      <Block title={r.upcoming}>
         {upcoming.length === 0 ? (
-          <Empty>Aucun rendez-vous prévu.</Empty>
+          <Empty>{r.upcomingEmpty}</Empty>
         ) : (
           <ul className="space-y-2">
             {upcoming.map((a) => {
@@ -443,8 +450,8 @@ export function RendezVous({ module, today, entries }: ModuleProps) {
                       {a.data.place ? ` · ${a.data.place}` : ""}
                     </p>
                   </div>
-                  <span className="shrink-0 text-xs font-semibold text-[#f0cd79]">{inDays === 0 ? "Aujourd'hui" : inDays === 1 ? "Demain" : `J-${inDays}`}</span>
-                  <IconButton label="Supprimer" onClick={() => remove(a.id)} disabled={pending}>
+                  <span className="shrink-0 text-xs font-semibold text-[#f0cd79]">{inDays === 0 ? k.today : inDays === 1 ? k.tomorrow : fmt(k.countdown, { n: inDays })}</span>
+                  <IconButton label={t.common.delete} onClick={() => remove(a.id)} disabled={pending}>
                     <Trash2 size={13} />
                   </IconButton>
                 </li>
@@ -454,9 +461,9 @@ export function RendezVous({ module, today, entries }: ModuleProps) {
         )}
       </Block>
 
-      <Block title="Passés">
+      <Block title={r.past}>
         {past.length === 0 ? (
-          <Empty>Rien pour l&apos;instant.</Empty>
+          <Empty>{r.pastEmpty}</Empty>
         ) : (
           <ul className="space-y-1.5">
             {past.slice(0, 8).map((a) => (
@@ -464,7 +471,7 @@ export function RendezVous({ module, today, entries }: ModuleProps) {
                 <span>
                   {dayLabel(a.day)} · {a.text}
                 </span>
-                <ScheduleButton title={a.text ?? "Rendez-vous"} today={today} onSchedule={schedule} label="Reprendre" />
+                <ScheduleButton title={a.text ?? r.fallback} today={today} onSchedule={schedule} label={r.again} />
               </li>
             ))}
           </ul>
@@ -473,8 +480,3 @@ export function RendezVous({ module, today, entries }: ModuleProps) {
     </>
   );
 }
-
-export const QUOTIDIEN_SOURCES = {
-  maison: ["Sécurité incendie : test mensuel des avertisseurs de fumée recommandé par les services d'incendie canadiens."],
-  finances: ["Règle 50/30/20 popularisée par E. Warren et A. W. Tyagi, All Your Worth (2005) : un repère, pas une norme."],
-};

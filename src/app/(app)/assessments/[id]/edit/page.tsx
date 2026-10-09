@@ -4,6 +4,12 @@ import { requireUser } from "@/server/auth/current-user";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardBody } from "@/components/ui/Card";
 import { AssessmentForm } from "@/components/assessments/AssessmentForm";
+import { getMessages } from "@/i18n/server";
+import { fmt } from "@/i18n/config";
+
+export async function generateMetadata() {
+  return { title: (await getMessages()).academics.editAssessmentMeta };
+}
 
 export default async function EditAssessmentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -15,10 +21,11 @@ export default async function EditAssessmentPage({ params }: { params: Promise<{
   ]);
 
   if (!assessment) notFound();
+  const k = (await getMessages()).academics;
 
   return (
     <>
-      <PageHeader title={`Modifier : ${assessment.title}`} description="Détails et note de l'évaluation." />
+      <PageHeader title={fmt(k.editAssessmentTitle, { title: assessment.title })} description={k.editAssessmentDesc} />
       <Card>
         <CardBody>
           <AssessmentForm courses={courses} assessment={assessment} />

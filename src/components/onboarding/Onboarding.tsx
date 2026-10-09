@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Bell, Check, Loader2, Mic, Sparkles } from "lucide-react";
 import { BrandMark } from "@/components/layout/BrandMark";
 import { RenderImage } from "@/components/tasks/RenderImage";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
 import { useI18n } from "@/i18n/client";
+import { timeZones } from "@/lib/time-zones";
 import { fmt } from "@/i18n/config";
 import { PROFILES, type ProfileType } from "@/lib/profile";
 import type { About } from "@/lib/settings";
@@ -53,13 +54,7 @@ export function Onboarding({ name, vapidPublicKey }: { name: string; vapidPublic
   const [answer, setAnswer] = useState<string | null>(null);
   const [asking, startAsk] = useTransition();
   const [finishing, startFinish] = useTransition();
-  const zones = useMemo(() => {
-    try {
-      return (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.("timeZone") ?? [];
-    } catch {
-      return [];
-    }
-  }, []);
+  const zones = timeZones();
 
   useEffect(() => {
     const id = setTimeout(() => setPlace(detectPlace(locale)), 0);

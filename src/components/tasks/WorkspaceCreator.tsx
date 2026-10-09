@@ -8,6 +8,9 @@ import { Modal } from "@/components/ui/Modal";
 import { applyWorkspaceAction, previewWorkspaceAction } from "@/server/actions/workspace.actions";
 import { undoCommandAction, type Undo } from "@/server/actions/capture.actions";
 import { TEMPLATES, type TemplateId, type WorkspacePlan } from "@/lib/workspaces";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
+import { plural } from "@/i18n/ns/workspace";
 
 const newOpId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `op-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -20,6 +23,9 @@ type Done = { message: string; undo: Undo | null; href: string; partial: boolean
  */
 export function WorkspaceCreator() {
   const router = useRouter();
+  const { t: i18n, locale } = useI18n();
+  const w = i18n.workspace.space;
+  const tplText = (id: TemplateId) => w.templates[id];
   const [open, setOpen] = useState(false);
   const [template, setTemplate] = useState<TemplateId>("projet");
   const [name, setName] = useState("");
@@ -56,15 +62,19 @@ export function WorkspaceCreator() {
     start(async () => {
       if (!done?.undo) return;
       const { missed } = await undoCommandAction(done.undo, done.opId);
-      setDone({ ...done, undo: null, undone: missed ? `Annulé en partie : ${missed} élément${missed > 1 ? "s avaient" : " avait"} déjà changé.` : "Espace annulé : tout ce qui avait été créé a été retiré." });
+      setDone({ ...done, undo: null, undone: missed ? plural(locale, missed, w.partialOne, w.partialMany) : w.undone });
       router.refresh();
     });
 
   const willCreate = plan
     ? [
-        ...plan.areas.map(({ area, isNew }) => (isNew ? `Secteur ${area.label} : ${area.subs.map((s) => s.label).join(", ") || "vide"}` : `Dans ${area.label} : ${area.subs.map((s) => s.label).join(", ")}`)),
-        ...(plan.project ? [`Projet « ${plan.project.title} » avec ses jalons : ${plan.project.milestones.join(", ")}`] : []),
-        ...plan.tasks.map((x) => `Tâche : ${x.title}`),
+        ...plan.areas.map(({ area, isNew }) =>
+          isNew
+            ? fmt(w.newSector, { name: area.label, subs: area.subs.map((s) => s.label).join(", ") || w.emptyWord })
+            : fmt(w.inSector, { name: area.label, subs: area.subs.map((s) => s.label).join(", ") })
+        ),
+        ...(plan.project ? [fmt(w.project, { title: plan.project.title, list: plan.project.milestones.join(", ") })] : []),
+        ...plan.tasks.map((x) => fmt(w.task, { title: x.title })),
       ]
     : [];
 
@@ -78,9 +88,9 @@ export function WorkspaceCreator() {
         }}
         className="mod-chip mod-chip-gold focus-ring"
       >
-        <FolderPlus size={13} /> Créer un espace
+        <FolderPlus size={13} /> {w.create}
       </button>
-      <Modal open={open} onClose={() => setOpen(false)} title="Créer un espace">
+      <Modal open={open} onClose={() => setOpen(false)} title={w.create}>
         {done ? (
           <div className="space-y-4">
             <p className="flex gap-2 text-sm text-[var(--ink)]" role="status">
@@ -90,12 +100,12 @@ export function WorkspaceCreator() {
             <div className="flex flex-wrap justify-end gap-2">
               {done.undo && (
                 <button type="button" onClick={undo} disabled={pending} className="mod-chip focus-ring">
-                  <Undo2 size={13} /> Annuler
+                  <Undo2 size={13} /> {i18n.common.undo}
                 </button>
               )}
               {!done.undone && (
                 <Link href={done.href} onClick={() => setOpen(false)} className="mod-chip mod-chip-gold focus-ring">
-                  Ouvrir l&apos;espace
+                  {w.open}
                 </Link>
               )}
             </div>
@@ -103,7 +113,7 @@ export function WorkspaceCreator() {
         ) : (
           <div className="space-y-4">
             <fieldset>
-              <legend className="mb-2 text-xs font-semibold text-[var(--ink-dim)]">Pour quoi ?</legend>
+              <legend className="mb-2 text-xs font-semibold text-[var(--ink-dim)]">{w.forWhat}</legend>
               <div className="grid gap-2 sm:grid-cols-2">
                 {TEMPLATES.map((x) => (
                   <label key={x.id} className="tile flex cursor-pointer flex-col gap-1 px-3.5 py-2.5 has-[:checked]:ring-2 has-[:checked]:ring-[#e8bf63]">
@@ -119,51 +129,51 @@ export function WorkspaceCreator() {
                         }}
                         className="h-4 w-4 accent-[#e8bf63]"
                       />
-                      <span className="text-sm font-semibold text-[var(--ink)]">{x.label}</span>
+                      <span className="text-sm font-semibold text-[var(--ink)]">{tplText(x.id).label}</span>
                     </span>
-                    <span className="text-xs leading-5 text-[var(--ink-dim)]">{x.pitch}</span>
+                    <span className="text-xs leading-5 text-[var(--ink-dim)]">{tplText(x.id).pitch}</span>
                   </label>
                 ))}
               </div>
             </fieldset>
             {t.needsName && (
               <label className="block">
-                <span className="mb-1 block text-xs font-semibold text-[var(--ink-dim)]">Nom du projet</span>
+                <span className="mb-1 block text-xs font-semibold text-[var(--ink-dim)]">{w.projectName}</span>
                 <input
                   value={name}
                   onChange={(e) => {
                     setName(e.target.value);
                     setPlan(null);
                   }}
-                  placeholder="ex. Site web, Mémoire, Déménagement"
+                  placeholder={w.namePlaceholder}
                   className="w-full rounded-xl border border-[rgba(255,220,148,0.18)] bg-[rgba(20,12,3,0.4)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[#e8bf63]"
                 />
               </label>
             )}
 
             {error && (
-              <p role="alert" className="text-sm text-[#ffb3a3]">
+              <p role="alert" className="rounded-xl bg-[rgba(220,60,40,0.18)] px-3 py-2 text-sm text-[#ffd9cf]">
                 {error}
               </p>
             )}
 
             {plan && (
               <div className="space-y-3 rounded-2xl border border-[rgba(255,220,148,0.12)] p-3.5 text-sm">
-                <Section title="Ce qui sera créé" items={willCreate} empty="Rien de nouveau : tout est déjà en place." />
-                <Section title="Pourquoi" items={plan.why} />
-                <Section title="Repris tel quel" items={plan.reused} />
-                <Section title="Déjà là, laissé de côté" items={plan.skipped} />
-                <Section title="À savoir" items={plan.notes} />
-                <p className="text-[0.7rem] text-[var(--ink-faint)]">Modèle {t.label} v{plan.version}. Rien n&apos;est encore enregistré ; tout reste modifiable et annulable.</p>
+                <Section title={w.willCreate} items={willCreate} empty={w.nothingNew} />
+                <Section title={w.why} items={plan.why} />
+                <Section title={w.reused} items={plan.reused} />
+                <Section title={w.skipped} items={plan.skipped} />
+                <Section title={w.toKnow} items={plan.notes} />
+                <p className="text-[0.7rem] text-[var(--ink-faint)]">{fmt(w.previewNote, { name: tplText(t.id).label })}</p>
               </div>
             )}
 
             <div className="flex flex-wrap justify-end gap-2">
               <button type="button" onClick={preview} disabled={pending || (t.needsName && !name.trim())} className="mod-chip focus-ring">
-                {pending && !plan ? "…" : "Voir l'aperçu"}
+                {pending && !plan ? "…" : w.preview}
               </button>
               <button type="button" onClick={create} disabled={pending || !plan || willCreate.length === 0} className="mod-chip mod-chip-gold focus-ring">
-                {pending && plan ? "Création…" : "Créer l'espace"}
+                {pending && plan ? w.creating : w.confirm}
               </button>
             </div>
           </div>

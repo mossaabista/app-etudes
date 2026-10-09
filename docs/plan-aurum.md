@@ -39,3 +39,16 @@ avant chaque push. Aucun déploiement, aucune fusion, aucun script lancé sur Ne
 Ce conteneur n'a ni clé Anthropic, ni clé ElevenLabs, ni accès à Neon. Les appels payants sont
 donc testés avec des réponses simulées. Un script `scripts/smoke-live.mjs` permettra de lancer,
 en local, les quelques vrais essais prévus (éléments « zztest… » supprimés ensuite).
+
+## État au moment de la pause
+
+**Fait**
+- Étape 1 (en partie) : marque Aurum/Jarvis, nettoyage et bilingue FR/EN sur la navigation, l'authentification, Today, Connexions, l'onboarding, les Cours/Évaluations/Labos/Syllabus, les Secteurs, Toutes mes tâches, les Projets, le Calendrier, les Documents, les Automatisations et les modules Travail/Quotidien/Social/Finances.
+- Étape 2 : fuseau par utilisateur (`src/server/zone.ts`, `currentZone()`), et client Claude unique (`src/server/claude.ts`, sans tool_choice forcé).
+- Étape 3 : onboarding (`src/components/onboarding/Onboarding.tsx`).
+- Étape 4 (à vérifier au navigateur) : Réglages en 8 sections (`src/app/(app)/settings/[section]`).
+- Forfaits (`src/lib/plans.ts`) et compteur d'usage (`src/server/usage.ts`), pas encore branché sur Jarvis.
+
+**Partiel** (agents de traduction coupés par la limite de dépense) : modules Santé/Sport/Nutrition/Esprit, composants des Réglages (`src/i18n/ns/modulesA.ts`, `settingsUi.ts`), console Jarvis et saisie rapide, messages générés côté serveur (Pilote, documents, automatisations).
+
+**Reste** : étapes 5 à 12 de ce plan.

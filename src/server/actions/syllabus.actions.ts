@@ -9,6 +9,8 @@ import { parseSyllabus, type FoundAssessment, type FoundSlot, type ParsedSyllabu
 import { parseSyllabusFileWithClaude, parseSyllabusWithClaude, syllabusAiEnabled, type SyllabusFile } from "@/server/syllabus-ai";
 import { docxText } from "@/server/docx";
 import { sourceNote, suspiciousLines, titleKey } from "@/lib/syllabus-review";
+import { getMessages } from "@/i18n/server";
+import { fmt } from "@/i18n/config";
 
 const MAX_BYTES = 4 * 1024 * 1024;
 const IMAGE_TYPES: Record<string, SyllabusFile["mediaType"]> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif" };
@@ -33,9 +35,10 @@ export type AnalyzedSyllabus = {
  */
 export async function analyzeSyllabusAction(form: FormData): Promise<{ error: string } | AnalyzedSyllabus> {
   await requireUser();
+  const k = (await getMessages()).academics;
   const file = form.get("file");
-  if (!(file instanceof File) || !file.size) return { error: "Choisis un fichier." };
-  if (file.size > MAX_BYTES) return { error: "Fichier trop lourd (4 Mo maximum)." };
+  if (!(file instanceof File) || !file.size) return { error: k.errPickFile };
+  if (file.size > MAX_BYTES) return { error: k.errTooBig };
   const ext = file.name.toLowerCase().split(".").pop() ?? "";
   const today = toISODate(new Date());
   const buf = Buffer.from(await file.arrayBuffer());
@@ -50,22 +53,22 @@ export async function analyzeSyllabusAction(form: FormData): Promise<{ error: st
       const pdf = await getDocumentProxy(new Uint8Array(buf));
       const { text } = await extractText(pdf, { mergePages: false });
       pageTexts = (Array.isArray(text) ? text : [text]).map(String);
-      readBy = "texte du PDF";
+      readBy = k.byPdf;
     } else if (ext === "docx") {
       const text = docxText(buf);
-      if (text == null) return { error: "Impossible de lire ce document Word (.docx)." };
+      if (text == null) return { error: k.errDocx };
       pageTexts = [text];
-      readBy = "texte du document Word";
+      readBy = k.byWord;
     } else if (IMAGE_TYPES[ext]) {
-      if (!syllabusAiEnabled()) return { error: "Lire une photo demande l'assistant (clé API absente sur ce serveur). Envoie plutôt le PDF ou le document Word du plan de cours." };
+      if (!syllabusAiEnabled()) return { error: k.errPhotoUnavailable };
       const r = await parseSyllabusFileWithClaude({ mediaType: IMAGE_TYPES[ext], base64: buf.toString("base64") }, today);
-      if (!r) return { error: "L'assistant n'a pas pu lire cette photo. Réessaie avec une image plus nette, ou envoie le PDF." };
+      if (!r) return { error: k.errPhotoFailed };
       parsed = r.parsed;
       pageTexts = r.pages;
-      readBy = "photo lue par l'assistant";
-      warnings.push("Texte lu sur une photo : vérifie chaque date avant d'importer.");
+      readBy = k.byPhoto;
+      warnings.push(k.warnPhoto);
     } else {
-      return { error: "Formats acceptés : PDF, Word (.docx) et photos (JPG, PNG, WebP)." };
+      return { error: k.errFormats };
     }
 
     const content = pageTexts.join("\n");
@@ -73,31 +76,31 @@ export async function analyzeSyllabusAction(form: FormData): Promise<{ error: st
       // A scanned PDF: no text layer. Claude can read the page images.
       if (ext === "pdf" && syllabusAiEnabled()) {
         const r = await parseSyllabusFileWithClaude({ mediaType: "application/pdf", base64: buf.toString("base64") }, today);
-        if (!r) return { error: "Ce PDF est une image scannée et l'assistant n'a pas pu le lire." };
+        if (!r) return { error: k.errScanFailed };
         parsed = r.parsed;
         pageTexts = r.pages;
-        readBy = "PDF scanné lu par l'assistant";
-        warnings.push("PDF scanné : le texte a été reconnu par l'assistant, vérifie chaque date avant d'importer.");
+        readBy = k.byScan;
+        warnings.push(k.warnScan);
       } else {
-        return { error: "Ce document ne contient pas de texte lisible (c'est peut-être une image scannée). Sans l'assistant activé, envoie un PDF avec du texte ou le document Word." };
+        return { error: k.errNoText };
       }
     }
 
     if (!parsed) {
       const ai = await parseSyllabusWithClaude(content, today);
       parsed = ai ?? parseSyllabus(content, today);
-      readBy += ai ? ", analysé par l'assistant" : ", analysé par règles";
+      readBy += ai ? k.byAi : k.byRules;
     }
 
     const suspicious = suspiciousLines(pageTexts);
     if (suspicious.length)
-      warnings.push(`Ce document contient ${suspicious.length} phrase${suspicious.length > 1 ? "s" : ""} qui ressemble${suspicious.length > 1 ? "nt" : ""} à des instructions (« ${suspicious[0].slice(0, 80)} ») : traitée${suspicious.length > 1 ? "s" : ""} comme du texte, jamais exécutée${suspicious.length > 1 ? "s" : ""}.`);
+      warnings.push(fmt(suspicious.length > 1 ? k.warnSuspiciousMany : k.warnSuspiciousOne, { n: suspicious.length, text: suspicious[0].slice(0, 80) }));
     const total = parsed.assessments.reduce((n, a) => n + (a.weight ?? 0), 0);
-    if (parsed.assessments.length && total && Math.abs(total - 100) > 1) warnings.push(`Les pondérations trouvées font ${total} % au lieu de 100 % : il en manque ou il y en a en trop.`);
+    if (parsed.assessments.length && total && Math.abs(total - 100) > 1) warnings.push(fmt(k.warnWeights, { n: total }));
 
     return { fileName: file.name, parsed, paged: ext === "pdf", pages: pageTexts.length, pageTexts: pageTexts.map((p) => p.slice(0, 20000)).slice(0, 60), excerpt: pageTexts.join("\n").slice(0, 12000), readBy, warnings };
   } catch {
-    return { error: "Impossible de lire ce fichier." };
+    return { error: k.errRead };
   }
 }
 
@@ -121,7 +124,7 @@ export async function importSyllabusAction(input: {
   let courseId = input.courseId;
   if (courseId) {
     const own = await prisma.course.findFirst({ where: { id: courseId, userId: user.id } });
-    if (!own) return { error: "Cours introuvable." };
+    if (!own) return { error: (await getMessages()).academics.syllabusCourseNotFound };
   } else {
     const code = input.course.code.trim().slice(0, 20) || "COURS";
     const count = await prisma.course.count({ where: { userId: user.id } });

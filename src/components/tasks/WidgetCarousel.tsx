@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { LiquidLayers } from "@/components/ui/LiquidMetal";
 import { RenderImage } from "@/components/tasks/RenderImage";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
 
 export interface CarouselItem {
   key: string;
@@ -31,6 +33,7 @@ export function WidgetCarousel({
   active: number;
   onActiveChange: (index: number) => void;
 }) {
+  const { t } = useI18n();
   const track = useRef<HTMLDivElement>(null);
   // The index the scroll position itself settled on. When `active` changes to something
   // else (an arrow, a dot, a tap on a side item) the track has to be scrolled there.
@@ -42,12 +45,12 @@ export function WidgetCarousel({
   const steerTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   function paint() {
-    const t = track.current;
-    if (!t) return;
-    const mid = t.scrollLeft + t.clientWidth / 2;
+    const el0 = track.current;
+    if (!el0) return;
+    const mid = el0.scrollLeft + el0.clientWidth / 2;
     let nearest = 0;
     let best = Infinity;
-    Array.from(t.children).forEach((node, i) => {
+    Array.from(el0.children).forEach((node, i) => {
       const el = node as HTMLElement;
       const d = (el.offsetLeft + el.offsetWidth / 2 - mid) / el.offsetWidth;
       const k = Math.min(Math.abs(d), 1.4);
@@ -75,16 +78,16 @@ export function WidgetCarousel({
   }
 
   function centre(index: number, smooth: boolean) {
-    const t = track.current;
-    const el = t?.children[index] as HTMLElement | undefined;
-    if (!t || !el) return;
+    const tr = track.current;
+    const el = tr?.children[index] as HTMLElement | undefined;
+    if (!tr || !el) return;
     if (smooth) {
       steering.current = true;
       clearTimeout(steerTimer.current);
       // scrollend is not everywhere yet; the timer covers the rest.
       steerTimer.current = setTimeout(() => (steering.current = false), 700);
     }
-    t.scrollTo({ left: el.offsetLeft + el.offsetWidth / 2 - t.clientWidth / 2, behavior: smooth ? "smooth" : "auto" });
+    tr.scrollTo({ left: el.offsetLeft + el.offsetWidth / 2 - tr.clientWidth / 2, behavior: smooth ? "smooth" : "auto" });
   }
 
   // First paint: land on the requested item without an animated sweep across the row.
@@ -123,7 +126,7 @@ export function WidgetCarousel({
           clearTimeout(steerTimer.current);
         }}
         role="tablist"
-        aria-label="Sections"
+        aria-label={t.workspace.area.sections}
         onKeyDown={(e) => {
           if (e.key === "ArrowRight") go(1);
           else if (e.key === "ArrowLeft") go(-1);
@@ -135,7 +138,7 @@ export function WidgetCarousel({
       </div>
 
       <div className="mt-2 flex items-center justify-center gap-3">
-        <button type="button" onClick={() => go(-1)} aria-label="Section précédente" className="lm focus-ring h-11 w-11 shrink-0">
+        <button type="button" onClick={() => go(-1)} aria-label={t.workspace.area.prevSection} className="lm focus-ring h-11 w-11 shrink-0">
           <LiquidLayers>
             <ChevronLeft size={18} />
           </LiquidLayers>
@@ -154,7 +157,7 @@ export function WidgetCarousel({
             />
           ))}
         </div>
-        <button type="button" onClick={() => go(1)} aria-label="Section suivante" className="lm focus-ring h-11 w-11 shrink-0">
+        <button type="button" onClick={() => go(1)} aria-label={t.workspace.area.nextSection} className="lm focus-ring h-11 w-11 shrink-0">
           <LiquidLayers>
             <ChevronRight size={18} />
           </LiquidLayers>
@@ -166,6 +169,8 @@ export function WidgetCarousel({
 
 function WidgetItem({ item, index, active, onSelect }: { item: CarouselItem; index: number; active: boolean; onSelect: () => void }) {
   const router = useRouter();
+  const { t } = useI18n();
+  const w = t.workspace.area;
   const stage = useRef<HTMLSpanElement>(null);
   // Warm the section page while its item is in front, so the tap opens it at once.
   useEffect(() => {
@@ -195,7 +200,7 @@ function WidgetItem({ item, index, active, onSelect }: { item: CarouselItem; ind
       data-active={active || undefined}
       // A side item comes to the front; the one in front opens its page.
       onClick={() => (active ? router.push(item.href) : onSelect())}
-      aria-label={active ? `Ouvrir ${item.label}` : item.label}
+      aria-label={active ? fmt(w.openNamed, { name: item.label }) : item.label}
       onPointerMove={onMove}
       onPointerLeave={onLeave}
       className="wc-item focus-ring"
@@ -214,9 +219,9 @@ function WidgetItem({ item, index, active, onSelect }: { item: CarouselItem; ind
         </span>
       </span>
       <span className="wc-label">{item.label}</span>
-      <span className="wc-meta">{item.count ? `${item.count} à faire` : "À jour"}</span>
+      <span className="wc-meta">{item.count ? fmt(t.workspace.sectors.openCount, { n: item.count }) : w.upToDate}</span>
       <span className="wc-open" aria-hidden>
-        Ouvrir <ArrowRight size={12} />
+        {w.open} <ArrowRight size={12} />
       </span>
     </button>
   );

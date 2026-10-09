@@ -137,6 +137,30 @@ export function stepLabel(s: Step): string {
   return base;
 }
 
+/** Step names in English, for readers who chose it; French stays in STEP_CATALOG. */
+export const STEP_LABEL_EN: Record<StepType, string> = {
+  plan_day: "Plan my day",
+  plan_week: "Plan my week",
+  plan_workouts: "Book my workouts",
+  create_task: "Add a task",
+  groceries_week: "Weekly grocery list",
+  notify_briefing: "Send me the daily summary",
+};
+const WHEN_EN: Record<string, string> = { matin: "morning", midi: "noon", soir: "evening" };
+
+/** The catalogue name of a step type in the reader's language. */
+export const stepNameIn = (type: StepType, locale: "fr" | "en") =>
+  locale === "en" ? STEP_LABEL_EN[type] ?? type : STEP_CATALOG.find((c) => c.type === type)?.label ?? type;
+
+/** stepLabel, in the reader's language. */
+export function stepLabelIn(s: Step, locale: "fr" | "en"): string {
+  if (locale !== "en") return stepLabel(s);
+  const base = stepNameIn(s.type, "en");
+  if (s.type === "plan_workouts") return `${base} (${s.sessions} × ${s.minutes} min${s.when !== "libre" ? `, ${WHEN_EN[s.when] ?? s.when}` : ""})`;
+  if (s.type === "create_task") return `Add the task “${s.title}”, due ${s.dueInDays === 0 ? "the same day" : `within ${s.dueInDays} d`}`;
+  return base;
+}
+
 export function triggerLabel(t: Trigger): string {
   if (t.type === "manual") return "À la demande";
   if (t.days.length === 7) return "Chaque matin";

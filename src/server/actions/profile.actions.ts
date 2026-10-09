@@ -5,6 +5,7 @@ import { requireUser } from "@/server/auth/current-user";
 import { getProfile, saveProfile } from "@/server/profile";
 import { CARDS, isProfileType, profileOf, type NavPrefs, type Profile, type ProfileType, type TodayCard } from "@/lib/profile";
 import { NAV_MODULES } from "@/lib/nav";
+import { getMessages } from "@/i18n/server";
 
 const empty = (type: ProfileType): Profile => ({ type, roles: [type], cards: profileOf(type).cards, cardsByRole: {}, nav: { shown: [], hidden: [] } });
 
@@ -14,7 +15,7 @@ const empty = (type: ProfileType): Profile => ({ type, roles: [type], cards: pro
  */
 export async function saveProfileAction(input: { type: ProfileType; cards?: TodayCard[]; roles?: ProfileType[] }) {
   const user = await requireUser();
-  if (!isProfileType(input.type)) return { error: "Profil inconnu." };
+  if (!isProfileType(input.type)) return { error: (await getMessages()).settingsUi.profile.unknown };
   const current = (await getProfile(user.id)) ?? empty(input.type);
   const valid = new Set(CARDS.map((c) => c.key));
   const cards = (input.cards ?? current.cardsByRole[input.type] ?? profileOf(input.type).cards).filter((c) => valid.has(c)).slice(0, 5);
@@ -28,7 +29,7 @@ export async function saveProfileAction(input: { type: ProfileType; cards?: Toda
 export async function switchRoleAction(type: ProfileType) {
   const user = await requireUser();
   const current = await getProfile(user.id);
-  if (!current || !current.roles.includes(type)) return { error: "Ce rôle n'est pas dans ton profil." };
+  if (!current || !current.roles.includes(type)) return { error: (await getMessages()).settingsUi.profile.notYours };
   await saveProfile(user.id, { ...current, type, cards: current.cardsByRole[type] ?? profileOf(type).cards });
   revalidatePath("/", "layout");
   return { ok: true };
@@ -38,7 +39,7 @@ export async function switchRoleAction(type: ProfileType) {
 export async function setNavModuleAction(key: string, choice: "show" | "hide" | "default") {
   const user = await requireUser();
   const m = NAV_MODULES.find((x) => x.key === key);
-  if (!m || m.core) return { error: "Module inconnu." };
+  if (!m || m.core) return { error: (await getMessages()).settingsUi.nav.unknown };
   const current = (await getProfile(user.id)) ?? empty("etudiant");
   const nav: NavPrefs = { shown: current.nav.shown.filter((k) => k !== key), hidden: current.nav.hidden.filter((k) => k !== key) };
   if (choice === "show") nav.shown.push(key);

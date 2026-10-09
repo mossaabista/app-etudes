@@ -9,6 +9,8 @@ import { WidgetCarousel } from "@/components/tasks/WidgetCarousel";
 import { createTaskAction, deleteTaskAction, toggleTaskStatusAction } from "@/server/actions/task.actions";
 import { PROJECT_VISUAL, type SubArea } from "@/lib/task-areas";
 import { imageSrc, type AreaSpec } from "@/lib/layout";
+import { useI18n } from "@/i18n/client";
+import { fmt, INTL, type Locale } from "@/i18n/config";
 
 export interface AreaTask {
   id: string;
@@ -18,8 +20,8 @@ export interface AreaTask {
   sub: string;
 }
 
-const dueLabel = (iso: string) =>
-  new Intl.DateTimeFormat("fr-CA", { timeZone: currentZone(), weekday: "short", day: "numeric", month: "short" }).format(new Date(iso));
+const dueLabel = (iso: string, locale: Locale) =>
+  new Intl.DateTimeFormat(INTL[locale], { timeZone: currentZone(), weekday: "short", day: "numeric", month: "short" }).format(new Date(iso));
 
 export function AreaView({
   area: spec,
@@ -32,6 +34,7 @@ export function AreaView({
   tasks: AreaTask[];
   initialSub?: string;
 }) {
+  const { t } = useI18n();
   const area = useMemo(() => ({ ...spec, subs: spec.subs.map((s) => ({ key: s.key, label: s.label, visual: { src: imageSrc(s.image) } })) }), [spec]);
 
   // For Projets the keys are the user's projects, plus "Général" for anything filed there
@@ -39,7 +42,7 @@ export function AreaView({
   const subs: SubArea[] = useMemo(() => {
     if (area.key !== "projets") return area.subs;
     const own = projects.map((p) => ({ key: p.id, label: p.title, visual: PROJECT_VISUAL }));
-    const needsGeneral = own.length === 0 || tasks.some((t) => t.sub === "general");
+    const needsGeneral = own.length === 0 || tasks.some((x) => x.sub === "general");
     return needsGeneral ? [...own, ...area.subs] : own;
   }, [area, projects, tasks]);
 
@@ -48,7 +51,7 @@ export function AreaView({
 
   const bySub = useMemo(() => {
     const map = new Map<string, AreaTask[]>();
-    for (const t of tasks) (map.get(t.sub) ?? map.set(t.sub, []).get(t.sub)!).push(t);
+    for (const x of tasks) (map.get(x.sub) ?? map.set(x.sub, []).get(x.sub)!).push(x);
     return map;
   }, [tasks]);
 
@@ -66,7 +69,7 @@ export function AreaView({
       <div className="glass-backdrop" aria-hidden />
       <div className="area-enter">
         <div className="mb-5 flex items-center gap-3">
-          <Link href="/tasks" aria-label="Retour aux dossiers" className="lm focus-ring h-11 w-11 shrink-0">
+          <Link href="/tasks" aria-label={t.workspace.area.back} className="lm focus-ring h-11 w-11 shrink-0">
             <LiquidLayers>
               <ChevronLeft size={18} />
             </LiquidLayers>
@@ -86,7 +89,7 @@ export function AreaView({
             key: s.key,
             label: s.label,
             src: s.visual.src,
-            count: (bySub.get(s.key) ?? []).filter((t) => !t.done).length,
+            count: (bySub.get(s.key) ?? []).filter((x) => !x.done).length,
             href: `/tasks/${area.key}/${s.key}`,
           }))}
         />
@@ -117,6 +120,8 @@ export function TaskDrawer({
   isProject: boolean;
   tasks: AreaTask[];
 }) {
+  const { t, locale } = useI18n();
+  const w = t.workspace.area;
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, adding] = useActionState(createTaskAction, null);
   const [pending, startTransition] = useTransition();
@@ -125,18 +130,18 @@ export function TaskDrawer({
     if (state && "success" in state) formRef.current?.reset();
   }, [state]);
 
-  const todo = tasks.filter((t) => !t.done);
-  const done = tasks.filter((t) => t.done);
+  const todo = tasks.filter((x) => !x.done);
+  const done = tasks.filter((x) => x.done);
 
   return (
     <section className="glass-card p-5" aria-busy={pending || adding}>
       <header className="mb-3">
         <div className="flex items-baseline gap-2">
-          <h2 className="text-sm font-semibold text-[var(--ink)]">Tâches · {sub.label}</h2>
-          <span className="text-xs text-[var(--ink-dim)]">{todo.length ? `${todo.length} à faire` : "rien en cours"}</span>
+          <h2 className="text-sm font-semibold text-[var(--ink)]">{fmt(w.drawerTitle, { name: sub.label })}</h2>
+          <span className="text-xs text-[var(--ink-dim)]">{todo.length ? fmt(t.workspace.sectors.openCount, { n: todo.length }) : w.nothingInProgress}</span>
         </div>
         <p className="mt-0.5 text-xs text-[var(--ink-faint)]">
-          Ta liste de choses à faire pour {sub.label}. Elles apparaissent aussi dans « À faire » sur Aujourd&apos;hui, à leur date.
+          {fmt(w.drawerIntro, { name: sub.label })}
         </p>
       </header>
 
@@ -156,48 +161,48 @@ export function TaskDrawer({
         <input
           name="title"
           required
-          placeholder={`Ajouter dans ${sub.label}…`}
+          placeholder={fmt(w.addIn, { name: sub.label })}
           className="glass-pill focus-ring min-w-0 flex-1 px-4 py-2.5 text-sm text-[var(--ink)] placeholder:text-[var(--ink-faint)]"
         />
         <input
           name="day"
           type="date"
-          aria-label="Échéance (facultatif)"
+          aria-label={w.dueOptional}
           className="glass-pill focus-ring hidden w-36 px-3 py-2.5 text-xs text-[var(--ink-dim)] [color-scheme:dark] sm:block"
         />
-        <button type="submit" disabled={adding} aria-label="Ajouter la tâche" className="lm focus-ring h-10 w-10 shrink-0 disabled:opacity-50">
+        <button type="submit" disabled={adding} aria-label={w.addTask} className="lm focus-ring h-10 w-10 shrink-0 disabled:opacity-50">
           <LiquidLayers>
             <Plus size={16} />
           </LiquidLayers>
         </button>
       </form>
-      {state && "error" in state && <p className="-mt-2 mb-3 text-xs text-red-300">{state.error}</p>}
+      {state && "error" in state && <p role="alert" className="-mt-2 mb-3 rounded-xl bg-[rgba(220,60,40,0.18)] px-3 py-2 text-xs text-[#ffd9cf]">{state.error}</p>}
 
       {tasks.length === 0 ? (
-        <p className="py-4 text-center text-xs text-[var(--ink-faint)]">Aucune tâche dans {sub.label} pour l&apos;instant.</p>
+        <p className="py-4 text-center text-xs text-[var(--ink-faint)]">{fmt(w.empty, { name: sub.label })}</p>
       ) : (
         <ul className="space-y-2">
-          {[...todo, ...done].map((t) => (
-            <li key={t.id} className={`tile flex items-center gap-3 px-3.5 py-2.5 ${t.done ? "opacity-55" : ""}`}>
+          {[...todo, ...done].map((task) => (
+            <li key={task.id} className={`tile flex items-center gap-3 px-3.5 py-2.5 ${task.done ? "opacity-55" : ""}`}>
               <button
                 type="button"
                 role="checkbox"
-                aria-checked={t.done}
-                aria-label={t.done ? `Rouvrir « ${t.title} »` : `Terminer « ${t.title} »`}
+                aria-checked={task.done}
+                aria-label={fmt(task.done ? t.today.reopenTask : t.today.completeTask, { title: task.title })}
                 disabled={pending}
-                onClick={() => startTransition(() => toggleTaskStatusAction(t.id))}
+                onClick={() => startTransition(() => toggleTaskStatusAction(task.id))}
                 className="check focus-ring"
-                data-checked={t.done || undefined}
+                data-checked={task.done || undefined}
               >
-                {t.done && <Check size={12} strokeWidth={3} />}
+                {task.done && <Check size={12} strokeWidth={3} />}
               </button>
-              <span className={`min-w-0 flex-1 text-sm text-[var(--ink)] ${t.done ? "line-through" : ""}`}>{t.title}</span>
-              {t.due && <span className="shrink-0 text-xs text-[var(--ink-dim)]">{dueLabel(t.due)}</span>}
+              <span className={`min-w-0 flex-1 text-sm text-[var(--ink)] ${task.done ? "line-through" : ""}`}>{task.title}</span>
+              {task.due && <span className="shrink-0 text-xs text-[var(--ink-dim)]">{dueLabel(task.due, locale)}</span>}
               <button
                 type="button"
-                aria-label={`Supprimer « ${t.title} »`}
+                aria-label={fmt(w.deleteNamed, { title: task.title })}
                 disabled={pending}
-                onClick={() => startTransition(() => deleteTaskAction(t.id))}
+                onClick={() => startTransition(() => deleteTaskAction(task.id))}
                 className="focus-ring rounded-full p-1 text-[var(--ink-faint)] hover:text-[var(--ink)]"
               >
                 <X size={14} />

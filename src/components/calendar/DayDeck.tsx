@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { LiquidLayers } from "@/components/ui/LiquidMetal";
+import { useI18n } from "@/i18n/client";
 
 export interface DeckDay {
   iso: string;
@@ -30,6 +31,7 @@ export function DayDeck({
   onClose: () => void;
   label: (iso: string) => string;
 }) {
+  const { t } = useI18n();
   const startX = useRef<number | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const canBack = active > 0;
@@ -66,7 +68,7 @@ export function DayDeck({
         <h2 className="truncate text-lg font-semibold capitalize tracking-tight text-on-gold">
           {label(days[active].iso)}
         </h2>
-        <button ref={closeRef} type="button" onClick={onClose} aria-label="Fermer et revenir au calendrier" className="lm focus-ring h-11 w-11 shrink-0">
+        <button ref={closeRef} type="button" onClick={onClose} aria-label={t.workspace.cal.closeDeck} className="lm focus-ring h-11 w-11 shrink-0">
           <LiquidLayers>
             <X size={18} />
           </LiquidLayers>
@@ -106,7 +108,7 @@ export function DayDeck({
             type="button"
             onClick={() => canBack && onChange(active - 1)}
             disabled={!canBack}
-            aria-label="Jour précédent"
+            aria-label={t.today.prev}
             className="lm focus-ring h-11 w-11 shrink-0 disabled:opacity-40"
           >
             <LiquidLayers>
@@ -114,13 +116,13 @@ export function DayDeck({
             </LiquidLayers>
           </button>
           <span className="min-w-[7rem] text-center text-xs font-medium text-[var(--ink-dim)]">
-            Glisse pour changer de jour
+            {t.workspace.cal.swipe}
           </span>
           <button
             type="button"
             onClick={() => canForward && onChange(active + 1)}
             disabled={!canForward}
-            aria-label="Jour suivant"
+            aria-label={t.today.next}
             className="lm focus-ring h-11 w-11 shrink-0 disabled:opacity-40"
           >
             <LiquidLayers>

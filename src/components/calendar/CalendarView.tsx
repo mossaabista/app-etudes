@@ -7,6 +7,9 @@ import { deleteEventAction, updateEventAction } from "@/server/actions/event.act
 import { undoCommandAction, type Undo } from "@/server/actions/capture.actions";
 import { DayDeck } from "@/components/calendar/DayDeck";
 import type { CalCategory, LegendEntry } from "@/lib/calendar-categories";
+import { useI18n } from "@/i18n/client";
+import { fmt, INTL, type Locale } from "@/i18n/config";
+import { plural } from "@/i18n/ns/workspace";
 
 export interface CalDay {
   iso: string;
@@ -35,7 +38,9 @@ export interface CalItem {
   edit?: { id: string; notes: string | null };
 }
 
-const WEEKDAY_LABELS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
+/** Short weekday names, Sunday first: 2023-01-01 was a Sunday. */
+const weekdayLabels = (locale: Locale) =>
+  Array.from({ length: 7 }, (_, i) => new Intl.DateTimeFormat(INTL[locale], { timeZone: "UTC", weekday: "short" }).format(new Date(Date.UTC(2023, 0, 1 + i, 12))));
 
 /** How many things a cell shows before "+N". Fewer, larger lines read at a glance. */
 const MAX_LINES = 3;
@@ -49,7 +54,12 @@ function order(a: CalItem, b: CalItem) {
   return (a.time ?? "99").localeCompare(b.time ?? "99");
 }
 
-export function CalendarView({ days, items, legend }: { days: CalDay[]; items: CalItem[]; legend: LegendEntry[] }) {
+export function CalendarView({ days, items, legend: rawLegend }: { days: CalDay[]; items: CalItem[]; legend: LegendEntry[] }) {
+  const { t, locale } = useI18n();
+  const w = t.workspace.cal;
+  // Category names in the reader's language; colours and order stay the profile's.
+  const legend = useMemo(() => rawLegend.map((l) => ({ ...l, label: (w.cat as Record<string, string>)[l.key] ?? l.label })), [rawLegend, w]);
+  const dayLabel = useCallback((iso: string) => formatDay(iso, locale), [locale]);
   const [hidden, setHidden] = useState<Set<CalCategory>>(new Set());
   const [selected, setSelected] = useState<string>(() => (days.find((d) => d.isToday) ?? days.find((d) => d.inMonth) ?? days[0]).iso);
   // Index into `days` of the day zoomed into the deck, or null while the grid is showing.
@@ -131,9 +141,9 @@ export function CalendarView({ days, items, legend }: { days: CalDay[]; items: C
 
       <section className="glass-card p-2.5 sm:p-4">
         <div className="grid grid-cols-7 gap-1 sm:gap-2">
-          {WEEKDAY_LABELS.map((w) => (
-            <div key={w} className="pb-1 text-center text-[11px] font-semibold uppercase tracking-wide text-[var(--ink-dim)]">
-              {w}
+          {weekdayLabels(locale).map((wd) => (
+            <div key={wd} className="pb-1 text-center text-[11px] font-semibold uppercase tracking-wide text-[var(--ink-dim)]">
+              {wd}
             </div>
           ))}
 
@@ -149,7 +159,7 @@ export function CalendarView({ days, items, legend }: { days: CalDay[]; items: C
                 key={d.iso}
                 type="button"
                 onClick={() => pick(index)}
-                aria-label={`${d.day}${list.length ? `, ${list.length} élément${list.length > 1 ? "s" : ""}` : ""}`}
+                aria-label={`${d.day}${list.length ? `, ${plural(locale, list.length, w.itemOne, w.itemMany)}` : ""}`}
                 aria-pressed={isSelected}
                 data-today={d.isToday || undefined}
                 data-selected={isSelected || undefined}
@@ -189,10 +199,10 @@ export function CalendarView({ days, items, legend }: { days: CalDay[]; items: C
                       <span className="line-clamp-2 min-w-0 break-words">{i.title}</span>
                     </span>
                   ))}
-                  {more > 0 && <span className="px-1 text-[11px] font-medium text-[var(--ink-dim)]">+{more} autre{more > 1 ? "s" : ""}</span>}
+                  {more > 0 && <span className="px-1 text-[11px] font-medium text-[var(--ink-dim)]">{plural(locale, more, w.moreOne, w.moreMany)}</span>}
                   {classes.length > 0 && (
                     <span className="cal-classes" style={{ "--c": colorOf(classes[0]) } as React.CSSProperties}>
-                      {classes.length} cours
+                      {plural(locale, classes.length, w.classOne, w.classMany)}
                     </span>
                   )}
                 </span>
@@ -208,7 +218,7 @@ export function CalendarView({ days, items, legend }: { days: CalDay[]; items: C
           onChange={change}
           onClose={close}
           label={dayLabel}
-          days={days.map((d) => ({ iso: d.iso, node: <DayCard day={d} items={byDay.get(d.iso) ?? []} colorOf={colorOf} labelOf={labelOf} /> }))}
+          days={days.map((d) => ({ iso: d.iso, node: <DayCard day={d} items={byDay.get(d.iso) ?? []} colorOf={colorOf} labelOf={labelOf} dayLabel={dayLabel} /> }))}
         />
       )}
     </div>
@@ -223,12 +233,16 @@ function DayCard({
   items,
   colorOf,
   labelOf,
+  dayLabel,
 }: {
   day: CalDay;
   items: CalItem[];
   colorOf: (i: CalItem) => string;
   labelOf: (c: CalCategory) => string;
+  dayLabel: (iso: string) => string;
 }) {
+  const { t } = useI18n();
+  const w = t.workspace.cal;
   const list = [...items].sort(byClock);
   const router = useRouter();
   const [editing, setEditing] = useState<string | null>(null);
@@ -238,10 +252,10 @@ function DayCard({
       <header className="mb-3 flex items-baseline gap-2">
         <h3 className="text-sm font-semibold capitalize text-[var(--ink)]">{dayLabel(day.iso)}</h3>
         {list.length > 0 && <span className="text-xs text-[var(--ink-dim)]">{list.length}</span>}
-        {day.isToday && <span className="ml-auto rounded-full bg-[#e8bf63] px-2 py-0.5 text-[10px] font-semibold text-[#2a1a05]">Aujourd&apos;hui</span>}
+        {day.isToday && <span className="ml-auto rounded-full bg-[#e8bf63] px-2 py-0.5 text-[10px] font-semibold text-[#2a1a05]">{t.nav.today}</span>}
       </header>
       {list.length === 0 ? (
-        <p className="py-6 text-center text-xs text-[var(--ink-faint)]">Rien ce jour-là.</p>
+        <p className="px-2 py-6 text-center text-xs leading-5 text-[var(--ink-faint)]">{w.emptyDay}</p>
       ) : (
         // Every card in the deck is the same height, so a busy day scrolls inside its card.
         <ol className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
@@ -253,7 +267,7 @@ function DayCard({
                   onCancel={() => setEditing(null)}
                   onSaved={(undo) => {
                     setEditing(null);
-                    setNote({ text: "Événement modifié.", undo });
+                    setNote({ text: w.eventChanged, undo });
                     router.refresh();
                   }}
                 />
@@ -270,22 +284,22 @@ function DayCard({
                   {i.title}
                 </p>
                 <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-[var(--ink-dim)]">
-                  {[labelOf(i.category), i.end ? `jusqu'à ${i.end}` : null, i.detail].filter(Boolean).join(" · ")}
+                  {[labelOf(i.category), i.end ? fmt(t.today.until, { time: i.end }) : null, i.detail].filter(Boolean).join(" · ")}
                 </p>
               </div>
               {i.edit && (
                 <span className="flex shrink-0 gap-0.5">
-                  <button type="button" onClick={() => setEditing(i.id)} aria-label={`Modifier ${i.title}`} className="focus-ring rounded p-1.5 text-[var(--ink-faint)] hover:text-[var(--ink)]">
+                  <button type="button" onClick={() => setEditing(i.id)} aria-label={fmt(w.editNamed, { title: i.title })} className="focus-ring rounded p-1.5 text-[var(--ink-faint)] hover:text-[var(--ink)]">
                     <Pencil size={13} />
                   </button>
                   <button
                     type="button"
                     onClick={async () => {
                       const r = await deleteEventAction(i.edit!.id);
-                      setNote("error" in r ? { text: r.error } : { text: `« ${i.title} » supprimé.`, undo: r.undo });
+                      setNote("error" in r ? { text: r.error } : { text: fmt(w.deletedNamed, { title: i.title }), undo: r.undo });
                       router.refresh();
                     }}
-                    aria-label={`Supprimer ${i.title}`}
+                    aria-label={fmt(w.deleteNamed, { title: i.title })}
                     className="focus-ring rounded p-1.5 text-[var(--ink-faint)] hover:text-[#ffb3a3]"
                   >
                     <Trash2 size={13} />
@@ -305,12 +319,12 @@ function DayCard({
               type="button"
               onClick={async () => {
                 const { missed } = await undoCommandAction(note.undo!);
-                setNote({ text: missed ? "Annulé en partie : l'événement avait déjà changé." : "Annulé." });
+                setNote({ text: missed ? w.undonePartial : w.undone });
                 router.refresh();
               }}
               className="mod-chip focus-ring text-xs"
             >
-              <Undo2 size={12} /> Annuler
+              <Undo2 size={12} /> {t.common.undo}
             </button>
           )}
         </p>
@@ -319,9 +333,9 @@ function DayCard({
   );
 }
 
-function dayLabel(iso: string) {
+function formatDay(iso: string, locale: Locale) {
   // Noon UTC keeps the date stable whatever zone the browser is in.
-  return new Intl.DateTimeFormat("fr-CA", { timeZone: "UTC", weekday: "long", day: "numeric", month: "long" }).format(new Date(`${iso}T12:00:00Z`));
+  return new Intl.DateTimeFormat(INTL[locale], { timeZone: "UTC", weekday: "long", day: "numeric", month: "long" }).format(new Date(`${iso}T12:00:00Z`));
 }
 
 const input = "w-full rounded-lg border border-[rgba(255,220,148,0.16)] bg-[rgba(20,14,6,0.55)] px-2.5 py-1.5 text-sm text-[var(--ink)] outline-none focus:border-[rgba(255,220,148,0.45)]";
@@ -335,6 +349,8 @@ function EventEditor({ item, onCancel, onSaved }: { item: CalItem; onCancel: () 
   const [notes, setNotes] = useState(item.edit?.notes ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const { t } = useI18n();
+  const w = t.workspace.cal;
   return (
     <form
       onSubmit={async (e) => {
@@ -347,24 +363,24 @@ function EventEditor({ item, onCancel, onSaved }: { item: CalItem; onCancel: () 
       }}
       className="space-y-2"
     >
-      <input value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Titre" maxLength={200} className={input} />
+      <input value={title} onChange={(e) => setTitle(e.target.value)} aria-label={w.title} maxLength={200} className={input} />
       <div className="grid grid-cols-3 gap-2">
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Date" className={input} />
-        <input type="time" value={start} onChange={(e) => setStart(e.target.value)} aria-label="Début" className={input} />
-        <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} aria-label="Fin" className={input} />
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label={w.date} className={input} />
+        <input type="time" value={start} onChange={(e) => setStart(e.target.value)} aria-label={w.start} className={input} />
+        <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} aria-label={w.end} className={input} />
       </div>
-      <input value={notes} onChange={(e) => setNotes(e.target.value)} aria-label="Notes" placeholder="Notes" maxLength={2000} className={input} />
+      <input value={notes} onChange={(e) => setNotes(e.target.value)} aria-label={w.notes} placeholder={w.notes} maxLength={2000} className={input} />
       {error && (
-        <p role="alert" className="text-xs text-[#ffb3a3]">
+        <p role="alert" className="rounded-xl bg-[rgba(220,60,40,0.18)] px-3 py-2 text-xs text-[#ffd9cf]">
           {error}
         </p>
       )}
       <div className="flex gap-2">
         <button type="submit" disabled={saving} className="mod-chip mod-chip-gold focus-ring text-xs">
-          Enregistrer
+          {t.common.save}
         </button>
         <button type="button" onClick={onCancel} className="mod-chip focus-ring text-xs">
-          Fermer
+          {t.common.close}
         </button>
       </div>
     </form>

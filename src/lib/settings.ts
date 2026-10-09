@@ -24,6 +24,8 @@ export interface UserSettings {
   jarvis: { voice: boolean; rate: number; style: ReplyStyle };
   notifications: { morning: string | null; evening: string | null; deadlines: boolean; muted: string[] };
   plan: Plan;
+  /** A small square photo (data URL, resized in the browser), or null for the initial. */
+  avatar: string | null;
   /** What the user told us at onboarding: lets Jarvis and its agents start from the right place. */
   about: About;
 }
@@ -52,6 +54,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   jarvis: { voice: true, rate: 1, style: "short" },
   notifications: { morning: "07:30", evening: null, deadlines: true, muted: [] },
   plan: "free",
+  avatar: null,
   about: NO_ABOUT,
 };
 
@@ -95,6 +98,7 @@ export function sanitizeSettings(raw: unknown): UserSettings {
       muted: Array.isArray(n.muted) ? [...new Set(n.muted.filter((x): x is string => typeof x === "string" && /^[a-z0-9-]{1,40}$/.test(x)))].slice(0, 40) : [],
     },
     plan: r.plan === "pro" ? "pro" : "free",
+    avatar: typeof r.avatar === "string" && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(r.avatar) && r.avatar.length <= 80_000 ? r.avatar : null,
     about: sanitizeAbout(r.about),
   };
 }

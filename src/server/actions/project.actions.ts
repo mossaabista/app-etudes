@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/server/auth/current-user";
+import { getMessages } from "@/i18n/server";
 import { checkRefs } from "@/server/ownership";
 
 export async function createProjectAction(_prev: unknown, formData: FormData) {
@@ -14,7 +15,7 @@ export async function createProjectAction(_prev: unknown, formData: FormData) {
   const courseId = (formData.get("courseId") as string) || null;
   const dueDate = formData.get("dueDate") ? new Date(formData.get("dueDate") as string) : null;
 
-  if (!title) return { error: "Title is required." };
+  if (!title) return { error: (await getMessages()).workspace.projects.titleRequired };
   const refError = await checkRefs(user.id, { courseId });
   if (refError) return { error: refError };
 
@@ -37,7 +38,7 @@ export async function updateProjectAction(_prev: unknown, formData: FormData) {
   const dueDate = formData.get("dueDate") ? new Date(formData.get("dueDate") as string) : null;
   const progress = formData.get("progress") ? parseInt(formData.get("progress") as string) : 0;
 
-  if (!title) return { error: "Title is required." };
+  if (!title) return { error: (await getMessages()).workspace.projects.titleRequired };
   const refError = await checkRefs(user.id, { courseId });
   if (refError) return { error: refError };
 
@@ -64,10 +65,10 @@ export async function addMilestoneAction(_prev: unknown, formData: FormData) {
   const title = (formData.get("title") as string)?.trim();
   const dueDate = formData.get("dueDate") ? new Date(formData.get("dueDate") as string) : null;
 
-  if (!title) return { error: "Title is required." };
+  if (!title) return { error: (await getMessages()).workspace.projects.titleRequired };
 
   const project = await prisma.project.findFirst({ where: { id: projectId, userId: user.id } });
-  if (!project) return { error: "Project not found." };
+  if (!project) return { error: (await getMessages()).workspace.projects.notFound };
 
   const count = await prisma.projectMilestone.count({ where: { projectId } });
   await prisma.projectMilestone.create({
@@ -119,10 +120,10 @@ export async function addMemberAction(_prev: unknown, formData: FormData) {
   const email = (formData.get("email") as string)?.trim() || null;
   const role = (formData.get("role") as string)?.trim() || null;
 
-  if (!name) return { error: "Name is required." };
+  if (!name) return { error: (await getMessages()).workspace.projects.nameRequired };
 
   const project = await prisma.project.findFirst({ where: { id: projectId, userId: user.id } });
-  if (!project) return { error: "Project not found." };
+  if (!project) return { error: (await getMessages()).workspace.projects.notFound };
 
   await prisma.projectMember.create({ data: { projectId, name, email, role } });
   revalidatePath(`/projects/${projectId}`);

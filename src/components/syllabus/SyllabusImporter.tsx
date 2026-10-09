@@ -8,25 +8,22 @@ import type { FoundAssessment, FoundSlot } from "@/lib/syllabus-parse";
 import { reviewAssessments, type Confidence, type ReviewedAssessment } from "@/lib/syllabus-review";
 import { toISODate } from "@/lib/dates";
 import { CheckBox, field } from "@/components/modules/kit";
+import { labelIn } from "@/lib/labels";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
 
-const TYPE_LABEL: Record<FoundAssessment["type"], string> = {
-  Exam: "Examen",
-  Quiz: "Quiz",
-  Lab: "Laboratoire",
-  Project: "Projet",
-  Assignment: "Devoir",
-  Presentation: "Présentation",
-};
-const CONFIDENCE: Record<Confidence, { label: string; color: string }> = {
-  high: { label: "Sûr", color: "#7fe0b0" },
-  medium: { label: "À vérifier", color: "#f0cd79" },
-  low: { label: "Douteux", color: "#ffb3a3" },
+const TYPES: FoundAssessment["type"][] = ["Exam", "Quiz", "Lab", "Project", "Assignment", "Presentation"];
+const CONFIDENCE: Record<Confidence, { key: "confHigh" | "confMedium" | "confLow"; color: string }> = {
+  high: { key: "confHigh", color: "#7fe0b0" },
+  medium: { key: "confMedium", color: "#f0cd79" },
+  low: { key: "confLow", color: "#ffb3a3" },
 };
 type Course = { id: string; code: string; name: string; assessments: { title: string; date: string | null }[] };
 const ACCEPT = ".pdf,.docx,.png,.jpg,.jpeg,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg,image/webp";
 const accepted = (name: string) => /\.(pdf|docx|png|jpe?g|webp)$/i.test(name);
 
-const DAY_LABEL: Record<string, string> = { Monday: "Lundi", Tuesday: "Mardi", Wednesday: "Mercredi", Thursday: "Jeudi", Friday: "Vendredi", Saturday: "Samedi", Sunday: "Dimanche" };
+/** Plural form: French counts 0 and 1 as singular, English only 1. */
+const plural = (n: number, locale: "fr" | "en") => (locale === "fr" ? n > 1 : n !== 1);
 
 interface Draft {
   id: string;
@@ -56,6 +53,8 @@ export function SyllabusImporter({ courses }: { courses: Course[] }) {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const input = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const { t } = useI18n();
+  const k = t.academics;
 
   const patch = (id: string, p: Partial<Draft> | ((d: Draft) => Partial<Draft>)) =>
     setDrafts((ds) => ds.map((d) => (d.id === id ? { ...d, ...(typeof p === "function" ? p(d) : p) } : d)));
@@ -128,7 +127,7 @@ export function SyllabusImporter({ courses }: { courses: Course[] }) {
       assessments: d.rows.filter((r) => r.on).map((r) => ({ title: r.title, type: r.type, date: r.date, time: r.time, weight: r.weight, line: r.line, source: r.source })),
       schedule: d.slots.filter((s) => s.on).map((s) => ({ day: s.day, start: s.start, end: s.end, type: s.type, room: s.room })),
     });
-    if ("error" in res) return patch(d.id, { status: "error", error: res.error ?? "Import impossible." });
+    if ("error" in res) return patch(d.id, { status: "error", error: res.error ?? k.importFailed });
     patch(d.id, { status: "imported", result: { courseId: res.courseId!, added: res.added!, slotsAdded: res.slotsAdded! }, open: false });
   };
 
@@ -157,18 +156,15 @@ export function SyllabusImporter({ courses }: { courses: Course[] }) {
             <FileUp size={22} />
           </span>
           <div className="min-w-0 flex-1">
-            <h2 className="text-base font-semibold text-[var(--ink)]">Dépose tous tes syllabus</h2>
-            <p className="mt-1 text-sm leading-6 text-[var(--ink-dim)]">
-              PDF, Word (.docx) ou photos, glissés ici ou choisis. Tu vérifies chaque date — avec la page d&apos;où elle vient — puis chaque cours obtient son dossier, ses
-              évaluations, son horaire et ses chapitres. Réimporter le même plan n&apos;ajoute pas de doublons.
-            </p>
+            <h2 className="text-base font-semibold text-[var(--ink)]">{k.dropTitle}</h2>
+            <p className="mt-1 text-sm leading-6 text-[var(--ink-dim)]">{k.dropBody}</p>
           </div>
           <input
             ref={input}
             type="file"
             multiple
             accept={ACCEPT}
-            aria-label="Choisir des plans de cours"
+            aria-label={k.chooseFilesAria}
             className="hidden"
             onChange={(e) => {
               const files = [...(e.target.files ?? [])];
@@ -177,7 +173,7 @@ export function SyllabusImporter({ courses }: { courses: Course[] }) {
             }}
           />
           <button type="button" onClick={() => input.current?.click()} className="mod-chip mod-chip-gold focus-ring shrink-0 px-5 py-3 text-sm">
-            <Sparkles size={15} /> Choisir des fichiers
+            <Sparkles size={15} /> {k.chooseFiles}
           </button>
         </div>
       </section>
@@ -185,7 +181,7 @@ export function SyllabusImporter({ courses }: { courses: Course[] }) {
       {ready.length > 1 && (
         <div className="flex justify-end">
           <button type="button" onClick={() => void importAll()} className="mod-chip mod-chip-gold focus-ring px-6 py-3 text-sm">
-            Tout importer ({ready.length}) <ArrowRight size={15} />
+            {fmt(k.importAll, { n: ready.length })} <ArrowRight size={15} />
           </button>
         </div>
       )}
@@ -220,6 +216,8 @@ function DraftCard({
   const setRow = (i: number, p: Partial<ReviewedAssessment>) => patch((x) => ({ rows: x.rows.map((r, j) => (j === i ? { ...r, ...p } : r)) }));
   const total = d.rows.filter((r) => r.on).reduce((s, r) => s + (r.weight ?? 0), 0);
   const name = d.courseId ? courses.find((c) => c.id === d.courseId)?.code : d.course.code || d.fileName;
+  const { t, locale } = useI18n();
+  const k = t.academics;
 
   return (
     <section className="glass-card p-5">
@@ -229,35 +227,45 @@ function DraftCard({
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-[var(--ink)]">
-            {d.status === "reading" ? `Lecture de ${d.fileName}…` : `${name}${d.course.name && !d.courseId ? ` — ${d.course.name}` : ""}`}
+            {d.status === "reading" ? fmt(k.readingFile, { file: d.fileName }) : `${name}${d.course.name && !d.courseId ? ` — ${d.course.name}` : ""}`}
           </p>
           <p className="truncate text-xs text-[var(--ink-dim)]">
             {d.status === "error"
               ? d.error
               : d.status === "imported"
-                ? `${d.result!.added} évaluation${d.result!.added > 1 ? "s" : ""} et ${d.result!.slotsAdded} créneau${d.result!.slotsAdded > 1 ? "x" : ""} importés`
+                ? fmt(k.importedSummary, {
+                    a: fmt(plural(d.result!.added, locale) ? k.wAssessmentMany : k.wAssessmentOne, { n: d.result!.added }),
+                    s: fmt(plural(d.result!.slotsAdded, locale) ? k.wSlotMany : k.wSlotOne, { n: d.result!.slotsAdded }),
+                  })
                 : d.status === "reading"
-                  ? "Cours, évaluations, horaire et chapitres…"
-                  : `${d.rows.length} évaluations (${d.rows.filter((r) => r.confidence !== "high").length} à vérifier) · ${d.slots.length} créneaux · ${d.topics.length} chapitres · ${d.courseId ? "cours existant" : "nouveau cours"} · ${d.readBy}`}
+                  ? k.readingHint
+                  : fmt(k.readySummary, {
+                      n: d.rows.length,
+                      c: d.rows.filter((r) => r.confidence !== "high").length,
+                      s: d.slots.length,
+                      t: d.topics.length,
+                      kind: d.courseId ? k.existingCourse : k.newCourse,
+                      by: d.readBy,
+                    })}
           </p>
         </div>
         {d.status === "ready" && (
           <>
             <button type="button" onClick={() => patch({ open: !d.open })} aria-expanded={d.open} className="mod-chip focus-ring">
-              Vérifier <ChevronDown size={13} className={d.open ? "rotate-180" : ""} />
+              {k.review} <ChevronDown size={13} className={d.open ? "rotate-180" : ""} />
             </button>
             <button type="button" onClick={onImport} disabled={!d.courseId && !d.course.code.trim()} className="mod-chip mod-chip-gold focus-ring">
-              Importer <ArrowRight size={13} />
+              {k.import} <ArrowRight size={13} />
             </button>
           </>
         )}
         {d.status === "imported" && (
           <Link href={`/courses/${d.result!.courseId}`} className="mod-chip focus-ring">
-            Voir le cours <ArrowRight size={13} />
+            {k.viewCourse} <ArrowRight size={13} />
           </Link>
         )}
         {(d.status === "ready" || d.status === "error") && (
-          <button type="button" onClick={onRemove} aria-label="Retirer" className="text-[var(--ink-faint)] hover:text-[var(--ink)]">
+          <button type="button" onClick={onRemove} aria-label={k.remove} className="text-[var(--ink-faint)] hover:text-[var(--ink)]">
             <X size={15} />
           </button>
         )}
@@ -276,8 +284,8 @@ function DraftCard({
       {d.status === "ready" && d.open && (
         <div className="mt-4 space-y-4">
           <div className="flex flex-wrap gap-2">
-            <select value={d.courseId} onChange={(e) => rereview(e.target.value)} aria-label="Cours" className={`${field} w-64 cursor-pointer appearance-none`}>
-              <option value="">Créer un nouveau cours</option>
+            <select value={d.courseId} onChange={(e) => rereview(e.target.value)} aria-label={k.course} className={`${field} w-64 cursor-pointer appearance-none`}>
+              <option value="">{k.createNewCourse}</option>
               {courses.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.code} — {c.name}
@@ -286,46 +294,47 @@ function DraftCard({
             </select>
             {!d.courseId && (
               <>
-                <input value={d.course.code} onChange={(e) => patch((x) => ({ course: { ...x.course, code: e.target.value } }))} placeholder="Code" aria-label="Code du cours" className={`${field} w-32`} />
-                <input value={d.course.name} onChange={(e) => patch((x) => ({ course: { ...x.course, name: e.target.value } }))} placeholder="Nom du cours" aria-label="Nom du cours" className={`${field} flex-1 basis-48`} />
-                <input value={d.course.professor} onChange={(e) => patch((x) => ({ course: { ...x.course, professor: e.target.value } }))} placeholder="Professeur" aria-label="Professeur" className={`${field} w-48`} />
+                <input value={d.course.code} onChange={(e) => patch((x) => ({ course: { ...x.course, code: e.target.value } }))} placeholder={k.codePh} aria-label={k.code} className={`${field} w-32`} />
+                <input value={d.course.name} onChange={(e) => patch((x) => ({ course: { ...x.course, name: e.target.value } }))} placeholder={k.name} aria-label={k.name} className={`${field} flex-1 basis-48`} />
+                <input value={d.course.professor} onChange={(e) => patch((x) => ({ course: { ...x.course, professor: e.target.value } }))} placeholder={k.professor} aria-label={k.professor} className={`${field} w-48`} />
               </>
             )}
           </div>
 
           <div>
             <p className="mb-2 text-xs font-semibold text-[var(--ink-dim)]">
-              Évaluations · total {total} %{total && Math.abs(total - 100) > 1 ? " (vérifie : le total devrait faire 100 %)" : ""}
+              {fmt(k.totalLine, { n: total })}
+              {total && Math.abs(total - 100) > 1 ? k.totalWarn : ""}
             </p>
             <ul className="space-y-2">
               {d.rows.map((r, i) => (
                 <li key={i} className={`tile flex flex-wrap items-center gap-2 px-3 py-2.5 ${r.on ? "" : "opacity-45"}`}>
-                  <CheckBox checked={r.on} label="Importer" onChange={() => setRow(i, { on: !r.on })} />
-                  <input value={r.title} onChange={(e) => setRow(i, { title: e.target.value })} aria-label="Titre" className={`${field} min-w-0 flex-1 basis-48`} />
-                  <select value={r.type} onChange={(e) => setRow(i, { type: e.target.value as FoundAssessment["type"] })} aria-label="Type" className={`${field} w-36 cursor-pointer appearance-none`}>
-                    {Object.entries(TYPE_LABEL).map(([k, l]) => (
-                      <option key={k} value={k}>
-                        {l}
+                  <CheckBox checked={r.on} label={k.import} onChange={() => setRow(i, { on: !r.on })} />
+                  <input value={r.title} onChange={(e) => setRow(i, { title: e.target.value })} aria-label={k.title} className={`${field} min-w-0 flex-1 basis-48`} />
+                  <select value={r.type} onChange={(e) => setRow(i, { type: e.target.value as FoundAssessment["type"] })} aria-label={k.type} className={`${field} w-36 cursor-pointer appearance-none`}>
+                    {TYPES.map((x) => (
+                      <option key={x} value={x}>
+                        {labelIn(x, locale)}
                       </option>
                     ))}
                   </select>
-                  <input type="date" value={r.date ?? ""} onChange={(e) => setRow(i, { date: e.target.value || null })} aria-label="Date" className={`${field} w-36`} />
-                  <input type="time" value={r.time ?? ""} onChange={(e) => setRow(i, { time: e.target.value || null })} aria-label="Heure" className={`${field} w-24`} />
+                  <input type="date" value={r.date ?? ""} onChange={(e) => setRow(i, { date: e.target.value || null })} aria-label={k.colDate} className={`${field} w-36`} />
+                  <input type="time" value={r.time ?? ""} onChange={(e) => setRow(i, { time: e.target.value || null })} aria-label={k.time} className={`${field} w-24`} />
                   <input
                     type="number"
                     step="0.5"
                     value={r.weight ?? ""}
                     onChange={(e) => setRow(i, { weight: e.target.value === "" ? null : Number(e.target.value) })}
                     placeholder="%"
-                    aria-label="Pondération"
+                    aria-label={k.weight}
                     className={`${field} w-20`}
                   />
                   <span className="basis-full text-[0.7rem] leading-5 text-[var(--ink-dim)]">
                     <span className="mr-2 inline-flex items-center gap-1 font-semibold" style={{ color: CONFIDENCE[r.confidence].color }}>
                       <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: CONFIDENCE[r.confidence].color }} />
-                      {CONFIDENCE[r.confidence].label}
+                      {k[CONFIDENCE[r.confidence].key]}
                     </span>
-                    {r.source ? `${r.source.page ? `p. ${r.source.page} — ` : ""}« ${r.source.excerpt.slice(0, 120)} »` : "Source inconnue"}
+                    {r.source ? `${r.source.page ? fmt(k.page, { n: r.source.page }) : ""}${fmt(k.quote, { text: r.source.excerpt.slice(0, 120) })}` : k.unknownSource}
                     {r.flags.length > 0 && <span className="block text-[var(--ink-faint)]">{r.flags.join(" ")}</span>}
                   </span>
                 </li>
@@ -342,7 +351,7 @@ function DraftCard({
                   onClick={() => patch((x) => ({ slots: x.slots.map((y, j) => (j === i ? { ...y, on: !y.on } : y)) }))}
                   className={`mod-chip focus-ring ${s.on ? "" : "opacity-45 line-through"}`}
                 >
-                  {DAY_LABEL[s.day]} {s.start}–{s.end} · {s.type === "Lab" ? "Labo" : s.type === "Tutorial" ? "DGD" : "Cours"}
+                  {labelIn(s.day, locale)} {s.start}–{s.end} · {s.type === "Lab" ? k.slotLab : s.type === "Tutorial" ? k.slotTutorial : k.slotLecture}
                   {s.room ? ` · ${s.room}` : ""}
                 </button>
               ))}
@@ -351,10 +360,10 @@ function DraftCard({
 
           {d.topics.length > 0 && (
             <div>
-              <p className="mb-1.5 text-xs font-semibold text-[var(--ink-dim)]">Chapitres repérés</p>
+              <p className="mb-1.5 text-xs font-semibold text-[var(--ink-dim)]">{k.chaptersFound}</p>
               <ol className="list-decimal space-y-0.5 pl-5 text-xs text-[var(--ink-dim)]">
-                {d.topics.map((t) => (
-                  <li key={t}>{t}</li>
+                {d.topics.map((topic) => (
+                  <li key={topic}>{topic}</li>
                 ))}
               </ol>
             </div>

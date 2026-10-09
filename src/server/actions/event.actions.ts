@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/server/auth/current-user";
+import { getMessages } from "@/i18n/server";
 import { fromISODate, toISODate, wallTimeToUtc } from "@/lib/dates";
 import type { Undo } from "@/server/actions/capture.actions";
 
@@ -24,10 +25,10 @@ export async function createEvent(_prev: EventState, formData: FormData): Promis
   const endTime = String(formData.get("endTime") ?? "").trim() || null;
   const notes = String(formData.get("notes") ?? "").trim() || null;
 
-  if (!title) return { error: "Donne un titre à l'événement." };
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "Date invalide." };
+  if (!title) return { error: (await getMessages()).today.needTitle };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: (await getMessages()).today.badDate };
   if (endTime && startTime && endTime < startTime) {
-    return { error: "L'heure de fin précède l'heure de début." };
+    return { error: (await getMessages()).today.endBeforeStart };
   }
 
   await prisma.calendarEvent.create({
@@ -78,13 +79,13 @@ export async function updateEventAction(id: string, patch: EventPatch): Promise<
   const date = String(patch?.date ?? "");
   const start = patch?.start ? String(patch.start) : null;
   const end = patch?.end ? String(patch.end) : null;
-  if (!title) return { error: "Donne un titre à l'événement." };
-  if (!DATE.test(date) || !fromISODate(date)) return { error: "Date invalide." };
-  if ((start && !TIME.test(start)) || (end && !TIME.test(end))) return { error: "Heure invalide." };
-  if (end && !start) return { error: "Une heure de fin demande une heure de début." };
-  if (start && end && end <= start) return { error: "L'heure de fin doit suivre l'heure de début." };
+  if (!title) return { error: (await getMessages()).today.needTitle };
+  if (!DATE.test(date) || !fromISODate(date)) return { error: (await getMessages()).today.badDate };
+  if ((start && !TIME.test(start)) || (end && !TIME.test(end))) return { error: (await getMessages()).workspace.cal.badTime };
+  if (end && !start) return { error: (await getMessages()).workspace.cal.endNeedsStart };
+  if (start && end && end <= start) return { error: (await getMessages()).today.endBeforeStart };
   const current = await prisma.calendarEvent.findFirst({ where: { id: String(id), userId: user.id } });
-  if (!current) return { error: "Événement introuvable." };
+  if (!current) return { error: (await getMessages()).workspace.cal.notFound };
   const undo: Undo = { t: "event-was", id: current.id, date: toISODate(current.date), startTime: current.startTime, endTime: current.endTime, title: current.title, notes: current.notes };
   await prisma.calendarEvent.update({
     where: { id: current.id },
@@ -98,7 +99,7 @@ export async function updateEventAction(id: string, patch: EventPatch): Promise<
 export async function deleteEventAction(id: string): Promise<{ ok: true; undo: Undo } | { error: string }> {
   const user = await requireUser();
   const e = await prisma.calendarEvent.findFirst({ where: { id: String(id), userId: user.id } });
-  if (!e) return { error: "Événement introuvable." };
+  if (!e) return { error: (await getMessages()).workspace.cal.notFound };
   await prisma.calendarEvent.deleteMany({ where: { id: e.id, userId: user.id } });
   refresh();
   return {

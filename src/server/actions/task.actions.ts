@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/server/auth/current-user";
+import { getMessages } from "@/i18n/server";
 import { wallTimeToUtc } from "@/lib/dates";
 import { checkRefs } from "@/server/ownership";
 
@@ -28,7 +29,7 @@ export async function createTaskAction(_prev: unknown, formData: FormData) {
   const category = (formData.get("category") as string)?.trim() || null;
 
   if (!title) {
-    return { error: "Title is required." };
+    return { error: (await getMessages()).workspace.task.titleRequired };
   }
   const refError = await checkRefs(user.id, { courseId, projectId, assessmentId, parentId });
   if (refError) return { error: refError };
@@ -61,7 +62,7 @@ export async function updateTaskAction(_prev: unknown, formData: FormData) {
   const category = (formData.get("category") as string)?.trim() || null;
 
   if (!title) {
-    return { error: "Title is required." };
+    return { error: (await getMessages()).workspace.task.titleRequired };
   }
   const refError = await checkRefs(user.id, { courseId });
   if (refError) return { error: refError };
@@ -116,7 +117,7 @@ export async function setTaskCategoryAction(id: string, category: string | null)
 export async function quickTaskAction(input: { title: string; category: string; due?: string | null; priority?: string; minutes?: number | null; parentId?: string | null; courseId?: string | null }) {
   const user = await requireUser();
   const title = input.title.trim().slice(0, 200);
-  if (!title) return { error: "Titre requis." };
+  if (!title) return { error: (await getMessages()).workspace.task.titleRequired };
   const refError = await checkRefs(user.id, { courseId: input.courseId });
   if (refError) return { error: refError };
   const parent = input.parentId ? await prisma.task.findFirst({ where: { id: input.parentId, userId: user.id }, select: { id: true, category: true, dueDate: true } }) : null;
@@ -142,7 +143,7 @@ export async function quickTaskAction(input: { title: string; category: string; 
 export async function updateTaskFieldsAction(id: string, patch: { priority?: string; due?: string | null; minutes?: number | null; title?: string }) {
   const user = await requireUser();
   const task = await prisma.task.findFirst({ where: { id, userId: user.id }, select: { id: true } });
-  if (!task) return { error: "Introuvable." };
+  if (!task) return { error: (await getMessages()).workspace.task.notFound };
   const data: { priority?: string; dueDate?: Date | null; estimatedTime?: number | null; title?: string } = {};
   if (patch.priority && ["Low", "Medium", "High", "Critical"].includes(patch.priority)) data.priority = patch.priority;
   if (patch.due !== undefined) {

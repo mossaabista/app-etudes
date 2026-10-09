@@ -11,6 +11,8 @@ import { RenderImage } from "@/components/tasks/RenderImage";
 import { CustomSection } from "@/components/modules/CustomSection";
 import type { SubSpec } from "@/lib/layout";
 import { SectionAssistant } from "@/components/modules/SectionAssistant";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
 
 /** The page behind a widget: its object, what it is for, its tools, and its tasks. */
 export function ModuleShell({
@@ -45,16 +47,21 @@ export function ModuleShell({
   category: string;
   project: ProjectInfo | null;
 }) {
+  const { t, locale } = useI18n();
   const def = project || custom ? null : MODULES[section];
   const Body = def?.Component;
-  const intro = project ? project.description || "Les étapes et les tâches de ce projet." : custom ? custom.intro : def?.intro;
+  const intros = t.modulesB.intro as Record<string, string>;
+  const intro = project ? project.description || t.modulesB.shell.projectIntro : custom ? custom.intro : def ? intros[section] : undefined;
+  // This app's own references are translated; the others come with their section.
+  const given = def?.sources;
+  const sources = (t.modulesB.sources as Record<string, readonly string[]>)[section] ?? (given && ("fr" in given ? given[locale] : given));
 
   return (
     <>
       <div className="glass-backdrop" aria-hidden />
       <div className="area-enter mx-auto max-w-5xl">
         <div className="mb-4 flex items-center gap-3">
-          <Link href={`/tasks/${areaKey}?s=${subKey}`} aria-label={`Retour à ${areaLabel}`} className="lm focus-ring h-11 w-11 shrink-0">
+          <Link href={`/tasks/${areaKey}?s=${subKey}`} aria-label={fmt(t.modulesB.shell.back, { area: areaLabel })} className="lm focus-ring h-11 w-11 shrink-0">
             <LiquidLayers>
               <ChevronLeft size={18} />
             </LiquidLayers>
@@ -95,7 +102,7 @@ export function ModuleShell({
           )}
         </div>
 
-        {def?.sources && <Sources items={def.sources} health={def.health} />}
+        {def && sources && <Sources items={sources} health={def.health} />}
       </div>
     </>
   );

@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { getMessages } from "@/i18n/server";
+import { fmt } from "@/i18n/config";
 
 export interface BalanceArea {
   key: string;
@@ -16,7 +18,8 @@ export interface BalanceArea {
  * The week across the eight areas as a radar: one spoke per area, the gold shape is how far
  * each was looked after. The thinnest spokes come with a nudge.
  */
-export function BalanceWheel({ areas }: { areas: BalanceArea[] }) {
+export async function BalanceWheel({ areas }: { areas: BalanceArea[] }) {
+  const w = (await getMessages()).workspace.sectors;
   const size = 260;
   const c = size / 2;
   const r = c - 34;
@@ -31,7 +34,7 @@ export function BalanceWheel({ areas }: { areas: BalanceArea[] }) {
   return (
     <section className="glass-card mb-8 grid gap-6 p-5 md:grid-cols-[auto_1fr] md:items-center">
       <div className="relative mx-auto" style={{ width: size, height: size }}>
-        <svg viewBox={`0 0 ${size} ${size}`} className="h-full w-full" role="img" aria-label={`Équilibre de la semaine : ${overall} sur 100`}>
+        <svg viewBox={`0 0 ${size} ${size}`} className="h-full w-full" role="img" aria-label={fmt(w.balanceAria, { n: overall })}>
           <defs>
             <radialGradient id="balance-fill">
               <stop offset="0" stopColor="#ffe9a0" stopOpacity="0.55" />
@@ -63,14 +66,14 @@ export function BalanceWheel({ areas }: { areas: BalanceArea[] }) {
 
       <div>
         <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-base font-semibold text-[var(--ink)]">Ta semaine en équilibre</h2>
+          <h2 className="text-base font-semibold text-[var(--ink)]">{w.balanceTitle}</h2>
           <span className="shrink-0 text-2xl font-semibold tabular-nums text-[#f0cd79]">
             {overall}
             <span className="text-xs font-normal text-[var(--ink-faint)]"> / 100</span>
           </span>
         </div>
         <p className="mt-1 text-xs leading-5 text-[var(--ink-dim)]">
-          Chaque tâche faite, séance notée, prière cochée ou appel passé compte dans son domaine. Voici ce qui mérite un peu d&apos;attention :
+          {w.balanceIntro}
         </p>
         <ul className="mt-3 space-y-2">
           {weakest.map((a) => (

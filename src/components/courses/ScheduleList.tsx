@@ -1,7 +1,8 @@
 "use client";
 
-import { label } from "@/lib/labels";
+import { labelIn } from "@/lib/labels";
 import { deleteScheduleAction } from "@/server/actions/course.actions";
+import { useI18n } from "@/i18n/client";
 
 type Schedule = {
   id: string;
@@ -13,32 +14,36 @@ type Schedule = {
 };
 
 export function ScheduleList({ schedules, courseId }: { schedules: Schedule[]; courseId: string }) {
+  const { t, locale } = useI18n();
+  const a = t.academics;
+
   if (schedules.length === 0) {
-    return <p className="text-sm text-slate-400">Aucun créneau pour l&apos;instant.</p>;
+    return <p className="text-sm text-[var(--ink-faint)]">{a.noSlots}</p>;
   }
 
   return (
     <ul className="space-y-2">
       {schedules.map((s) => (
-        <li key={s.id} className="flex items-center justify-between rounded-md bg-slate-50 px-3 py-2">
+        <li key={s.id} className="tile flex items-center justify-between gap-2 px-3 py-2">
           <div className="text-sm">
-            <span className="font-medium text-slate-900">{label(s.type)}</span>
-            <span className="mx-1.5 text-slate-300">|</span>
-            <span className="text-slate-600">{label(s.day)}</span>
-            <span className="mx-1.5 text-slate-300">|</span>
-            <span className="text-slate-600">{s.startTime} – {s.endTime}</span>
+            <span className="font-medium text-[var(--ink)]">{labelIn(s.type, locale)}</span>
+            <span className="mx-1.5 text-[var(--ink-faint)]">·</span>
+            <span className="text-[var(--ink-dim)]">{labelIn(s.day, locale)}</span>
+            <span className="mx-1.5 text-[var(--ink-faint)]">·</span>
+            <span className="text-[var(--ink-dim)]">{s.startTime} – {s.endTime}</span>
             {s.room && (
               <>
-                <span className="mx-1.5 text-slate-300">|</span>
-                <span className="text-slate-500">{s.room}</span>
+                <span className="mx-1.5 text-[var(--ink-faint)]">·</span>
+                <span className="text-[var(--ink-dim)]">{s.room}</span>
               </>
             )}
           </div>
           <button
+            type="button"
             onClick={() => deleteScheduleAction(s.id, courseId)}
-            className="text-xs text-slate-400 hover:text-red-500"
+            className="focus-ring shrink-0 text-xs text-[var(--ink-faint)] hover:text-[#ffb3a3]"
           >
-            Retirer
+            {a.remove}
           </button>
         </li>
       ))}

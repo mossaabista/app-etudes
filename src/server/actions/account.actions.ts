@@ -6,6 +6,8 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/server/auth/current-user";
 import { clearSessionCookie } from "@/server/auth/session";
 import { allow } from "@/server/rate-limit";
+import { getMessages } from "@/i18n/server";
+import { fmt } from "@/i18n/config";
 
 const DELETE_WORD = "SUPPRIMER";
 
@@ -16,10 +18,11 @@ const DELETE_WORD = "SUPPRIMER";
  */
 export async function deleteAccountAction(input: { password: string; confirm: string }): Promise<{ error: string } | never> {
   const user = await requireUser();
-  if (!allow(user.id, "command")) return { error: "Trop de tentatives : réessaie dans une minute." };
-  if (String(input?.confirm ?? "").trim() !== DELETE_WORD) return { error: `Tape ${DELETE_WORD} pour confirmer.` };
+  const t = (await getMessages()).settingsUi.deleteAccount;
+  if (!allow(user.id, "command")) return { error: t.tooMany };
+  if (String(input?.confirm ?? "").trim() !== DELETE_WORD) return { error: fmt(t.typeWord, { word: DELETE_WORD }) };
   const row = await prisma.user.findFirst({ where: { id: user.id }, select: { id: true, password: true } });
-  if (!row || !(await bcrypt.compare(String(input?.password ?? ""), row.password))) return { error: "Mot de passe incorrect : rien n'a été supprimé." };
+  if (!row || !(await bcrypt.compare(String(input?.password ?? ""), row.password))) return { error: t.wrongPassword };
   await prisma.user.delete({ where: { id: row.id } });
   await clearSessionCookie();
   redirect("/login?compte=supprime");

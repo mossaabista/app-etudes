@@ -6,6 +6,8 @@ import { ArrowDown, ArrowUp, Check } from "lucide-react";
 import { RenderImage } from "@/components/tasks/RenderImage";
 import { CARDS, PROFILES, profileOf, type Profile, type ProfileType, type TodayCard } from "@/lib/profile";
 import { saveProfileAction } from "@/server/actions/profile.actions";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
 
 /**
  * Pick the roles you hold, the one that is active, and (for it) the Today cards. Nothing
@@ -19,6 +21,10 @@ export function ProfileSettings({ current }: { current: Profile | null }) {
   const [cards, setCards] = useState<TodayCard[]>(initial.cards);
   const [saved, setSaved] = useState(false);
   const [pending, start] = useTransition();
+  const { t: all } = useI18n();
+  const t = all.settingsUi.profile;
+  const roleLabel = (r: ProfileType) => (r === "freelance" || r === "personnel" ? t.labels[r] : all.onboarding.profiles[r].label);
+  const cardLabel = (c: TodayCard) => all.cards[c];
   const dirty = type !== initial.type || cards.join() !== initial.cards.join() || [...roles].sort().join() !== [...initial.roles].sort().join();
 
   // A tile adds or removes a role; removing the active one hands over to another.
@@ -63,7 +69,7 @@ export function ProfileSettings({ current }: { current: Profile | null }) {
   return (
     <div className="space-y-6">
       <div>
-        <p className="mb-3 text-xs font-medium uppercase tracking-[0.14em] text-[var(--ink-faint)]">Je suis · un ou plusieurs rôles</p>
+        <p className="mb-3 text-xs font-medium uppercase tracking-[0.14em] text-[var(--ink-faint)]">{t.roles}</p>
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
           {PROFILES.map((p) => {
             const on = roles.includes(p.type);
@@ -80,31 +86,31 @@ export function ProfileSettings({ current }: { current: Profile | null }) {
                 </span>
                 <span className="flex items-center gap-1 text-sm font-semibold text-[var(--ink)]">
                   {on && <Check size={13} className="text-[#f0cd79]" aria-hidden />}
-                  {p.label}
+                  {roleLabel(p.type)}
                 </span>
-                {p.type === type && <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-[#f0cd79]">Actif</span>}
+                {p.type === type && <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-[#f0cd79]">{t.active}</span>}
               </button>
             );
           })}
         </div>
         {roles.length > 1 && (
           <label className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[var(--ink-dim)]">
-            Contexte actif
+            {t.context}
             <select value={type} onChange={(e) => activate(e.target.value as ProfileType)} className="focus-ring cursor-pointer rounded-md border border-[rgba(255,220,148,0.18)] bg-[rgba(255,220,148,0.06)] px-2.5 py-1.5 text-xs text-[var(--ink)]">
               {roles.map((r) => (
                 <option key={r} value={r}>
-                  {profileOf(r).label}
+                  {roleLabel(r)}
                 </option>
               ))}
             </select>
-            <span>— tu peux aussi en changer depuis le menu.</span>
+            <span>{t.contextHint}</span>
           </label>
         )}
-        <p className="mt-2.5 text-xs leading-5 text-[var(--ink-dim)]">{profileOf(type).pitch}</p>
+        <p className="mt-2.5 text-xs leading-5 text-[var(--ink-dim)]">{t.pitch[type]}</p>
       </div>
 
       <div>
-        <p className="mb-3 text-xs font-medium uppercase tracking-[0.14em] text-[var(--ink-faint)]">Cartes de l&apos;écran Aujourd&apos;hui · {cards.length}/5</p>
+        <p className="mb-3 text-xs font-medium uppercase tracking-[0.14em] text-[var(--ink-faint)]">{fmt(t.cards, { n: cards.length })}</p>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {CARDS.map((c) => {
             const on = cards.includes(c.key);
@@ -117,18 +123,18 @@ export function ProfileSettings({ current }: { current: Profile | null }) {
                   </span>
                   <span className="min-w-0">
                     <span className="block text-sm font-semibold text-[var(--ink)]">
-                      {c.label}
+                      {cardLabel(c.key)}
                       {on && <span className="ml-1.5 text-xs font-normal text-[#f0cd79]">#{i + 1}</span>}
                     </span>
-                    <span className="mt-0.5 block text-xs text-[var(--ink-dim)]">{c.desc}</span>
+                    <span className="mt-0.5 block text-xs text-[var(--ink-dim)]">{t.cardDesc[c.key]}</span>
                   </span>
                 </button>
                 {on && cards.length > 1 && (
                   <span className="flex shrink-0 flex-col">
-                    <button type="button" disabled={i === 0} onClick={() => move(c.key, -1)} aria-label={`Monter ${c.label}`} className="focus-ring rounded p-0.5 text-[var(--ink-dim)] hover:text-[var(--ink)] disabled:opacity-25">
+                    <button type="button" disabled={i === 0} onClick={() => move(c.key, -1)} aria-label={fmt(t.up, { name: cardLabel(c.key) })} className="focus-ring rounded p-0.5 text-[var(--ink-dim)] hover:text-[var(--ink)] disabled:opacity-25">
                       <ArrowUp size={13} />
                     </button>
-                    <button type="button" disabled={i === cards.length - 1} onClick={() => move(c.key, 1)} aria-label={`Descendre ${c.label}`} className="focus-ring rounded p-0.5 text-[var(--ink-dim)] hover:text-[var(--ink)] disabled:opacity-25">
+                    <button type="button" disabled={i === cards.length - 1} onClick={() => move(c.key, 1)} aria-label={fmt(t.down, { name: cardLabel(c.key) })} className="focus-ring rounded p-0.5 text-[var(--ink-dim)] hover:text-[var(--ink)] disabled:opacity-25">
                       <ArrowDown size={13} />
                     </button>
                   </span>
@@ -140,14 +146,14 @@ export function ProfileSettings({ current }: { current: Profile | null }) {
       </div>
 
       <div className="flex flex-wrap items-center justify-end gap-3">
-        <p className="mr-auto text-xs text-[var(--ink-faint)]">Changer de rôle change seulement ce qui est affiché : tes cours, tâches et secteurs restent intacts et accessibles.</p>
+        <p className="mr-auto text-xs text-[var(--ink-faint)]">{t.footer}</p>
         {saved && !dirty && (
           <span className="flex items-center gap-1.5 text-xs text-[#f0cd79]">
-            <Check size={13} /> Enregistré
+            <Check size={13} /> {t.saved}
           </span>
         )}
         <button type="button" disabled={!dirty || pending || cards.length === 0} onClick={save} className="mod-chip mod-chip-gold focus-ring px-5 py-2.5 text-sm">
-          {pending ? "Enregistrement…" : "Enregistrer"}
+          {pending ? all.settingsUi.saving : all.common.save}
         </button>
       </div>
     </div>

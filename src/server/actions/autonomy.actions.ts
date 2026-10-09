@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/server/auth/current-user";
 import { saveAutonomy } from "@/server/autonomy";
 import type { Autonomy } from "@/lib/risk";
+import { getMessages } from "@/i18n/server";
 
-/** Set how much the assistant may do without asking. Unknown values fall back to the default. */
+/** Set how much Jarvis may do without asking. Unknown values fall back to the default. */
 export async function saveAutonomyAction(input: Autonomy) {
   const user = await requireUser();
   try {
@@ -13,6 +14,6 @@ export async function saveAutonomyAction(input: Autonomy) {
     revalidatePath("/settings");
     return { ok: true as const, saved };
   } catch {
-    return { error: "Impossible d'enregistrer ce réglage." };
+    return { error: (await getMessages()).settingsUi.autonomy.saveError };
   }
 }

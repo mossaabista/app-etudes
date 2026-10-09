@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/server/auth/current-user";
+import { getMessages } from "@/i18n/server";
+import { fmt } from "@/i18n/config";
 import { MASS_DELETE } from "@/lib/risk";
 import type { Undo } from "@/server/actions/capture.actions";
 
@@ -13,7 +15,7 @@ const refresh = () => revalidatePath("/", "layout");
 export async function bulkCompleteAction(list: string[]): Promise<{ ok: true; count: number; undo: Undo | null } | { error: string }> {
   const user = await requireUser();
   const chosen = await prisma.task.findMany({ where: { id: { in: ids(list) }, userId: user.id, status: { not: "Done" } }, select: { id: true, status: true } });
-  if (!chosen.length) return { error: "Aucune tâche à cocher." };
+  if (!chosen.length) return { error: (await getMessages()).workspace.task.noneToCheck };
   const undo: Undo = { t: "many", list: chosen.map((t) => ({ t: "task-status", id: t.id, status: t.status })) };
   await prisma.task.updateMany({ where: { id: { in: chosen.map((t) => t.id) }, userId: user.id }, data: { status: "Done" } });
   refresh();
@@ -27,10 +29,10 @@ export async function bulkCompleteAction(list: string[]): Promise<{ ok: true; co
 export async function bulkDeleteAction(list: string[], confirmed = false): Promise<{ ok: true; count: number; kept: number; undo: Undo | null } | { confirm: string } | { error: string }> {
   const user = await requireUser();
   const chosen = await prisma.task.findMany({ where: { id: { in: ids(list) }, userId: user.id } });
-  if (!chosen.length) return { error: "Aucune tâche à supprimer." };
+  if (!chosen.length) return { error: (await getMessages()).workspace.task.noneToDelete };
   const withSubtasks = new Set((await prisma.task.findMany({ where: { userId: user.id, parentId: { in: chosen.map((t) => t.id) } }, select: { parentId: true } })).map((s) => s.parentId));
   const doomed = chosen.filter((t) => !withSubtasks.has(t.id));
-  if (doomed.length > MASS_DELETE && !confirmed) return { confirm: `Supprimer ${doomed.length} tâches d'un coup ?` };
+  if (doomed.length > MASS_DELETE && !confirmed) return { confirm: fmt((await getMessages()).workspace.task.confirmDelete, { n: doomed.length }) };
   if (doomed.length) await prisma.task.deleteMany({ where: { id: { in: doomed.map((t) => t.id) }, userId: user.id } });
   refresh();
   return {

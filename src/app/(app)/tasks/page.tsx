@@ -12,22 +12,20 @@ import { LayoutEditor } from "@/components/tasks/LayoutEditor";
 import { WorkspaceCreator } from "@/components/tasks/WorkspaceCreator";
 import { BalanceWheel, type BalanceArea } from "@/components/tasks/BalanceWheel";
 import { startOfWeek } from "@/lib/dates";
+import { getLocale, getMessages } from "@/i18n/server";
+import { fmt } from "@/i18n/config";
+import { plural } from "@/i18n/ns/workspace";
 
-// What to suggest when an area has had little attention this week.
-const NUDGES: Record<string, string> = {
-  travail: "Bloque un créneau de concentration : le Pilote le place pour toi.",
-  equipe: "Un point rapide avec l'équipe, ou une tâche à déléguer ?",
-  projets: "Avance d'une étape sur un projet, même petite.",
-  apprentissage: "20 minutes de lecture ou d'une formation.",
-  sante: "Une séance, une nuit notée ou un verre d'eau de plus.",
-  esprit: "Quelques minutes de respiration ou de gratitude.",
-  social: "Appelle un proche : c'est le moment.",
-  quotidien: "Une course, une facture ou une tâche de maison à régler.",
-};
+export async function generateMetadata() {
+  return { title: (await getMessages()).nav.sectors };
+}
 
 export default async function TasksPage() {
   const user = await requireUser();
-  const layout = await getLayout(user.id);
+  const [layout, t, locale] = await Promise.all([getLayout(user.id), getMessages(), getLocale()]);
+  const w = t.workspace.sectors;
+  // What to suggest when an area has had little attention this week.
+  const nudge = (key: string): string | undefined => (w.nudges as Record<string, string>)[key];
   const AREAS = layout.areas;
   const keys = new Set(AREAS.map((a) => a.key));
   // A category names its sector by key; one that is no longer in the layout is unfiled.
@@ -52,31 +50,31 @@ export default async function TasksPage() {
   // Attention per area this week: finished tasks, recorded entries, planned blocks.
   const activity = new Map<string, number>();
   const bump = (area: string | undefined, n = 1) => area && activity.set(area, (activity.get(area) ?? 0) + n);
-  for (const t of doneThisWeek) bump(splitCategory(t.category)?.area ?? (t.projectId ? "projets" : undefined));
+  for (const d of doneThisWeek) bump(splitCategory(d.category)?.area ?? (d.projectId ? "projets" : undefined));
   for (const e of entriesThisWeek) bump(e.module.split(":")[0], e._count);
   for (const e of eventsThisWeek) bump(e.type.split(":")[1]);
   // Diminishing returns: the first few actions matter most; ~10 in a week fills a spoke.
   const balance: BalanceArea[] = AREAS.map((a) => {
     const n = activity.get(a.key) ?? 0;
-    return { key: a.key, label: a.label, front: a.front, color: a.color, count: n, score: Math.min(1, Math.log1p(n) / Math.log1p(10)), hint: n ? `${n} action${n > 1 ? "s" : ""} cette semaine · ${NUDGES[a.key] ?? "Continue sur ta lancée."}` : (NUDGES[a.key] ?? `Un petit pas dans ${a.label} cette semaine ?`) };
+    return { key: a.key, label: a.label, front: a.front, color: a.color, count: n, score: Math.min(1, Math.log1p(n) / Math.log1p(10)), hint: n ? `${plural(locale, n, w.actionOne, w.actionMany)} · ${nudge(a.key) ?? w.keepGoing}` : (nudge(a.key) ?? fmt(w.smallStep, { area: a.label })) };
   });
 
   // A task belongs to an area by its category; one attached to a project but never
   // filed counts under Projets, since that is where it would be looked for.
-  const areaOf = (t: (typeof tasks)[number]) => splitCategory(t.category)?.area ?? (t.projectId ? "projets" : null);
+  const areaOf = (task: (typeof tasks)[number]) => splitCategory(task.category)?.area ?? (task.projectId ? "projets" : null);
   const open = new Map<string, number>();
   const unsorted = [];
-  for (const t of tasks) {
-    const area = areaOf(t);
+  for (const task of tasks) {
+    const area = areaOf(task);
     if (area) open.set(area, (open.get(area) ?? 0) + 1);
-    else unsorted.push({ id: t.id, title: t.title });
+    else unsorted.push({ id: task.id, title: task.title });
   }
 
   const groups: CategoryGroup[] = AREAS.map((a) => ({
     label: a.label,
     options:
       a.key === "projets" && projects.length > 0
-        ? [...projects.map((p) => ({ value: `projets:${p.id}`, label: p.title })), { value: "projets:general", label: "Général" }]
+        ? [...projects.map((p) => ({ value: `projets:${p.id}`, label: p.title })), { value: "projets:general", label: w.general }]
         : a.subs.map((s) => ({ value: `${a.key}:${s.key}`, label: s.label })),
   }));
 
@@ -87,14 +85,14 @@ export default async function TasksPage() {
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold tracking-tight text-on-gold">
-            Secteurs
-            {tasks.length > 0 && <span className="ml-2 text-sm font-normal text-on-gold">{tasks.length} à faire</span>}
+            {t.nav.sectors}
+            {tasks.length > 0 && <span className="ml-2 text-sm font-normal text-on-gold">{fmt(w.openCount, { n: tasks.length })}</span>}
           </h1>
-          <p className="text-xs text-on-gold">Les domaines de ta vie. Ajoute, retire ou crée les tiens — à la main ou au micro.</p>
+          <p className="text-xs text-on-gold">{w.intro}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <a href="/liste" className="mod-chip focus-ring">
-            <ListChecks size={13} /> Toutes mes tâches
+            <ListChecks size={13} /> {w.allTasks}
           </a>
           <WorkspaceCreator />
           <LayoutEditor layout={layout} />
@@ -125,10 +123,10 @@ export default async function TasksPage() {
                 <div className="folder-shadow" aria-hidden />
 
                 <div className="folder-meta glass-pill mx-auto mt-4 flex max-w-full items-center gap-2 px-4 py-2 text-xs">
-                  <span className={count ? "text-[var(--ink)]" : ""}>{count ? `${count} à faire` : "Rien à faire"}</span>
+                  <span className={count ? "text-[var(--ink)]" : ""}>{count ? fmt(w.openCount, { n: count }) : w.nothingToDo}</span>
                   <span className="text-[var(--ink-faint)]">·</span>
                   <span className="shrink-0">
-                    {sections} {a.key === "projets" && projects.length > 0 ? "projets" : "sections"}
+                    {a.key === "projets" && projects.length > 0 ? plural(locale, sections, w.projectOne, w.projectMany) : plural(locale, sections, w.sectionOne, w.sectionMany)}
                   </span>
                 </div>
               </OpeningFolder>

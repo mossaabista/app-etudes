@@ -4,11 +4,25 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ButtonLink } from "@/components/ui/Button";
 import { ProgressBar } from "@/components/ui/ProgressBar";
-import { StatusBadge } from "@/components/ui/Badge";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import Link from "next/link";
+import { labelIn } from "@/lib/labels";
+import { getLocale, getMessages } from "@/i18n/server";
+import { fmt, INTL } from "@/i18n/config";
+import { plural } from "@/i18n/ns/workspace";
+
+const STATUS_TONE: Record<string, BadgeTone> = { NotStarted: "neutral", InProgress: "blue", Completed: "green" };
+
+export async function generateMetadata() {
+  return { title: (await getMessages()).nav.projects };
+}
 
 export default async function ProjectsPage() {
   const user = await requireUser();
+  const [t, locale] = await Promise.all([getMessages(), getLocale()]);
+  const w = t.workspace.projects;
+  // A project's due date is a calendar day stored at midnight UTC: read it there.
+  const day = (d: Date) => new Intl.DateTimeFormat(INTL[locale], { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" }).format(d);
 
   const projects = await prisma.project.findMany({
     where: { userId: user.id },
@@ -22,41 +36,41 @@ export default async function ProjectsPage() {
   return (
     <>
       <PageHeader
-        title="Projets"
-        description="Tes projets d'équipe et personnels, leurs jalons et leur avancement."
-        action={<ButtonLink href="/projects/new" size="sm">+ Nouveau projet</ButtonLink>}
+        title={t.nav.projects}
+        description={w.intro}
+        action={<ButtonLink href="/projects/new" size="sm">{w.newButton}</ButtonLink>}
       />
       {projects.length === 0 ? (
         <EmptyState
-          title="Aucun projet pour l'instant"
-          description="Crée un projet pour suivre livrables, jalons et coéquipiers."
-          action={<ButtonLink href="/projects/new" size="sm">+ Nouveau projet</ButtonLink>}
+          title={w.emptyTitle}
+          description={w.emptyDesc}
+          action={<ButtonLink href="/projects/new" size="sm">{w.newButton}</ButtonLink>}
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((p) => (
-            <Link key={p.id} href={`/projects/${p.id}`} className="group block rounded-lg border border-slate-200 bg-white p-4 transition-shadow hover:shadow-md">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-900 group-hover:text-slate-700">{p.title}</h3>
+            <Link key={p.id} href={`/projects/${p.id}`} className="glass-card focus-ring group block p-4 transition-transform hover:-translate-y-0.5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold text-[var(--ink)]">{p.title}</h3>
                   {p.course && (
                     <span className="mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold text-white" style={{ backgroundColor: p.course.color }}>
                       {p.course.code}
                     </span>
                   )}
                 </div>
-                <StatusBadge status={p.status} />
+                <Badge tone={STATUS_TONE[p.status] ?? "neutral"}>{labelIn(p.status, locale)}</Badge>
               </div>
-              {p.description && <p className="mt-2 text-xs text-slate-500 line-clamp-2">{p.description}</p>}
+              {p.description && <p className="mt-2 line-clamp-2 text-xs text-[var(--ink-dim)]">{p.description}</p>}
               <div className="mt-3">
                 <ProgressBar value={p.progress} />
               </div>
-              <div className="mt-2 flex gap-3 text-xs text-slate-400">
-                <span>{p._count.milestones} milestones</span>
-                <span>{p._count.tasks} tasks</span>
-                <span>{p._count.members} members</span>
+              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--ink-faint)]">
+                <span>{plural(locale, p._count.milestones, w.milestoneOne, w.milestoneMany)}</span>
+                <span>{plural(locale, p._count.tasks, w.taskOne, w.taskMany)}</span>
+                <span>{plural(locale, p._count.members, w.memberOne, w.memberMany)}</span>
               </div>
-              {p.dueDate && <p className="mt-1 text-xs text-slate-400">Due {new Date(p.dueDate).toLocaleDateString("en-CA")}</p>}
+              {p.dueDate && <p className="mt-1 text-xs text-[var(--ink-faint)]">{fmt(w.dueOn, { date: day(p.dueDate) })}</p>}
             </Link>
           ))}
         </div>

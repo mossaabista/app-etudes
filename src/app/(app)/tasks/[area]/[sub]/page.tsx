@@ -9,6 +9,20 @@ import { ModuleShell } from "@/components/modules/ModuleShell";
 import { relatedModules } from "@/components/modules/related";
 import type { Entry } from "@/components/modules/kit";
 import type { AreaTask } from "@/components/tasks/AreaView";
+import { getMessages } from "@/i18n/server";
+
+export async function generateMetadata({ params }: { params: Promise<{ area: string; sub: string }> }) {
+  const { area: areaKey, sub: subKey } = await params;
+  const user = await requireUser();
+  const area = findArea(await getLayout(user.id), areaKey);
+  const fallback = area?.label ?? (await getMessages()).nav.sectors;
+  if (!area) return { title: fallback };
+  if (area.key === "projets" && subKey !== "general") {
+    const project = await prisma.project.findFirst({ where: { id: subKey, userId: user.id }, select: { title: true } });
+    return { title: project?.title ?? fallback };
+  }
+  return { title: area.subs.find((s) => s.key === subKey)?.label ?? fallback };
+}
 
 export default async function SectionPage({ params }: { params: Promise<{ area: string; sub: string }> }) {
   const { area: areaKey, sub: subKey } = await params;

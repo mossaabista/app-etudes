@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { Block, Meter, Stats, dayLabel } from "@/components/modules/kit";
+import { Block, Meter, Stats, useModuleText } from "@/components/modules/kit";
+import { labelIn } from "@/lib/labels";
 
 export interface ProjectInfo {
   id: string;
@@ -13,25 +14,25 @@ export interface ProjectInfo {
   status: string;
 }
 
-const STATUS: Record<string, string> = { NotStarted: "Pas commencé", InProgress: "En cours", Completed: "Terminé" };
-
 /** A project's section: where it stands, and the way into its full page. */
 export function ProjectModule({ project }: { project: ProjectInfo }) {
+  const { t, locale, day, pct } = useModuleText();
+  const p = t.modulesB.project;
   return (
     <Block
-      title="Avancement"
+      title={p.progressTitle}
       action={
         <Link href={`/projects/${project.id}`} className="mod-chip focus-ring">
-          Ouvrir le projet <ArrowRight size={13} />
+          {p.open} <ArrowRight size={13} />
         </Link>
       }
       wide
     >
       <Stats
         items={[
-          { label: "Progression", value: `${project.progress} %`, tone: "gold" },
-          { label: "Statut", value: STATUS[project.status] ?? project.status },
-          { label: "Échéance", value: project.dueDate ? dayLabel(project.dueDate, { day: "numeric", month: "long" }) : "—" },
+          { label: p.progress, value: pct(project.progress), tone: "gold" },
+          { label: p.status, value: labelIn(project.status, locale) },
+          { label: p.due, value: project.dueDate ? day(project.dueDate, { day: "numeric", month: "long" }) : "—" },
         ]}
       />
       <div className="mt-4">

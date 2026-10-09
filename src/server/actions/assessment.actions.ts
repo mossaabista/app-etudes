@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/server/auth/current-user";
 import { checkRefs } from "@/server/ownership";
+import { getMessages } from "@/i18n/server";
 
 export async function createAssessmentAction(_prev: unknown, formData: FormData) {
   const user = await requireUser();
@@ -17,7 +18,7 @@ export async function createAssessmentAction(_prev: unknown, formData: FormData)
   const notes = (formData.get("notes") as string)?.trim() || null;
 
   if (!courseId || !title || !type) {
-    return { error: "Course, title, and type are required." };
+    return { error: (await getMessages()).academics.errAssessmentFields };
   }
   const refError = await checkRefs(user.id, { courseId });
   if (refError) return { error: refError };
@@ -45,9 +46,9 @@ export async function updateAssessmentAction(_prev: unknown, formData: FormData)
   const notes = (formData.get("notes") as string)?.trim() || null;
 
   if (!title || !type) {
-    return { error: "Title and type are required." };
+    return { error: (await getMessages()).academics.errTitleType };
   }
-  if (!courseId) return { error: "Course is required." };
+  if (!courseId) return { error: (await getMessages()).academics.errCourseRequired };
   const refError = await checkRefs(user.id, { courseId });
   if (refError) return { error: refError };
 
@@ -86,8 +87,8 @@ export async function toggleAssessmentStatusAction(id: string) {
 export async function setAssessmentGradeAction(id: string, grade: number | null) {
   const user = await requireUser();
   const assessment = await prisma.assessment.findFirst({ where: { id, userId: user.id } });
-  if (!assessment) return { error: "Introuvable." };
-  if (grade != null && (!Number.isFinite(grade) || grade < 0 || grade > 150)) return { error: "Note invalide." };
+  if (!assessment) return { error: (await getMessages()).academics.errAssessmentGone };
+  if (grade != null && (!Number.isFinite(grade) || grade < 0 || grade > 150)) return { error: (await getMessages()).academics.errGrade };
   await prisma.assessment.update({ where: { id }, data: { grade, ...(grade != null ? { status: "Completed" } : {}) } });
   revalidatePath(`/courses/${assessment.courseId}`);
   revalidatePath("/today");

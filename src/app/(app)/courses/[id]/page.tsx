@@ -4,7 +4,9 @@ import { ChevronLeft, Clock, FileText, FlaskConical, GraduationCap, Mail, MapPin
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/server/auth/current-user";
 import { currentZone, toISODate } from "@/lib/dates";
-import { label } from "@/lib/labels";
+import { labelIn } from "@/lib/labels";
+import { getLocale, getMessages } from "@/i18n/server";
+import { INTL, fmt, type Locale } from "@/i18n/config";
 import { LiquidLayers } from "@/components/ui/LiquidMetal";
 import { DeleteCourseButton } from "@/components/courses/DeleteCourseButton";
 import { ScheduleForm } from "@/components/courses/ScheduleForm";
@@ -14,8 +16,13 @@ import { StudyPlanner } from "@/components/courses/StudyPlanner";
 import { TaskCheck } from "@/components/today/TaskCheck";
 
 const WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const fr = (t: string) => t.replace(/^0/, "").replace(":00", " h").replace(":", " h ");
-const pct = (n: number) => `${(Math.round(n * 10) / 10).toString().replace(".", ",")} %`;
+/** "09:30" → "9 h 30" in French, "9:30" in English. */
+const clock = (t: string, locale: Locale) => (locale === "fr" ? t.replace(/^0/, "").replace(":00", " h").replace(":", " h ") : t.replace(/^0/, ""));
+const pct = (n: number, locale: Locale) => `${new Intl.NumberFormat(INTL[locale], { maximumFractionDigits: 1 }).format(Math.round(n * 10) / 10)}${locale === "fr" ? " %" : "%"}`;
+
+export async function generateMetadata() {
+  return { title: (await getMessages()).academics.courseMeta };
+}
 
 export default async function CourseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -32,6 +39,10 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
     },
   });
   if (!course) notFound();
+  const t = await getMessages();
+  const a = t.academics;
+  const locale = await getLocale();
+  const p = (n: number) => pct(n, locale);
 
   const now = new Date();
   // Grades: the weighted average of what is graded, and what the rest must average to
@@ -61,22 +72,22 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
     })
     .sort((a, b) => a.d - b.d || a.s.startTime.localeCompare(b.s.startTime))[0];
 
-  const fmtDue = (d: Date) => new Intl.DateTimeFormat("fr-CA", { timeZone: currentZone(), weekday: "long", day: "numeric", month: "long" }).format(d);
+  const fmtDay = (d: Date) => new Intl.DateTimeFormat(INTL[locale], { timeZone: currentZone(), day: "numeric", month: "long" }).format(d);
 
   return (
     <>
       <div className="glass-backdrop" aria-hidden />
       <div className="area-enter mx-auto max-w-5xl">
         <div className="mb-4 flex items-center gap-3">
-          <Link href="/courses" aria-label="Retour aux cours" className="lm focus-ring h-11 w-11 shrink-0">
+          <Link href="/courses" aria-label={a.backToCourses} className="lm focus-ring h-11 w-11 shrink-0">
             <LiquidLayers>
               <ChevronLeft size={18} />
             </LiquidLayers>
           </Link>
-          <p className="text-xs font-medium uppercase tracking-wide text-on-gold">Cours</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-on-gold">{a.courseEyebrow}</p>
           <div className="ml-auto flex gap-2">
             <Link href={`/courses/${id}/edit`} className="mod-chip focus-ring">
-              <PencilLine size={13} /> Modifier
+              <PencilLine size={13} /> {t.common.edit}
             </Link>
             <DeleteCourseButton courseId={id} />
           </div>
@@ -109,12 +120,12 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
             </div>
             {nextClass && (
               <div className="text-right">
-                <p className="text-[0.68rem] uppercase tracking-wide text-[var(--ink-faint)]">Prochain cours</p>
+                <p className="text-[0.68rem] uppercase tracking-wide text-[var(--ink-faint)]">{a.nextClass}</p>
                 <p className="text-sm font-semibold text-[var(--ink)]">
-                  {nextClass.d === 0 ? "Aujourd'hui" : nextClass.d === 1 ? "Demain" : label(nextClass.s.day)} · {fr(nextClass.s.startTime)}
+                  {nextClass.d === 0 ? a.today : nextClass.d === 1 ? a.tomorrow : labelIn(nextClass.s.day, locale)} · {clock(nextClass.s.startTime, locale)}
                 </p>
                 <p className="text-xs text-[var(--ink-dim)]">
-                  {label(nextClass.s.type)}
+                  {labelIn(nextClass.s.type, locale)}
                   {nextClass.s.room ? ` · ${nextClass.s.room}` : ""}
                 </p>
               </div>
@@ -124,36 +135,40 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
 
         {/* Key figures */}
         <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Kpi icon={<Target size={14} />} label="Moyenne actuelle" value={average != null ? pct(average) : "—"} sub={gradedWeight ? `sur ${pct(gradedWeight)} évalués` : "aucune note encore"} gold />
-          <Kpi icon={<FileText size={14} />} label="Évaluations" value={`${course.assessments.filter((a) => a.status === "Completed").length} / ${course.assessments.length}`} sub="faites" />
-          <Kpi icon={<Clock size={14} />} label="Prochaine" value={next ? (days! <= 1 ? (days === 0 ? "Aujourd'hui" : "Demain") : `${days} jours`) : "—"} sub={next ? `${next.title}` : "rien à venir"} />
+          <Kpi icon={<Target size={14} />} label={a.kpiAverage} value={average != null ? p(average) : "—"} sub={gradedWeight ? fmt(a.kpiAverageSub, { pct: p(gradedWeight) }) : a.noGradeYet} gold />
+          <Kpi icon={<FileText size={14} />} label={a.kpiAssessments} value={`${course.assessments.filter((x) => x.status === "Completed").length} / ${course.assessments.length}`} sub={a.kpiDone} />
+          <Kpi icon={<Clock size={14} />} label={a.kpiNext} value={next ? (days! <= 1 ? (days === 0 ? a.today : a.tomorrow) : fmt(a.inDays, { n: days! })) : "—"} sub={next ? `${next.title}` : a.nothingAhead} />
           <Kpi
             icon={<Target size={14} />}
-            label="Pour finir à 80 %"
-            value={!gradedWeight || need80 == null ? "—" : need80 <= 0 ? "Acquis" : need80 > 100 ? "Hors d'atteinte" : pct(need80)}
-            sub={gradedWeight && need80 != null && need80 > 0 && need80 <= 100 ? `de moyenne sur les ${pct(remaining)} restants` : gradedWeight ? "" : "entre tes notes pour le savoir"}
+            label={a.kpiTarget}
+            value={!gradedWeight || need80 == null ? "—" : need80 <= 0 ? a.secured : need80 > 100 ? a.outOfReach : p(need80)}
+            sub={gradedWeight && need80 != null && need80 > 0 && need80 <= 100 ? fmt(a.targetSub, { pct: p(remaining) }) : gradedWeight ? "" : a.targetHint}
           />
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
           <div className="space-y-4">
             <StudyPlanner
-              targets={upcoming.slice(0, 6).map((a) => ({ id: a.id, title: a.title, type: a.type, due: toISODate(a.dueDate!), weight: a.weight, code: course.code }))}
-              title={next ? `Plan de révision · ${next.title}` : "Plan de révision"}
+              targets={upcoming.slice(0, 6).map((u) => ({ id: u.id, title: u.title, type: u.type, due: toISODate(u.dueDate!), weight: u.weight, code: course.code }))}
+              title={next ? fmt(a.studyPlanFor, { title: next.title }) : a.studyPlan}
             />
 
             <section className="glass-card p-5">
               <header className="mb-3 flex items-baseline justify-between gap-2">
-                <h2 className="text-sm font-semibold text-[var(--ink)]">Évaluations</h2>
-                <span className="text-xs text-[var(--ink-dim)]">{pct(totalWeight)} au total</span>
+                <h2 className="text-sm font-semibold text-[var(--ink)]">{a.assessmentsTitle}</h2>
+                <span className="text-xs text-[var(--ink-dim)]">{fmt(a.totalWeight, { pct: p(totalWeight) })}</span>
               </header>
               {course.assessments.length === 0 ? (
                 <Empty>
-                  Aucune évaluation. <Link href="/syllabus" className="text-[#f0cd79] underline-offset-4 hover:underline">Importe le syllabus</Link> : elles se rangent toutes seules.
+                  {a.noAssessments}{" "}
+                  <Link href="/syllabus" className="text-[#f0cd79] underline-offset-4 hover:underline">
+                    {a.importTheSyllabus}
+                  </Link>
+                  {a.noAssessmentsAfter}
                 </Empty>
               ) : (
                 <CourseAssessments
-                  items={course.assessments.map((a) => ({ id: a.id, title: a.title, type: a.type, weight: a.weight, due: a.dueDate?.toISOString() ?? null, done: a.status === "Completed", grade: a.grade }))}
+                  items={course.assessments.map((x) => ({ id: x.id, title: x.title, type: x.type, weight: x.weight, due: x.dueDate?.toISOString() ?? null, done: x.status === "Completed", grade: x.grade }))}
                 />
               )}
             </section>
@@ -161,7 +176,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
 
           <div className="space-y-4">
             <section className="glass-card p-5">
-              <h2 className="mb-3 text-sm font-semibold text-[var(--ink)]">Horaire</h2>
+              <h2 className="mb-3 text-sm font-semibold text-[var(--ink)]">{a.schedule}</h2>
               <ScheduleList schedules={course.schedules} courseId={id} />
               <div className="mt-4 border-t border-[rgba(255,220,148,0.1)] pt-4">
                 <ScheduleForm courseId={id} />
@@ -171,34 +186,34 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
             {course.labs.length > 0 && (
               <section className="glass-card p-5">
                 <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
-                  <FlaskConical size={14} className="text-[#f0cd79]" /> Laboratoires
+                  <FlaskConical size={14} className="text-[#f0cd79]" /> {a.labsTitle}
                 </h2>
                 <ul className="space-y-1.5">
                   {course.labs.map((l) => (
                     <li key={l.id} className={`flex items-center gap-2 text-sm ${l.status === "Completed" || l.status === "Submitted" ? "opacity-55" : ""}`}>
-                      <span className="w-12 shrink-0 text-xs font-semibold text-[var(--ink-dim)]">Lab {l.labNumber}</span>
+                      <span className="w-12 shrink-0 text-xs font-semibold text-[var(--ink-dim)]">{fmt(a.labN, { n: l.labNumber })}</span>
                       <span className="min-w-0 flex-1 truncate text-[var(--ink)]">{l.deliverable ?? l.title}</span>
-                      <span className="shrink-0 text-xs text-[var(--ink-dim)]">{l.dueDate ? fmtDue(l.dueDate).replace(/^\w+ /, "") : "—"}</span>
+                      <span className="shrink-0 text-xs text-[var(--ink-dim)]">{l.dueDate ? fmtDay(l.dueDate) : "—"}</span>
                     </li>
                   ))}
                 </ul>
                 <Link href="/labs" className="mt-3 inline-block text-xs text-[#f0cd79] underline-offset-4 hover:underline">
-                  Gérer les labos
+                  {a.manageLabs}
                 </Link>
               </section>
             )}
 
             <section className="glass-card p-5">
-              <h2 className="mb-3 text-sm font-semibold text-[var(--ink)]">Tâches du cours</h2>
+              <h2 className="mb-3 text-sm font-semibold text-[var(--ink)]">{a.courseTasks}</h2>
               {course.tasks.length === 0 ? (
-                <Empty>Rien pour ce cours. Dis au micro : « ajoute réviser le chapitre 2 de {course.code} demain ».</Empty>
+                <Empty>{fmt(a.noTasks, { code: course.code })}</Empty>
               ) : (
                 <ul className="space-y-1.5">
-                  {course.tasks.map((t) => (
-                    <li key={t.id} className={`flex items-start gap-2.5 ${t.status === "Done" ? "opacity-55" : ""}`}>
-                      <TaskCheck id={t.id} done={t.status === "Done"} label={t.title} />
-                      <span className={`min-w-0 flex-1 text-sm text-[var(--ink)] ${t.status === "Done" ? "line-through" : ""}`}>{t.title}</span>
-                      {t.dueDate && <span className="shrink-0 text-xs text-[var(--ink-dim)]">{new Intl.DateTimeFormat("fr-CA", { timeZone: currentZone(), day: "numeric", month: "short" }).format(t.dueDate)}</span>}
+                  {course.tasks.map((task) => (
+                    <li key={task.id} className={`flex items-start gap-2.5 ${task.status === "Done" ? "opacity-55" : ""}`}>
+                      <TaskCheck id={task.id} done={task.status === "Done"} label={task.title} />
+                      <span className={`min-w-0 flex-1 text-sm text-[var(--ink)] ${task.status === "Done" ? "line-through" : ""}`}>{task.title}</span>
+                      {task.dueDate && <span className="shrink-0 text-xs text-[var(--ink-dim)]">{new Intl.DateTimeFormat(INTL[locale], { timeZone: currentZone(), day: "numeric", month: "short" }).format(task.dueDate)}</span>}
                     </li>
                   ))}
                 </ul>
@@ -206,16 +221,16 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
             </section>
 
             <section className="glass-card p-5">
-              <h2 className="mb-2 text-sm font-semibold text-[var(--ink)]">Syllabus</h2>
+              <h2 className="mb-2 text-sm font-semibold text-[var(--ink)]">{a.syllabus}</h2>
               {course.syllabi[0] ? (
                 <p className="text-xs text-[var(--ink-dim)]">
-                  {course.syllabi[0].fileName} · importé le {new Intl.DateTimeFormat("fr-CA", { day: "numeric", month: "long" }).format(course.syllabi[0].createdAt)}
+                  {fmt(a.syllabusImported, { file: course.syllabi[0].fileName, date: fmtDay(course.syllabi[0].createdAt) })}
                 </p>
               ) : (
-                <p className="text-xs text-[var(--ink-dim)]">Pas encore de syllabus : avec lui, le plan de révision connaît les chapitres.</p>
+                <p className="text-xs text-[var(--ink-dim)]">{a.noSyllabus}</p>
               )}
               <Link href="/syllabus" className="mod-chip focus-ring mt-3">
-                <Upload size={13} /> {course.syllabi[0] ? "Réimporter" : "Importer le syllabus"}
+                <Upload size={13} /> {course.syllabi[0] ? a.reimport : a.importSyllabus}
               </Link>
             </section>
           </div>

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/server/auth/current-user";
+import { getMessages } from "@/i18n/server";
 
 const COURSE_COLORS = [
   "#3b82f6", "#8b5cf6", "#ec4899", "#f59e0b",
@@ -22,7 +23,7 @@ export async function createCourseAction(_prev: unknown, formData: FormData) {
   const term = (formData.get("term") as string)?.trim() || null;
 
   if (!code || !name) {
-    return { error: "Course code and name are required." };
+    return { error: (await getMessages()).academics.errCodeName };
   }
 
   await prisma.course.create({
@@ -46,7 +47,7 @@ export async function updateCourseAction(_prev: unknown, formData: FormData) {
   const term = (formData.get("term") as string)?.trim() || null;
 
   if (!code || !name) {
-    return { error: "Course code and name are required." };
+    return { error: (await getMessages()).academics.errCodeName };
   }
 
   await prisma.course.update({
@@ -78,11 +79,11 @@ export async function addScheduleAction(_prev: unknown, formData: FormData) {
   const room = (formData.get("room") as string)?.trim() || null;
 
   if (!type || !day || !startTime || !endTime) {
-    return { error: "All schedule fields are required." };
+    return { error: (await getMessages()).academics.errSlotFields };
   }
 
   const course = await prisma.course.findFirst({ where: { id: courseId, userId: user.id } });
-  if (!course) return { error: "Course not found." };
+  if (!course) return { error: (await getMessages()).academics.errCourseGone };
 
   await prisma.courseSchedule.create({
     data: { courseId, type, day, startTime, endTime, room },

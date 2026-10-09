@@ -1,7 +1,12 @@
 "use client";
 
+import { Check, X } from "lucide-react";
 import { toggleTaskStatusAction, deleteTaskAction } from "@/server/actions/task.actions";
-import { PriorityBadge } from "@/components/ui/Badge";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { labelIn } from "@/lib/labels";
+import { currentZone } from "@/lib/dates";
+import { useI18n } from "@/i18n/client";
+import { fmt, INTL } from "@/i18n/config";
 
 type Task = {
   id: string; title: string; priority: string; status: string;
@@ -9,26 +14,31 @@ type Task = {
   course: { code: string; color: string } | null;
 };
 
+const PRIORITY_TONE: Record<string, BadgeTone> = { Low: "neutral", Medium: "blue", High: "amber", Critical: "red" };
+
 export function TaskRow({ task }: { task: Task }) {
+  const { t, locale } = useI18n();
   const due = task.dueDate ? new Date(task.dueDate) : null;
   const isPast = due && due < new Date() && task.status !== "Done";
+  const done = task.status === "Done";
 
   return (
-    <div className="flex items-center gap-3 rounded-md border border-slate-100 bg-white px-4 py-3">
+    <div className={`tile flex items-center gap-3 px-3.5 py-2.5 ${done ? "opacity-55" : ""}`}>
       <button
+        type="button"
+        role="checkbox"
+        aria-checked={done}
+        aria-label={fmt(done ? t.today.reopenTask : t.today.completeTask, { title: task.title })}
         onClick={() => toggleTaskStatusAction(task.id)}
-        className={`h-5 w-5 shrink-0 rounded border-2 transition-colors ${
-          task.status === "Done"
-            ? "border-emerald-500 bg-emerald-500 text-white"
-            : "border-slate-300 hover:border-slate-400"
-        }`}
+        className="check focus-ring"
+        data-checked={done || undefined}
       >
-        {task.status === "Done" && <span className="flex items-center justify-center text-xs">✓</span>}
+        {done && <Check size={12} strokeWidth={3} />}
       </button>
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className={`text-sm font-medium truncate ${task.status === "Done" ? "line-through text-slate-400" : "text-slate-900"}`}>
+          <span className={`truncate text-sm font-medium text-[var(--ink)] ${done ? "line-through" : ""}`}>
             {task.title}
           </span>
           {task.course && (
@@ -37,19 +47,25 @@ export function TaskRow({ task }: { task: Task }) {
             </span>
           )}
         </div>
-        <div className="mt-0.5 flex gap-3 text-xs text-slate-500">
-          {due && <span className={isPast ? "text-red-500 font-medium" : ""}>{due.toLocaleDateString("en-CA")}</span>}
-          {task.estimatedTime && <span>{task.estimatedTime}min</span>}
+        <div className="mt-0.5 flex gap-3 text-xs text-[var(--ink-dim)]">
+          {due && (
+            <span className={isPast ? "font-semibold text-[#ffb3a3]" : ""}>
+              {new Intl.DateTimeFormat(INTL[locale], { timeZone: currentZone(), day: "numeric", month: "short", year: "numeric" }).format(due)}
+            </span>
+          )}
+          {task.estimatedTime ? <span>{fmt(t.workspace.task.minutes, { n: task.estimatedTime })}</span> : null}
         </div>
       </div>
 
-      <PriorityBadge priority={task.priority} />
+      <Badge tone={PRIORITY_TONE[task.priority] ?? "neutral"}>{labelIn(task.priority, locale)}</Badge>
 
       <button
+        type="button"
         onClick={() => deleteTaskAction(task.id)}
-        className="text-xs text-slate-400 hover:text-red-500"
+        aria-label={fmt(t.workspace.task.deleteNamed, { title: task.title })}
+        className="focus-ring rounded-full p-1 text-[var(--ink-faint)] hover:text-[#ffb3a3]"
       >
-        ✕
+        <X size={14} />
       </button>
     </div>
   );

@@ -6,16 +6,20 @@ import { CalendarPlus, Undo2 } from "lucide-react";
 import { Block, field } from "@/components/modules/kit";
 import { scheduleWorkoutsAction, undoWorkoutsAction } from "@/server/actions/fitness.actions";
 import type { WorkoutTime } from "@/server/fitness";
+import { useI18n } from "@/i18n/client";
+import { fmt } from "@/i18n/config";
 
-const WHEN: { key: WorkoutTime; label: string }[] = [
-  { key: "libre", label: "Peu importe" },
-  { key: "matin", label: "Le matin" },
-  { key: "midi", label: "Le midi" },
-  { key: "soir", label: "Le soir" },
+const WHEN: { key: WorkoutTime; label: "any" | "morning" | "noon" | "evening" }[] = [
+  { key: "libre", label: "any" },
+  { key: "matin", label: "morning" },
+  { key: "midi", label: "noon" },
+  { key: "soir", label: "evening" },
 ];
 
 /** Book the week's sessions in free time, in one tap, with undo. */
 export function WorkoutPlanner() {
+  const { t, locale } = useI18n();
+  const w = t.modulesA.planner;
   const router = useRouter();
   const [count, setCount] = useState(3);
   const [minutes, setMinutes] = useState(60);
@@ -25,13 +29,13 @@ export function WorkoutPlanner() {
 
   return (
     <Block
-      title="Planifier mes séances de la semaine"
-      hint="Dans ton temps libre des sept prochains jours : autour des cours, rendez-vous et repas, jamais un jour de repos ni un jour où tu t'entraînes déjà, avec un jour de récupération entre deux séances quand c'est possible."
+      title={w.title}
+      hint={w.hint}
       wide
     >
       <div className="flex flex-wrap items-end gap-2">
         <label className="text-xs text-[var(--ink-dim)]">
-          Séances
+          {w.sessions}
           <select value={count} onChange={(e) => setCount(Number(e.target.value))} className={`${field} mt-1 block w-24 cursor-pointer appearance-none`}>
             {[1, 2, 3, 4, 5, 6, 7].map((n) => (
               <option key={n} value={n}>
@@ -41,21 +45,21 @@ export function WorkoutPlanner() {
           </select>
         </label>
         <label className="text-xs text-[var(--ink-dim)]">
-          Durée
+          {w.duration}
           <select value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} className={`${field} mt-1 block w-28 cursor-pointer appearance-none`}>
             {[30, 45, 60, 75, 90].map((n) => (
               <option key={n} value={n}>
-                {n} min
+                {fmt(t.modulesA.minutes, { n })}
               </option>
             ))}
           </select>
         </label>
         <label className="text-xs text-[var(--ink-dim)]">
-          Moment
+          {w.moment}
           <select value={when} onChange={(e) => setWhen(e.target.value as WorkoutTime)} className={`${field} mt-1 block w-36 cursor-pointer appearance-none`}>
-            {WHEN.map((w) => (
-              <option key={w.key} value={w.key}>
-                {w.label}
+            {WHEN.map((x) => (
+              <option key={x.key} value={x.key}>
+                {w[x.label]}
               </option>
             ))}
           </select>
@@ -67,16 +71,19 @@ export function WorkoutPlanner() {
             setBusy(true);
             try {
               const r = await scheduleWorkoutsAction({ count, minutes, when });
-              setResult({ message: r.message, ids: r.ids });
+              // The server words its reply in French (with the days and times); in English, say what happened.
+              const n = r.ids.length;
+              const message = locale === "fr" ? r.message : n === 0 ? w.noSlot : n === 1 ? fmt(w.bookedOne, { min: minutes }) : fmt(w.bookedMany, { n, min: minutes });
+              setResult({ message, ids: r.ids });
               router.refresh();
             } catch {
-              setResult({ message: "Je n'ai pas pu joindre le serveur : rien n'a été ajouté.", ids: [] });
+              setResult({ message: t.common.serverDown, ids: [] });
             }
             setBusy(false);
           }}
           className="mod-chip mod-chip-gold focus-ring"
         >
-          <CalendarPlus size={13} /> {busy ? "Je cherche…" : "Trouver les créneaux et réserver"}
+          <CalendarPlus size={13} /> {busy ? w.searching : w.book}
         </button>
       </div>
       {result && (
@@ -86,13 +93,17 @@ export function WorkoutPlanner() {
             <button
               type="button"
               onClick={async () => {
-                const r = await undoWorkoutsAction(result.ids);
-                setResult({ message: `Annulé : ${r.removed} séance${r.removed > 1 ? "s" : ""} retirée${r.removed > 1 ? "s" : ""} du calendrier.`, ids: [] });
-                router.refresh();
+                try {
+                  const r = await undoWorkoutsAction(result.ids);
+                  setResult({ message: fmt((locale === "fr" ? r.removed <= 1 : r.removed === 1) ? w.undoneOne : w.undoneMany, { n: r.removed }), ids: [] });
+                  router.refresh();
+                } catch {
+                  setResult({ message: t.common.serverDown, ids: result.ids });
+                }
               }}
               className="mod-chip focus-ring"
             >
-              <Undo2 size={12} /> Annuler
+              <Undo2 size={12} /> {t.common.undo}
             </button>
           )}
         </div>
