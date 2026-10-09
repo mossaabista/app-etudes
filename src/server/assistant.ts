@@ -50,6 +50,8 @@ export interface AssistantAction {
   template?: string;
   /** create_task / add_milestone: the project, as p:<id>. */
   project?: string;
+  /** create_task: Low | Medium | High | Critical. */
+  priority?: string;
   /** plan_workouts: how many sessions, how long, and when in the day. */
   sessions?: number;
   minutes?: number;
@@ -259,6 +261,7 @@ function buildTool(allowed: Set<Op>) {
               url: { type: "string", description: "navigate : chemin de page" },
               template: { type: "string", enum: ["projet", "semestre", "freelance", "entrainement"], description: "create_workspace : modèle d'espace" },
               project: { type: "string", description: "create_task / add_milestone : id exact p:… du projet" },
+              priority: { type: "string", enum: ["Low", "Medium", "High", "Critical"], description: "create_task : priorité si l'utilisateur la donne (« urgent », « haute priorité » = High)" },
               sessions: { type: "number", description: "plan_workouts : nombre de séances (1 à 7)" },
               minutes: { type: "number", description: "plan_workouts : durée d'une séance en minutes" },
               when: { type: "string", enum: ["matin", "midi", "soir", "libre"], description: "plan_workouts : moment préféré" },

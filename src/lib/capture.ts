@@ -11,6 +11,7 @@ export interface Parsed {
   day: string;
   time: string | null;
   minutes: number;
+  priority: "Low" | "Medium" | "High" | "Critical";
   /** Which parts the sentence actually gave, so the preview can show what was understood. */
   found: { day: boolean; time: boolean; minutes: boolean; section: boolean };
 }
@@ -96,6 +97,12 @@ export function parseCapture(input: string, today: string): Parsed {
   // A bare "2 heures" is a length, but "à 9 heures" is a time.
   if (minutes == null && (m = cut(/(?<!\b(?:a|vers|des|de|jusqu'a|pour))\s(\d)\s*heures?(?=\s)/))) minutes = Number(m[1]) * 60;
 
+  // Priority, said in words; "pas urgent" before "urgent".
+  let priority: Parsed["priority"] = "Medium";
+  if (cut(/\s(?:(?:de|en|a)\s+)?(?:(?:basse|faible|petite)\s+priorite|priorite\s+(?:basse|faible))(?=\s)|\spas\s+(?:tres\s+)?(?:urgente?|important(?:e)?|presse)(?=\s)/)) priority = "Low";
+  else if (cut(/\s(?:(?:de|en|a)\s+)?(?:priorite\s+(?:critique|maximale|absolue)|tres\s+urgente?|critique)(?=\s)/)) priority = "Critical";
+  else if (cut(/\s(?:(?:de|en|a)\s+)?(?:(?:haute|forte|grande)\s+priorite|priorite\s+(?:haute|elevee|forte))(?=\s)|\s(?:urgente?|prioritaire|importante?)(?=\s)/)) priority = "High";
+
   // Time of day.
   let time: string | null = null;
   if ((m = cut(/\s(?:a|vers|des)?\s*(\d{1,2})\s*(?:h|heures?|:)\s*(\d{2})?(?=\s)/))) {
@@ -153,8 +160,11 @@ export function parseCapture(input: string, today: string): Parsed {
     .replace(/\s+/g, " ")
     .trim()
     // Spoken lead-ins: "mets-moi", "ajoute", "rappelle-moi de", "je dois", "il faut que je".
-    .replace(/^(?:(?:mets|mettez|met|ajoute|ajouter|ajoutez|rajoute|rajouter|rajoutez|note|noter|programme|planifie|prevois|prévois|cree|crée|creer|créer)(?:[-\s]moi)?\s+(?:un|une|le|la|du|des)?\s*|(?:rappelle|rappelez)[-\s]moi\s+(?:de\s+|d'|que\s+(?:je\s+dois\s+|j'ai\s+|il\s+faut\s+que\s+je\s+)?)?|je\s+dois\s+|il\s+faut\s+que\s+je\s+|j'ai\s+)/i, "")
-    .replace(/^(?:de|du|le|la|un|une|à|a|et)\s+/i, "")
+    .replace(/^(?:(?:mets|mettez|met|ajoute|ajouter|ajoutez|rajoute|rajouter|rajoutez|note|noter|programme|planifie|prevois|prévois|cree|crée|creer|créer)(?:[-\s]moi)?\s+(?:une|un|le|la|du|des)?\s*|(?:rappelle|rappelez)[-\s]moi\s+(?:de\s+|d'|que\s+(?:je\s+dois\s+|j'ai\s+|il\s+faut\s+que\s+je\s+)?)?|je\s+dois\s+|il\s+faut\s+que\s+je\s+|j'ai\s+)/i, "")
+    .replace(/^(?:de|du|le|la|une|un|à|a|et)\s+/i, "")
+    // "une tâche (pour) : réserver la salle" — the filler says nothing the task does not.
+    .replace(/^(?:(?:une|la)\s+)?(?:t[âa]che|rappel)\s*(?:pour|de)?\s*[:,-]?\s+(?=\S)/i, "")
+    .replace(/^(?:pour|de)\s*[:,-]\s*/i, "")
     .replace(/\s+(?:de|du|des|le|la|à|a|au|pour|et|ce|cette)$/i, "")
     .trim();
   const key = `${area}:${sub}`;
@@ -165,6 +175,7 @@ export function parseCapture(input: string, today: string): Parsed {
     day: day ?? today,
     time,
     minutes: minutes ?? DEFAULT_MINUTES[key] ?? 30,
+    priority,
     found: { day: !!day, time: !!time, minutes: minutes != null, section },
   };
 }

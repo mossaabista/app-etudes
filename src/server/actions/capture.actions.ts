@@ -426,7 +426,7 @@ async function create(userId: string, text: string, today: string, options?: { a
   }
 
   const t = await prisma.task.create({
-    data: { userId, title: p.title, category: `${area}:${sub}`, dueDate: atWall(p.day, p.time ?? "23:59"), estimatedTime: p.found.minutes ? p.minutes : null, priority: "Medium", status: "ToDo" },
+    data: { userId, title: p.title, category: `${area}:${sub}`, dueDate: atWall(p.day, p.time ?? "23:59"), estimatedTime: p.found.minutes ? p.minutes : null, priority: p.priority, status: "ToDo" },
   });
   done();
   return { ok: true, message: `${p.title} → ${section}, ${isDeadline(text) ? "à rendre " : "à faire "}${when}.`, undo: { t: "delete-task", id: t.id } };

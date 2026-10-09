@@ -200,12 +200,12 @@ export async function executePlan(userId: string, actions: AssistantAction[], re
               category: project ? `projets:${project.id}` : section(a.section),
               projectId: project?.id ?? null,
               dueDate: a.date || !project ? atWall(day, a.time && TIME.test(a.time) ? a.time : "23:59") : null,
-              priority: "Medium",
+              priority: ["Low", "Medium", "High", "Critical"].includes(a.priority ?? "") ? a.priority! : "Medium",
               status: "ToDo",
             },
           });
           undos.push({ t: "delete-task", id: t.id });
-          did.push(`« ${t.title} » ajouté à tes tâches${day !== today ? ` pour ${dayWords(day)}` : ""}.`);
+          did.push(`« ${t.title} » ajouté à tes tâches${day !== today ? ` pour ${dayWords(day)}` : ""}${t.priority === "High" ? ", priorité haute" : t.priority === "Critical" ? ", priorité critique" : t.priority === "Low" ? ", priorité basse" : ""}.`);
           ok = true;
           break;
         }
