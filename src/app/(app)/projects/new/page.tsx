@@ -14,7 +14,7 @@ export default async function NewProjectPage() {
 
   return (
     <>
-      <PageHeader title="New Project" description="Create a project to track work and milestones." />
+      <PageHeader title="Nouveau projet" description="Suis le travail et les jalons d'un projet." />
       <Card>
         <CardBody>
           <ProjectForm courses={courses} />

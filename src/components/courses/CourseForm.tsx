@@ -40,33 +40,33 @@ export function CourseForm({ course }: { course?: Course }) {
       )}
 
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Course code" htmlFor="code">
+        <Field label="Code du cours" htmlFor="code">
           <Input id="code" name="code" placeholder="CHM1711" defaultValue={course?.code ?? ""} required />
         </Field>
-        <Field label="Course name" htmlFor="name">
-          <Input id="name" name="name" placeholder="Organic Chemistry" defaultValue={course?.name ?? ""} required />
+        <Field label="Nom du cours" htmlFor="name">
+          <Input id="name" name="name" placeholder="Chimie organique" defaultValue={course?.name ?? ""} required />
         </Field>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Professor" htmlFor="professor">
-          <Input id="professor" name="professor" placeholder="Dr. Smith" defaultValue={course?.professor ?? ""} />
+        <Field label="Professeur" htmlFor="professor">
+          <Input id="professor" name="professor" placeholder="Dr Tremblay" defaultValue={course?.professor ?? ""} />
         </Field>
-        <Field label="Professor email" htmlFor="email">
-          <Input id="email" name="email" type="email" placeholder="smith@uni.ca" defaultValue={course?.email ?? ""} />
+        <Field label="Courriel du professeur" htmlFor="email">
+          <Input id="email" name="email" type="email" placeholder="prof@uottawa.ca" defaultValue={course?.email ?? ""} />
         </Field>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Room" htmlFor="room">
+        <Field label="Local" htmlFor="room">
           <Input id="room" name="room" placeholder="MNT 263" defaultValue={course?.room ?? ""} />
         </Field>
-        <Field label="Term" htmlFor="term">
-          <Input id="term" name="term" placeholder="Fall 2026" defaultValue={course?.term ?? ""} />
+        <Field label="Session" htmlFor="term">
+          <Input id="term" name="term" placeholder="Automne 2026" defaultValue={course?.term ?? ""} />
         </Field>
       </div>
 
-      <Field label="Color" htmlFor="color">
+      <Field label="Couleur" htmlFor="color">
         <div className="flex gap-2">
           {COLORS.map((c) => (
             <label key={c.value} className="cursor-pointer">
@@ -89,7 +89,7 @@ export function CourseForm({ course }: { course?: Course }) {
 
       <div className="flex justify-end gap-3 pt-2">
         <Button type="submit" disabled={pending}>
-          {pending ? "Saving..." : course ? "Update course" : "Create course"}
+          {pending ? "Enregistrement…" : course ? "Enregistrer" : "Créer le cours"}
         </Button>
       </div>
     </form>

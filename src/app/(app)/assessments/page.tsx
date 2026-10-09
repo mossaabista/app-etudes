@@ -24,15 +24,15 @@ export default async function AssessmentsPage({ searchParams }: { searchParams: 
   return (
     <>
       <PageHeader
-        title="Assessments"
-        description="Track your assignments, quizzes, and exams."
-        action={<ButtonLink href="/assessments/new" size="sm">+ Add Assessment</ButtonLink>}
+        title="Évaluations"
+        description="Tes devoirs, quiz et examens, avec leurs dates et leurs notes."
+        action={<ButtonLink href="/assessments/new" size="sm">+ Ajouter une évaluation</ButtonLink>}
       />
       {assessments.length === 0 ? (
         <EmptyState
-          title="No assessments yet"
-          description="Add your assignments, quizzes, and exams to track deadlines and grades."
-          action={<ButtonLink href="/assessments/new" size="sm">+ Add Assessment</ButtonLink>}
+          title="Aucune évaluation pour l'instant"
+          description="Importe un syllabus ou ajoute tes devoirs, quiz et examens pour suivre dates et notes."
+          action={<ButtonLink href="/assessments/new" size="sm">+ Ajouter une évaluation</ButtonLink>}
         />
       ) : (
         <div className="space-y-6">

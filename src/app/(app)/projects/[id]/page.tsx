@@ -38,7 +38,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         description={project.description ?? undefined}
         action={
           <div className="flex gap-2">
-            <ButtonLink href={`/projects/${id}/edit`} variant="secondary" size="sm">Edit</ButtonLink>
+            <ButtonLink href={`/projects/${id}/edit`} variant="secondary" size="sm">Modifier</ButtonLink>
             <DeleteProjectButton projectId={id} />
           </div>
         }
@@ -60,24 +60,24 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Milestones" />
+          <CardHeader title="Jalons" />
           <CardBody>
             <MilestoneSection milestones={project.milestones} projectId={id} />
           </CardBody>
         </Card>
 
         <Card>
-          <CardHeader title="Team Members" />
+          <CardHeader title="Équipe" />
           <CardBody>
             <MemberSection members={project.members} projectId={id} />
           </CardBody>
         </Card>
 
         <Card className="lg:col-span-2">
-          <CardHeader title="Tasks" />
+          <CardHeader title="Tâches" />
           <CardBody>
             {project.tasks.length === 0 ? (
-              <p className="text-sm text-slate-400">No tasks linked to this project yet.</p>
+              <p className="text-sm text-slate-400">Aucune tâche liée à ce projet pour l&apos;instant.</p>
             ) : (
               <div className="space-y-2">
                 {project.tasks.map((t) => <TaskRow key={t.id} task={t} />)}

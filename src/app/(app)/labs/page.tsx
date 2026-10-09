@@ -1,3 +1,4 @@
+import { label } from "@/lib/labels";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/server/auth/current-user";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -95,8 +96,8 @@ export default async function LabsPage() {
                 {/* Lab schedule info */}
                 {course.schedules.map((s) => (
                   <div key={s.id} className="mb-4 flex items-center gap-2 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                    <span className="font-medium">Horaire:</span>
-                    <span>{s.day} {s.startTime}–{s.endTime}</span>
+                    <span className="font-medium">Horaire :</span>
+                    <span>{label(s.day)} {s.startTime}–{s.endTime}</span>
                     {s.room && <span className="text-slate-400">({s.room})</span>}
                   </div>
                 ))}

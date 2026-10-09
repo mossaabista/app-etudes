@@ -13,14 +13,33 @@ export interface DeckCard {
 /** Below this, a horizontal drag counts as a swipe rather than a tap. */
 const SWIPE_PX = 45;
 
-export function CardDeck({ cards, initial = 1 }: { cards: DeckCard[]; initial?: number }) {
-  const [active, setActive] = useState(initial);
+export function CardDeck({
+  cards,
+  initial = 1,
+  active: controlled,
+  onActiveChange,
+}: {
+  cards: DeckCard[];
+  initial?: number;
+  /** Pass to drive the deck from outside (the keyboard on a task area, for one). */
+  active?: number;
+  onActiveChange?: (index: number) => void;
+}) {
+  const [own, setOwn] = useState(initial);
+  const active = controlled ?? own;
+  const setActive = (index: number) => {
+    if (controlled === undefined) setOwn(index);
+    onActiveChange?.(index);
+  };
   const startX = useRef<number | null>(null);
+  // A swipe ends with a click on whatever is under the finger. When the card is a link,
+  // that click would open it, so it is swallowed once a swipe has fired.
+  const swiped = useRef(false);
   const n = cards.length;
 
   // The deck wraps, so there is always a card either side. Clamping instead would leave
   // the ends showing two cards and a gap.
-  const go = (step: number) => setActive((i) => (i + step + n) % n);
+  const go = (step: number) => setActive((active + step + n) % n);
 
   /** Signed distance on the ring: for three cards this is always -1, 0 or 1. */
   function ringOffset(index: number) {
@@ -35,16 +54,25 @@ export function CardDeck({ cards, initial = 1 }: { cards: DeckCard[]; initial?: 
     if (startX.current === null) return;
     const dx = e.clientX - startX.current;
     startX.current = null;
-    if (Math.abs(dx) >= SWIPE_PX) go(dx < 0 ? 1 : -1);
+    swiped.current = Math.abs(dx) >= SWIPE_PX;
+    if (swiped.current) go(dx < 0 ? 1 : -1);
   }
 
   return (
-    <div className="select-none">
+    // The side cards swing out past the page edge on narrow screens; clip sideways only,
+    // so the cards keep their room above and below.
+    <div className="select-none overflow-x-clip">
       <div
         className="deck"
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
         onPointerCancel={() => (startX.current = null)}
+        onClickCapture={(e) => {
+          if (!swiped.current) return;
+          swiped.current = false;
+          e.preventDefault();
+          e.stopPropagation();
+        }}
       >
         {cards.map((card, i) => {
           const offset = ringOffset(i);

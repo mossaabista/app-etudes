@@ -1,5 +1,6 @@
 "use client";
 
+import { label } from "@/lib/labels";
 import { useActionState } from "react";
 import { createProjectAction, updateProjectAction } from "@/server/actions/project.actions";
 import { Field, Input, Select, Textarea } from "@/components/ui/Form";
@@ -25,34 +26,34 @@ export function ProjectForm({ courses, project }: { courses: Course[]; project?:
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{state.error}</p>
       )}
 
-      <Field label="Title" htmlFor="projTitle">
-        <Input id="projTitle" name="title" placeholder="Capstone Project" defaultValue={project?.title ?? ""} required />
+      <Field label="Titre" htmlFor="projTitle">
+        <Input id="projTitle" name="title" placeholder="Projet de fin d'études" defaultValue={project?.title ?? ""} required />
       </Field>
 
       <Field label="Description" htmlFor="projDesc">
-        <Textarea id="projDesc" name="description" rows={2} placeholder="What's this project about?" defaultValue={project?.description ?? ""} />
+        <Textarea id="projDesc" name="description" rows={2} placeholder="De quoi parle ce projet ?" defaultValue={project?.description ?? ""} />
       </Field>
 
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Course" htmlFor="projCourse">
+        <Field label="Cours" htmlFor="projCourse">
           <Select id="projCourse" name="courseId" defaultValue={project?.courseId ?? ""}>
-            <option value="">No course</option>
+            <option value="">Aucun cours</option>
             {courses.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
           </Select>
         </Field>
-        <Field label="Due date" htmlFor="projDue">
+        <Field label="Échéance" htmlFor="projDue">
           <Input id="projDue" name="dueDate" type="date" defaultValue={project?.dueDate ? new Date(project.dueDate).toISOString().split("T")[0] : ""} />
         </Field>
       </div>
 
       {project && (
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Status" htmlFor="projStatus">
+          <Field label="Statut" htmlFor="projStatus">
             <Select id="projStatus" name="status" defaultValue={project.status}>
-              {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+              {STATUSES.map((s) => <option key={s} value={s}>{label(s)}</option>)}
             </Select>
           </Field>
-          <Field label="Progress (%)" htmlFor="projProgress">
+          <Field label="Avancement (%)" htmlFor="projProgress">
             <Input id="projProgress" name="progress" type="number" min="0" max="100" defaultValue={project.progress} />
           </Field>
         </div>
@@ -60,7 +61,7 @@ export function ProjectForm({ courses, project }: { courses: Course[]; project?:
 
       <div className="flex justify-end gap-3 pt-2">
         <Button type="submit" disabled={pending}>
-          {pending ? "Saving..." : project ? "Update" : "Create project"}
+          {pending ? "Enregistrement…" : project ? "Enregistrer" : "Créer le projet"}
         </Button>
       </div>
     </form>

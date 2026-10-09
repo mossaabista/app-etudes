@@ -1,0 +1,30 @@
+# name|subject — each prompt is "<subject>, <STYLE>", seed 21 (heart: 11), 1024x1024, 4 steps.
+# STYLE: crafted from glossy black ceramic with polished gold accents, only black and gold colors, premium 3D icon render, soft studio lighting, warm rim light, isolated on a plain pure black background, centered, three-quarter view, no text, no logo
+heart|A realistic anatomical human heart with aorta and arteries
+cart|A shopping cart filled with groceries, bread, fruit and bottles
+hourglass|An elegant hourglass with flowing sand
+clock|A classic twin-bell alarm clock
+coins|A neat stack of coins with one coin standing upright
+apple|A single apple with a leaf on its stem
+moon|A crescent moon with two small stars
+calendar|A desk calendar with rings at the top
+plane|A folded paper airplane in flight
+envelope|A sealed envelope with a round wax seal
+bubbles|Two overlapping speech bubbles
+chart|A rising bar chart with an upward arrow
+gears|Two interlocking cog gears
+book|A closed hardcover book with a bookmark ribbon
+cap|A graduation cap with a tassel
+trophy|A trophy cup with two handles on a base
+soap|A bar of soap with a few soap bubbles
+beads|A string of prayer beads with a tassel
+openbook|An open book with fanned pages
+stones|A stack of smooth balanced zen stones
+sun|A radiant sun with sharp rays
+house|A small modern house with a pitched roof
+gift|A gift box tied with a ribbon bow
+rings|Two interlocked rings
+family|Three abstract figurines, two adults and a child, standing together
+network|Three abstract people figurines connected by thin rods, a team network
+arrow|A bold arrow curving forward and upward
+dumbbells|A single hexagonal dumbbell lying horizontally, clean simple shape

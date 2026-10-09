@@ -39,13 +39,13 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: rgba(255, 220, 148, 0.25);
   border-radius: 9999px;
 }
 
 @layer components {
   .focus-ring {
-    @apply outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-[#f0cd79] focus-visible:ring-offset-2 focus-visible:ring-offset-[#2a1a05];
   }
 
   /* Frosted glass needs something behind it to refract, so the page lays down a few
@@ -456,6 +456,11 @@ body {
   .deck-card[data-pos="right"] {
     transform: translateX(56%) translateZ(-300px) rotateY(-36deg);
   }
+  /* The front card is solid: the turned-away cards behind it showed through the glass as
+     ghost rows, which read as clutter rather than depth. */
+  .deck-card[data-pos="center"] .glass-card {
+    background: linear-gradient(158deg, #2e200c 0%, #1a1106 100%);
+  }
   .deck-card[data-pos="left"]:hover,
   .deck-card[data-pos="right"]:hover {
     opacity: 0.96;
@@ -471,6 +476,926 @@ body {
     .deck-card { transition: none; }
   }
 
+
+  /* Month grid. Each day is a recessed well in the card, so the chips sitting in it
+     read as raised. */
+  .cal-cell {
+    border-radius: 12px;
+    background: var(--row);
+    border: 1px solid rgba(255, 220, 148, 0.07);
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.35);
+    transition: background 0.15s ease, border-color 0.15s ease;
+    min-width: 0;
+  }
+  .cal-cell:hover { background: var(--row-hover); }
+  .cal-cell[data-today] { border-color: rgba(232, 191, 99, 0.55); }
+  .cal-cell[data-selected] {
+    border-color: #e8bf63;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(232, 191, 99, 0.5);
+  }
+
+  /* A small glossy bar of solid colour, like the blocks in the printed calendar. */
+  .cal-chip {
+    display: block;
+    min-width: 0;
+    padding: 1px 6px;
+    border-radius: 6px;
+    font-size: 10.5px;
+    line-height: 15px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--chip-ink, #fff);
+    background: linear-gradient(180deg,
+      color-mix(in oklab, var(--c, #64748b) 78%, white) 0%,
+      var(--c, #64748b) 50%,
+      color-mix(in oklab, var(--c, #64748b) 82%, black) 100%);
+    box-shadow:
+      0 1px 0 color-mix(in oklab, var(--c, #64748b) 45%, black),
+      0 2px 4px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  }
+  /* Month grid lines: dark, quiet, legible. The category only colours a thin bar on the
+     left, so a busy month reads as text rather than as a wall of colour. */
+  .cal-line {
+    display: flex;
+    align-items: baseline;
+    gap: 0.3rem;
+    min-width: 0;
+    padding: 3px 7px 3px 8px;
+    border-radius: 7px;
+    font-size: 12px;
+    line-height: 15px;
+    font-weight: 500;
+    color: var(--ink);
+    overflow: hidden;
+    background: linear-gradient(90deg, color-mix(in oklab, var(--c) 22%, rgba(20, 13, 4, 0.75)), rgba(20, 13, 4, 0.55));
+    box-shadow: inset 2.5px 0 0 var(--c), inset 0 0 0 1px rgba(255, 220, 148, 0.06);
+  }
+  .cal-line-time { flex-shrink: 0; font-size: 10.5px; font-weight: 600; color: color-mix(in oklab, var(--c) 70%, white); font-variant-numeric: tabular-nums; }
+  .cal-classes {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0 4px;
+    font-size: 11px;
+    color: var(--ink-faint);
+  }
+  .cal-classes::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--c); opacity: 0.8; }
+  .cal-count {
+    min-width: 1.1rem;
+    padding: 0 4px;
+    border-radius: 9999px;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.1rem;
+    text-align: center;
+    color: var(--ink-dim);
+    background: rgba(255, 220, 148, 0.1);
+  }
+
+  /* Classes repeat every week, so they sit a little quieter than the deliverables. */
+  .cal-chip-sm {
+    font-size: 9.5px;
+    line-height: 13px;
+    opacity: 0.92;
+  }
+
+  /* Day deck: the grid zooms into a single day. The overlay fades in while the deck
+     grows from slightly smaller, so it reads as moving closer rather than as a new page. */
+  @keyframes day-overlay-in {
+    from { opacity: 0; }
+  }
+  @keyframes day-deck-in {
+    from { opacity: 0; transform: scale(0.82); }
+  }
+  .day-overlay { animation: day-overlay-in 0.25s ease both; }
+  .day-overlay-deck { animation: day-deck-in 0.38s cubic-bezier(0.22, 0.75, 0.2, 1) both; }
+  @media (prefers-reduced-motion: reduce) {
+    .day-overlay, .day-overlay-deck { animation: none; }
+  }
+
+  /* Chrome folder (Courses). The planes are separate layers in a shared 3D space, so the
+     flap can swing out and the sheet rise without redrawing anything. Sizes run off the
+     folder's own width (cqw) so the lettering scales with the deck card. */
+  .folder-stage {
+    perspective: 900px;
+    perspective-origin: 50% 30%;
+  }
+  .folder {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 400 / 340;
+    container-type: inline-size;
+    transform-style: preserve-3d;
+    transform: rotateX(10deg);
+    transition: transform 0.6s cubic-bezier(0.22, 0.75, 0.2, 1);
+  }
+  .folder-back {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+  .folder-sheet {
+    position: absolute;
+    left: 13%;
+    right: 11%;
+    top: 12%;
+    height: 46%;
+    border-radius: 3cqw;
+    background:
+      repeating-linear-gradient(180deg, transparent 0 3.6cqw, rgba(0, 0, 0, 0.1) 3.6cqw 3.9cqw),
+      linear-gradient(170deg,
+        color-mix(in oklab, var(--c, #64748b) 62%, white) 0%,
+        var(--c, #64748b) 48%,
+        color-mix(in oklab, var(--c, #64748b) 60%, black) 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 6px 12px rgba(0, 0, 0, 0.55);
+    transform: translateZ(8px) rotate(-2.5deg);
+    transition: transform 0.6s cubic-bezier(0.22, 0.75, 0.2, 1);
+  }
+  .folder-front {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 79.4%;
+    transform-origin: 50% 100%;
+    transform: translateZ(22px) rotateX(-7deg);
+    transition: transform 0.6s cubic-bezier(0.22, 0.75, 0.2, 1);
+  }
+  .folder-front > svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  /* Opening: the flap drops towards the reader and the sheet slides up out of the pocket. */
+  .folder-link:hover .folder-front,
+  .folder-link:focus-visible .folder-front { transform: translateZ(22px) rotateX(-22deg); }
+  .folder-link:hover .folder-sheet,
+  .folder-link:focus-visible .folder-sheet { transform: translateZ(8px) translateY(-16%) rotate(-4deg); }
+
+  @keyframes folder-float {
+    0%, 100% { transform: rotateX(10deg) rotateY(0deg) translateY(0); }
+    50% { transform: rotateX(13deg) rotateY(-5deg) translateY(-2.5%); }
+  }
+  .deck-card[data-pos="center"] .folder { animation: folder-float 7s ease-in-out infinite; }
+
+  /* Contact shadow on the "desk", kept off the folder itself: a filter there would flatten
+     the 3D planes into one. */
+  .folder-shadow {
+    height: 7%;
+    margin: -2% 12% 0;
+    border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(8, 4, 0, 0.7), transparent);
+    filter: blur(6px);
+  }
+
+  .folder-label {
+    position: absolute;
+    inset: 24% 9% 10%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2.5cqw;
+    text-align: center;
+    isolation: isolate;
+  }
+
+  /* Raised chrome lettering. The face is a metal gradient clipped to the glyphs; the
+     ::before copy underneath is stacked down a few pixels to make the extruded sides, since
+     a text-shadow cannot sit beneath clipped text. */
+  .folder-code {
+    position: relative;
+    font-size: 15cqw;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: transparent;
+    background: linear-gradient(180deg,
+      #ffffff 0%, #e7eaee 26%, #8a9097 47%, #2c3036 52%, #b8bec5 66%, #f4f6f8 84%, #9aa0a7 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+  .folder-code::before {
+    content: attr(data-text);
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    color: #1d2024;
+    text-shadow:
+      0 1px 0 #3a3e44, 0 2px 0 #30343a, 0 3px 0 #272a2f, 0 4px 0 #1f2226,
+      0 5px 0 #17191c, 0 6px 0 #101113,
+      0 10px 14px rgba(0, 0, 0, 0.85);
+  }
+  /* The name is engraved rather than raised: dark in the cut, a lit lower lip. */
+  .folder-name {
+    max-width: 100%;
+    font-size: 3.6cqw;
+    font-weight: 600;
+    line-height: 1.25;
+    color: #7c838b;
+    text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.16);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .deck-card[data-pos="center"] .folder { animation: none; }
+  }
+
+  /* A side card is a target for the deck, not a link: its click turns the deck instead. */
+  .deck-card:not([data-pos="center"]) a { pointer-events: none; }
+
+  /* Opening a task folder, after the wallet reference. Three beats:
+     1. squash (0-0.15s): the folder dips back and flattens, winding up;
+     2. spring (0.15-0.8s): it bounces up, the flap drops open past its rest and settles,
+        and the contents burst out of the pocket on overshooting curves, staggered;
+     3. hand-over (from 0.85s): it swells and fades as the area page grows in (.area-enter). */
+  .folder-link[data-opening] .folder {
+    animation: folder-pop 0.8s cubic-bezier(0.3, 0.9, 0.4, 1) forwards;
+  }
+  @keyframes folder-pop {
+    0% { transform: rotateX(10deg); }
+    18% { transform: rotateX(26deg) scale(1.05, 0.88); }
+    46% { transform: rotateX(2deg) scale(0.96, 1.07) translateY(-4%); }
+    68% { transform: rotateX(12deg) scale(1.02, 0.98); }
+    100% { transform: rotateX(9deg) scale(1); }
+  }
+  .folder-link[data-opening] .folder-front {
+    animation: flap-open 0.7s cubic-bezier(0.3, 1.5, 0.5, 1) 0.12s forwards;
+  }
+  @keyframes flap-open {
+    to { transform: translateZ(22px) rotateX(-58deg); }
+  }
+  .folder-link[data-opening] .folder-sheet {
+    animation: sheet-rise 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) 0.14s forwards;
+  }
+  @keyframes sheet-rise {
+    to { transform: translateZ(8px) translateY(-40%) rotate(-7deg); }
+  }
+  .folder-link[data-opening] .folder-stage {
+    animation: folder-handover 0.24s ease-in 0.84s forwards;
+  }
+  @keyframes folder-handover {
+    to { transform: scale(1.18); opacity: 0; }
+  }
+  .folder-link[data-opening] .folder-meta,
+  .folder-link[data-opening] .folder-shadow {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  /* The burst: everything starts tucked in the pocket, invisible, and springs out. */
+  .burst {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+    pointer-events: none;
+  }
+  .burst-sheet {
+    position: absolute;
+    left: 17%;
+    right: 15%;
+    top: 14%;
+    height: 44%;
+    border-radius: 3cqw;
+    opacity: 0;
+    transform: translateZ(10px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 6px 14px rgba(0, 0, 0, 0.5);
+  }
+  .burst-sheet-a {
+    background: linear-gradient(170deg, #ffffff, #e4e6ea 55%, #b8bdc4);
+  }
+  .burst-sheet-b {
+    background: linear-gradient(170deg,
+      color-mix(in oklab, var(--c, #64748b) 40%, white),
+      color-mix(in oklab, var(--c, #64748b) 80%, white) 60%,
+      var(--c, #64748b));
+  }
+  .folder-link[data-opening] .burst-sheet-a { animation: sheet-a 0.62s cubic-bezier(0.3, 1.7, 0.5, 1) 0.16s forwards; }
+  .folder-link[data-opening] .burst-sheet-b { animation: sheet-b 0.62s cubic-bezier(0.3, 1.7, 0.5, 1) 0.2s forwards; }
+  @keyframes sheet-a {
+    0% { opacity: 1; transform: translateZ(10px); }
+    100% { opacity: 1; transform: translateZ(10px) translate(10%, -48%) rotate(9deg); }
+  }
+  @keyframes sheet-b {
+    0% { opacity: 1; transform: translateZ(12px); }
+    100% { opacity: 1; transform: translateZ(12px) translate(-6%, -30%) rotate(-3deg); }
+  }
+
+  .burst-item {
+    position: absolute;
+    left: 50%;
+    top: 30%;
+    width: 29%;
+    aspect-ratio: 1;
+    margin-left: -14.5%;
+    container-type: size;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transform: translateZ(16px) translateY(30%) scale(0.35);
+  }
+  .folder-link[data-opening] .burst-item {
+    animation: burst-out 0.66s cubic-bezier(0.3, 1.55, 0.5, 1) var(--d, 0.18s) forwards;
+  }
+  @keyframes burst-out {
+    0% { opacity: 0; transform: translateZ(16px) translateY(30%) scale(0.35); }
+    12% { opacity: 1; }
+    100% { opacity: 1; transform: translateZ(30px) translate(var(--x), var(--y)) scale(1) rotate(var(--r)); }
+  }
+  .burst-visual.object-img { max-width: 100%; max-height: 100%; }
+
+  /* Coins: thrown higher than the rest, they peak and drop back a little as they spin. */
+  .burst-bead {
+    position: absolute;
+    left: 50%;
+    top: 34%;
+    width: var(--bs);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    opacity: 0;
+    background: radial-gradient(circle at 32% 28%, #ffffff 0%, #d4d8dc 22%, #5d6369 58%, #1b1d20 100%);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.45);
+  }
+  .folder-link[data-opening] .burst-bead {
+    animation: bead-fly 0.9s cubic-bezier(0.2, 0.8, 0.4, 1) var(--d) forwards;
+  }
+  @keyframes bead-fly {
+    0% { opacity: 0; transform: translateZ(20px) translate(0, 20%) scale(0.4); }
+    15% { opacity: 1; }
+    65% { opacity: 1; transform: translateZ(40px) translate(var(--x), var(--y)) scale(1) rotateY(300deg); }
+    100% { opacity: 1; transform: translateZ(40px) translate(var(--x), calc(var(--y) + 7cqw)) scale(0.95) rotateY(520deg); }
+  }
+
+  @keyframes area-enter {
+    from { opacity: 0; transform: scale(0.9); filter: blur(10px); }
+  }
+  .area-enter { animation: area-enter 0.5s cubic-bezier(0.2, 0.75, 0.2, 1) backwards; }
+
+  /* A section's object as a still: the folder burst. */
+  .object-img {
+    max-width: 84cqw;
+    max-height: 86cqh;
+    object-fit: contain;
+    user-select: none;
+    pointer-events: none;
+    filter: drop-shadow(0 22px 20px rgba(40, 20, 0, 0.55));
+  }
+
+  /* Widget carousel (a task area). The row scrolls natively and snaps; --s, --o and --r
+     are written per item on every scroll frame from its distance to the centre. */
+  .wc-track {
+    --w: clamp(15rem, 26vw, 22rem);
+    display: flex;
+    gap: clamp(0.25rem, 2vw, 1.5rem);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    padding: 1.5rem calc(50% - var(--w) / 2) 0.75rem;
+    perspective: 1100px;
+  }
+  .wc-track::-webkit-scrollbar { display: none; }
+
+  .wc-item {
+    flex: 0 0 var(--w);
+    scroll-snap-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 1.5rem;
+    transform: rotateY(var(--r, 0deg)) scale(var(--s, 1));
+    opacity: var(--o, 1);
+    cursor: pointer;
+    animation: wc-in 0.6s cubic-bezier(0.2, 0.75, 0.2, 1) calc(var(--i, 0) * 60ms) backwards;
+  }
+  @keyframes wc-in {
+    from { opacity: 0; translate: 0 18px; }
+  }
+
+  .wc-stage {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    perspective: 800px;
+  }
+  .wc-float {
+    position: absolute;
+    inset: 4% 4% 10%;
+  }
+  .wc-item[data-active] .wc-float { animation: wc-float 6s ease-in-out infinite; }
+  @keyframes wc-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4.5%); }
+  }
+  .wc-tilt {
+    position: absolute;
+    inset: 0;
+    transform: rotateX(var(--ty, 0deg)) rotateY(var(--tx, 0deg));
+    transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .wc-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    user-select: none;
+    pointer-events: none;
+    filter: drop-shadow(0 16px 18px rgba(36, 18, 0, 0.42)) drop-shadow(0 3px 4px rgba(36, 18, 0, 0.3));
+  }
+  /* The glint: a warm band of light crossing the object every few seconds, masked to its
+     silhouette so it reads as a reflection on the surface, not a sheet over it. */
+  .wc-glint {
+    position: absolute;
+    inset: 0;
+    -webkit-mask: var(--mask) center / contain no-repeat;
+    mask: var(--mask) center / contain no-repeat;
+    background: linear-gradient(105deg, transparent 38%, rgba(255, 236, 190, 0.55) 49%, rgba(255, 255, 255, 0.75) 50%, rgba(255, 236, 190, 0.55) 51%, transparent 62%);
+    background-size: 260% 100%;
+    background-position: 160% 0;
+    mix-blend-mode: soft-light;
+    opacity: 0;
+  }
+  .wc-item[data-active] .wc-glint { animation: wc-glint 5.5s ease-in-out 1s infinite; }
+  @keyframes wc-glint {
+    0% { background-position: 160% 0; opacity: 0; }
+    8% { opacity: 1; }
+    40% { background-position: -60% 0; opacity: 1; }
+    48%, 100% { background-position: -60% 0; opacity: 0; }
+  }
+  /* Contact shadow on the page; it tightens as the object rises. */
+  .wc-shadow {
+    position: absolute;
+    left: 20%;
+    right: 20%;
+    bottom: 4%;
+    height: 8%;
+    border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(46, 22, 0, 0.5), transparent);
+    filter: blur(3px);
+  }
+  .wc-item[data-active] .wc-shadow { animation: wc-shadow 6s ease-in-out infinite; }
+  @keyframes wc-shadow {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(0.82); opacity: 0.7; }
+  }
+
+  /* Stand-in while a render is still being made: a dark gold-rimmed disc with a slow sheen. */
+  .wc-pending {
+    position: absolute;
+    inset: 18%;
+    border-radius: 50%;
+    background:
+      linear-gradient(110deg, transparent 35%, rgba(255, 226, 160, 0.16) 50%, transparent 65%) 0 0 / 250% 100%,
+      radial-gradient(circle at 35% 30%, #3a2a12, #160e04 70%);
+    box-shadow: inset 0 0 0 1.5px rgba(232, 191, 99, 0.45), 0 18px 30px rgba(36, 18, 0, 0.35);
+    animation: wc-pending 2.4s ease-in-out infinite;
+  }
+  @keyframes wc-pending {
+    from { background-position: 160% 0, 0 0; }
+    to { background-position: -60% 0, 0 0; }
+  }
+  .wc-label {
+    font-size: 1.3rem;
+    font-weight: 650;
+    letter-spacing: -0.015em;
+    color: var(--ink);
+    text-shadow: 0 1px 2px rgba(40, 22, 2, 0.45);
+  }
+  .wc-meta {
+    padding: 0.2rem 0.7rem;
+    border-radius: 9999px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--ink-dim);
+    background: rgba(32, 21, 8, 0.55);
+    box-shadow: inset 0 1px 0 rgba(255, 226, 158, 0.14);
+  }
+  .wc-item[data-active] .wc-meta { color: var(--ink); }
+  /* The way in: only the item in front shows it. */
+  .wc-open {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0.15rem;
+    padding: 0.35rem 0.9rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #2a1a05;
+    background: linear-gradient(180deg, #ffe9a0, #c9952f);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 6px 14px rgba(40, 20, 0, 0.3);
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+  .wc-item[data-active] .wc-open { opacity: 1; transform: none; }
+  .wc-item[data-active]:hover .wc-open { background: linear-gradient(180deg, #fff0bd, #d9a53c); }
+
+  /* Guided breathing: the ring grows on the inhale; its transition time is the phase length. */
+  .breath-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, rgba(255, 233, 160, 0.55), rgba(201, 149, 47, 0.35) 55%, rgba(120, 80, 20, 0.15) 75%, transparent 76%);
+    box-shadow: 0 0 40px rgba(255, 200, 90, 0.35), inset 0 0 0 1.5px rgba(255, 226, 158, 0.5);
+    transition-property: transform;
+    transition-timing-function: ease-in-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .wc-item, .wc-item[data-active] .wc-float, .wc-item[data-active] .wc-glint, .wc-item[data-active] .wc-shadow { animation: none; }
+  }
+
+  /* Round chrome checkbox for task rows. */
+  .check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    color: #2a1a05;
+    background: linear-gradient(180deg, rgba(34, 24, 9, 0.9), rgba(12, 8, 2, 0.95));
+    box-shadow: inset 0 0 0 1.5px rgba(255, 220, 148, 0.45), inset 0 2px 4px rgba(0, 0, 0, 0.6);
+    transition: background 0.2s ease, box-shadow 0.2s ease;
+  }
+  .check:hover { box-shadow: inset 0 0 0 1.5px rgba(255, 220, 148, 0.8), inset 0 2px 4px rgba(0, 0, 0, 0.6); }
+  .check[data-checked] {
+    background: linear-gradient(180deg, #ffe9a0, #c9952f);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 0 10px rgba(255, 200, 90, 0.5);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .area-enter { animation: none; }
+    /* The opening still has to show what is inside, so it simply cuts to the open state. */
+    .folder-link[data-opening] * { animation-duration: 1ms !important; animation-delay: 0s !important; }
+  }
+
+  /* Section pages (/tasks/[area]/[sub]). */
+  .mod-hero-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 18px 22px rgba(36, 18, 0, 0.45));
+    animation: wc-float 6s ease-in-out infinite;
+  }
+  .mod-stat {
+    display: flex;
+    flex-direction: column;
+    padding: 0.75rem 0.9rem;
+    border-radius: 1rem;
+    background: rgba(255, 220, 148, 0.06);
+    box-shadow: inset 0 1px 0 rgba(255, 226, 158, 0.12), inset 0 0 0 1px rgba(255, 220, 148, 0.08);
+  }
+  .mod-meter {
+    height: 6px;
+    border-radius: 9999px;
+    background: rgba(255, 220, 148, 0.1);
+    overflow: hidden;
+  }
+  .mod-meter > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #a6761f, #ffe9a0);
+    transition: width 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .mod-bar {
+    position: relative;
+    width: 100%;
+    height: 4.5rem;
+    border-radius: 0.5rem;
+    background: rgba(255, 220, 148, 0.07);
+    overflow: hidden;
+  }
+  .mod-bar > span {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: inherit;
+    background: linear-gradient(0deg, #8a5f18, #d8ae51);
+    transition: height 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .mod-bar > span[data-full] { background: linear-gradient(0deg, #c9952f, #ffe9a0); box-shadow: 0 0 12px rgba(255, 200, 90, 0.45); }
+  .mod-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    color: var(--ink-dim);
+    background: rgba(255, 220, 148, 0.06);
+    box-shadow: inset 0 0 0 1px rgba(255, 220, 148, 0.16);
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+  .mod-icon:hover:not(:disabled) { color: var(--ink); background: rgba(255, 220, 148, 0.12); }
+  .mod-icon:disabled { opacity: 0.4; }
+  .mod-icon-gold { color: #2a1a05; background: linear-gradient(180deg, #ffe9a0, #c9952f); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6); }
+  .mod-icon-gold:hover:not(:disabled) { color: #2a1a05; background: linear-gradient(180deg, #fff0bd, #d9a53c); }
+  .mod-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.85rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ink);
+    background: rgba(255, 220, 148, 0.08);
+    box-shadow: inset 0 0 0 1px rgba(255, 220, 148, 0.2);
+    white-space: nowrap;
+    transition: background 0.15s ease;
+  }
+  .mod-chip:hover:not(:disabled) { background: rgba(255, 220, 148, 0.14); }
+  .mod-chip:disabled { opacity: 0.5; }
+  .mod-chip-gold { color: #2a1a05; background: linear-gradient(180deg, #ffe9a0, #c9952f); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 4px 12px rgba(40, 20, 0, 0.3); }
+  .mod-chip-gold:hover:not(:disabled) { background: linear-gradient(180deg, #fff0bd, #d9a53c); }
+  .mod-tab {
+    padding: 0.4rem 0.85rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ink-dim);
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+  .mod-tab[data-on] { color: #2a1a05; background: linear-gradient(180deg, #ffe9a0, #c9952f); }
+  .mod-tab:not([data-on]):hover { color: var(--ink); }
+
+  /* Quick capture: the gold "+" floating over every page, and its sheet. */
+  .qc-fab {
+    position: fixed;
+    right: 1.25rem;
+    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    z-index: 55;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 3.4rem;
+    height: 3.4rem;
+    border-radius: 9999px;
+    color: #2a1a05;
+    background: radial-gradient(circle at 35% 28%, #fff3c9, #e8bf63 45%, #a6761f 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), inset 0 -3px 6px rgba(80, 45, 0, 0.35), 0 10px 26px rgba(40, 20, 0, 0.45), 0 0 0 1px rgba(255, 233, 160, 0.4);
+    transition: transform 0.2s cubic-bezier(0.3, 1.5, 0.5, 1), box-shadow 0.2s ease;
+  }
+  .qc-fab:hover { transform: scale(1.07) rotate(90deg); }
+  .qc-fab:active { transform: scale(0.95); }
+  @media (min-width: 768px) {
+    .qc-fab { bottom: 1.75rem; right: 1.75rem; }
+  }
+  .qc-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: max(12vh, 4rem) 1rem 1rem;
+    background: rgba(18, 10, 2, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    animation: day-overlay-in 0.2s ease both;
+  }
+  .qc-sheet {
+    width: min(38rem, 100%);
+    padding: 1.4rem 1.5rem;
+    animation: qc-in 0.32s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+  }
+  @keyframes qc-in {
+    from { opacity: 0; transform: translateY(-12px) scale(0.97); }
+  }
+  .qc-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--ink);
+    background: color-mix(in oklab, var(--c, #e8bf63) 18%, rgba(255, 220, 148, 0.06));
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--c, #e8bf63) 45%, transparent);
+    animation: qc-pop 0.25s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+  }
+  .qc-chip[data-dim] { color: var(--ink-dim); }
+  .qc-chip select option, .qc-chip select optgroup { background: #1f1508; color: var(--ink); }
+  @keyframes qc-pop {
+    from { opacity: 0; transform: scale(0.85); }
+  }
+  .qc-toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+    z-index: 80;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    max-width: min(34rem, calc(100vw - 2rem));
+    padding: 0.7rem 1rem;
+    border-radius: 1rem;
+    font-size: 0.82rem;
+    color: var(--ink);
+    background: linear-gradient(180deg, #2e200c, #1a1106);
+    box-shadow: 0 14px 34px rgba(20, 10, 0, 0.5), inset 0 0 0 1px rgba(232, 191, 99, 0.35);
+    transform: translateX(-50%);
+    animation: qc-toast 0.35s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+  }
+  @keyframes qc-toast {
+    from { opacity: 0; transform: translate(-50%, 12px); }
+  }
+  @media (min-width: 768px) {
+    .qc-toast { bottom: 2rem; }
+  }
+
+  /* The microphone rides just above the "+". Listening, it glows and breathes. */
+  .qc-mic {
+    position: fixed;
+    right: 1.65rem;
+    bottom: calc(9.6rem + env(safe-area-inset-bottom, 0px));
+    z-index: 55;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.6rem;
+    height: 2.6rem;
+    border-radius: 9999px;
+    color: #f0cd79;
+    background: linear-gradient(180deg, #2e200c, #140d04);
+    box-shadow: inset 0 0 0 1px rgba(232, 191, 99, 0.45), inset 0 1px 0 rgba(255, 233, 160, 0.25), 0 8px 20px rgba(20, 10, 0, 0.45);
+    transition: transform 0.2s cubic-bezier(0.3, 1.5, 0.5, 1);
+  }
+  .qc-mic:hover { transform: scale(1.08); }
+  @media (min-width: 768px) {
+    .qc-mic { right: 2.15rem; bottom: 6.1rem; }
+  }
+  .qc-mic-inline {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 2.6rem;
+    height: 2.6rem;
+    border-radius: 9999px;
+    color: #f0cd79;
+    background: rgba(255, 220, 148, 0.08);
+    box-shadow: inset 0 0 0 1px rgba(232, 191, 99, 0.35);
+  }
+  .qc-mic[data-on],
+  .qc-mic-inline[data-on] {
+    color: #2a1a05;
+    background: radial-gradient(circle at 35% 28%, #fff3c9, #e8bf63 50%, #a6761f);
+    animation: qc-listen 1.3s ease-in-out infinite;
+  }
+  @keyframes qc-listen {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(240, 205, 121, 0.55); }
+    50% { box-shadow: 0 0 0 10px rgba(240, 205, 121, 0); }
+  }
+  .qc-answer {
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.85rem 1rem;
+    border-radius: 16px;
+    font-size: 0.92rem;
+    line-height: 1.55;
+    color: var(--ink);
+    background: linear-gradient(135deg, rgba(240, 205, 121, 0.12), rgba(240, 205, 121, 0.03));
+    box-shadow: inset 0 0 0 1px rgba(240, 205, 121, 0.25);
+    animation: qc-pop 0.3s ease both;
+  }
+  .qc-toast[data-error] { box-shadow: 0 14px 34px rgba(20, 10, 0, 0.5), inset 0 0 0 1px rgba(255, 140, 120, 0.4); }
+  .qc-undo {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #2a1a05;
+    background: linear-gradient(180deg, #ffe9a0, #c9952f);
+  }
+
+  /* Today: what comes next, and where "now" falls in the day. */
+  .next-up {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.7rem 0.9rem;
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(240, 205, 121, 0.16), rgba(240, 205, 121, 0.04));
+    box-shadow: inset 0 0 0 1px rgba(240, 205, 121, 0.3);
+  }
+  .now-line {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.35rem 0 0.55rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #f0cd79;
+  }
+  .now-line::before { content: ""; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: #f0cd79; box-shadow: 0 0 10px #f0cd79; }
+  .now-line::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(240, 205, 121, 0.7), transparent); }
+
+  /* Course page hero: the course colour as a soft light behind the title. */
+  .course-hero::after {
+    content: "";
+    position: absolute;
+    right: -10%;
+    top: -60%;
+    width: 60%;
+    height: 220%;
+    background: radial-gradient(closest-side, color-mix(in oklab, var(--c) 35%, transparent), transparent);
+    pointer-events: none;
+  }
+  .course-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.65rem;
+    border-radius: 9999px;
+    background: rgba(255, 220, 148, 0.07);
+    box-shadow: inset 0 0 0 1px rgba(255, 220, 148, 0.12);
+  }
+
+  /* Something new arriving: it drops onto its spot, settles, and glows gold once. */
+  .land-in {
+    animation: land-in 0.95s cubic-bezier(0.2, 0.9, 0.25, 1.15) both;
+  }
+  @keyframes land-in {
+    0% { opacity: 0; transform: translateY(-28px) scale(1.12) rotate(-1.5deg); box-shadow: 0 0 0 0 rgba(240, 205, 121, 0); }
+    55% { opacity: 1; transform: translateY(3px) scale(0.98) rotate(0); box-shadow: 0 0 0 3px rgba(240, 205, 121, 0.75), 0 0 34px rgba(240, 205, 121, 0.55); }
+    75% { transform: translateY(-1px) scale(1.01); }
+    100% { transform: none; box-shadow: 0 0 0 0 rgba(240, 205, 121, 0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .land-in { animation: none; }
+  }
+
+  /* Onboarding profile cards. */
+  .ob-card {
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+    padding: 1.25rem 1.4rem;
+    transition: transform 0.25s cubic-bezier(0.3, 1.4, 0.5, 1), box-shadow 0.25s ease;
+    animation: wc-in 0.55s cubic-bezier(0.2, 0.75, 0.2, 1) calc(var(--i, 0) * 80ms) backwards;
+  }
+  .ob-card:hover { transform: translateY(-3px); }
+  .ob-card-on { box-shadow: 0 20px 44px rgba(28, 15, 2, 0.46), 0 0 0 2px #f0cd79, 0 0 30px rgba(255, 200, 90, 0.35); }
+
+  /* The Pilot: a glowing gold orb, and proposal rows that cascade in. */
+  .pilot { position: relative; overflow: hidden; }
+  .pilot::after {
+    content: "";
+    position: absolute;
+    inset: -40% 40% auto -10%;
+    height: 140%;
+    background: radial-gradient(closest-side, rgba(255, 210, 120, 0.12), transparent);
+    pointer-events: none;
+  }
+  .pilot-orb {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.4rem;
+    height: 2.4rem;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    color: #2a1a05;
+    background: radial-gradient(circle at 35% 30%, #fff3c9, #e8bf63 50%, #9a6b1c);
+    box-shadow: 0 0 22px rgba(255, 200, 90, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    animation: pilot-pulse 3.2s ease-in-out infinite;
+  }
+  @keyframes pilot-pulse {
+    0%, 100% { box-shadow: 0 0 16px rgba(255, 200, 90, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.7); }
+    50% { box-shadow: 0 0 30px rgba(255, 200, 90, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.7); }
+  }
+  .pilot-step { animation: wc-in 0.45s cubic-bezier(0.2, 0.75, 0.2, 1) calc(var(--i, 0) * 70ms) backwards; }
+  @media (prefers-reduced-motion: reduce) {
+    .pilot-orb, .pilot-step { animation: none; }
+  }
+
+  .balance-shape { transform-origin: center; animation: balance-in 0.9s cubic-bezier(0.3, 1.4, 0.5, 1) both; }
+  @keyframes balance-in { from { transform: scale(0.2); opacity: 0; } }
 
   .glass-pill-active {
     background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
@@ -488,4 +1413,58 @@ input:-webkit-autofill:focus {
   -webkit-text-fill-color: #0f172a;
   -webkit-box-shadow: 0 0 0px 1000px #fff inset;
   transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Pages written before the amber theme use Tailwind's slate and light status tints. Inside
+   the app shell those palette entries are re-pointed at the theme's ink and translucent
+   tints, so every older screen sits on the dark glass without a markup sweep. New
+   components use the --ink tokens directly and are unaffected. */
+.app-main {
+  --color-white: rgba(26, 17, 6, 0.72);
+  --color-slate-50: rgba(255, 220, 148, 0.05);
+  --color-slate-100: rgba(255, 220, 148, 0.08);
+  --color-slate-200: rgba(255, 220, 148, 0.14);
+  --color-slate-300: rgba(255, 220, 148, 0.24);
+  --color-slate-400: #9d8455;
+  --color-slate-500: #bba06c;
+  --color-slate-600: #d3b681;
+  --color-slate-700: #e6cf9f;
+  --color-slate-800: #f0dfbb;
+  --color-slate-900: #f8eedb;
+  --color-red-50: rgba(248, 113, 113, 0.14);
+  --color-red-200: rgba(248, 113, 113, 0.3);
+  --color-red-500: #ff8f7a;
+  --color-red-600: #ff9f8c;
+  --color-red-700: #ffb3a3;
+  --color-red-800: #ffc2b8;
+  --color-red-900: #ffd6cf;
+  --color-emerald-50: rgba(52, 211, 153, 0.14);
+  --color-emerald-600: #7fe0b0;
+  --color-emerald-700: #a7f0cf;
+  --color-green-50: rgba(52, 211, 153, 0.14);
+  --color-green-100: rgba(52, 211, 153, 0.22);
+  --color-green-700: #a7f0cf;
+  --color-blue-50: rgba(96, 165, 250, 0.14);
+  --color-blue-100: rgba(96, 165, 250, 0.2);
+  --color-blue-200: rgba(96, 165, 250, 0.3);
+  --color-blue-600: #9cc6ff;
+  --color-blue-700: #bcd8ff;
+  --color-blue-800: #cfe3ff;
+  --color-blue-900: #e0edff;
+  --color-amber-50: rgba(251, 191, 36, 0.14);
+  --color-amber-700: #ffd77a;
+  --color-amber-800: #ffe08a;
+  --color-violet-50: rgba(167, 139, 250, 0.16);
+  --color-violet-700: #d9ccff;
+}
+/* text-white on a coloured chip should stay white, not take the remapped surface colour. */
+.app-main .text-white { color: #fff; }
+
+@layer components {
+  .btn-gold {
+    color: #2a1a05;
+    background: linear-gradient(180deg, #ffe9a0, #c9952f);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 4px 12px rgba(40, 20, 0, 0.3);
+  }
+  .btn-gold:hover { background: linear-gradient(180deg, #fff0bd, #d9a53c); }
 }

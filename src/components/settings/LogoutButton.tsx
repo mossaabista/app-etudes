@@ -1,15 +1,15 @@
 "use client";
 
+import { LogOut } from "lucide-react";
 import { logoutAction } from "@/server/actions/auth.actions";
-import { Button } from "@/components/ui/Button";
 
 export function LogoutButton() {
   return (
-    <form action={logoutAction}>
-      <p className="mb-3 text-xs text-slate-500">Sign out of your account on this device.</p>
-      <Button type="submit" variant="danger" size="sm">
-        Sign out
-      </Button>
+    <form action={logoutAction} className="flex flex-wrap items-center justify-between gap-3">
+      <p className="text-xs text-[var(--ink-dim)]">Te déconnecter de cet appareil.</p>
+      <button type="submit" className="mod-chip focus-ring">
+        <LogOut size={13} /> Se déconnecter
+      </button>
     </form>
   );
 }

@@ -1,11 +1,11 @@
 import { type InputHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 
 const fieldBase =
-  "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus-ring";
+  "w-full rounded-xl border border-[rgba(255,220,148,0.18)] bg-[rgba(12,8,2,0.45)] px-3 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--ink-faint)] [color-scheme:dark] focus-ring";
 
 export function Label({ children, htmlFor }: { children: React.ReactNode; htmlFor?: string }) {
   return (
-    <label htmlFor={htmlFor} className="mb-1.5 block text-xs font-medium text-slate-700">
+    <label htmlFor={htmlFor} className="mb-1.5 block text-xs font-medium text-[var(--ink-dim)]">
       {children}
     </label>
   );

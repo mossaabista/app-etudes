@@ -1,5 +1,6 @@
 "use client";
 
+import { label } from "@/lib/labels";
 import { toggleAssessmentStatusAction, deleteAssessmentAction } from "@/server/actions/assessment.actions";
 import { StatusBadge } from "@/components/ui/Badge";
 import Link from "next/link";
@@ -37,7 +38,7 @@ export function AssessmentRow({ a }: { a: Assessment }) {
           </span>
         </div>
         <div className="mt-0.5 flex gap-3 text-xs text-slate-500">
-          <span>{a.type}</span>
+          <span>{label(a.type)}</span>
           {a.weight != null && <span>{a.weight}%</span>}
           {due && <span className={isPast ? "text-red-500 font-medium" : ""}>{due.toLocaleDateString("en-CA")}</span>}
           {a.grade != null && <span className="text-emerald-600 font-medium">{a.grade}%</span>}

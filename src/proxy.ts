@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const PUBLIC_PATHS = ["/login", "/register"];
+/** Open to everyone, signed in or not: the marketing page. */
+const MARKETING_PATHS = ["/bienvenue"];
 
 function verifyTokenSimple(token: string): boolean {
   const parts = token.split(".");
@@ -17,8 +19,11 @@ export function proxy(request: NextRequest) {
   const token = request.cookies.get("etudes_session")?.value;
   const hasSession = token ? verifyTokenSimple(token) : false;
 
+  if (MARKETING_PATHS.includes(pathname)) return NextResponse.next();
+
   if (!hasSession && !PUBLIC_PATHS.includes(pathname)) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    // A visitor landing on the bare domain sees what the app is before being asked to sign in.
+    return NextResponse.redirect(new URL(pathname === "/" ? "/bienvenue" : "/login", request.url));
   }
 
   if (hasSession && PUBLIC_PATHS.includes(pathname)) {

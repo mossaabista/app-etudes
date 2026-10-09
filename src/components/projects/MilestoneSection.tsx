@@ -41,16 +41,16 @@ export function MilestoneSection({ milestones, projectId }: { milestones: Milest
       <form action={formAction} className="flex gap-2 items-end">
         <input type="hidden" name="projectId" value={projectId} />
         <div className="flex-1">
-          <Field label="New milestone" htmlFor="msTitle">
-            <Input id="msTitle" name="title" placeholder="e.g. Submit draft" required />
+          <Field label="Nouveau jalon" htmlFor="msTitle">
+            <Input id="msTitle" name="title" placeholder="ex. Remettre le brouillon" required />
           </Field>
         </div>
         <div className="w-36">
-          <Field label="Due" htmlFor="msDue">
+          <Field label="Échéance" htmlFor="msDue">
             <Input id="msDue" name="dueDate" type="date" />
           </Field>
         </div>
-        <Button type="submit" size="sm" variant="secondary" disabled={pending}>Add</Button>
+        <Button type="submit" size="sm" variant="secondary" disabled={pending}>Ajouter</Button>
       </form>
       {state?.error && <p className="mt-1 text-xs text-red-600">{state.error}</p>}
     </div>

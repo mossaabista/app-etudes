@@ -22,15 +22,15 @@ export default async function ProjectsPage() {
   return (
     <>
       <PageHeader
-        title="Projects"
-        description="Manage your group projects and individual work."
-        action={<ButtonLink href="/projects/new" size="sm">+ New Project</ButtonLink>}
+        title="Projets"
+        description="Tes projets d'équipe et personnels, leurs jalons et leur avancement."
+        action={<ButtonLink href="/projects/new" size="sm">+ Nouveau projet</ButtonLink>}
       />
       {projects.length === 0 ? (
         <EmptyState
-          title="No projects yet"
-          description="Create a project to track deliverables, milestones, and team members."
-          action={<ButtonLink href="/projects/new" size="sm">+ New Project</ButtonLink>}
+          title="Aucun projet pour l'instant"
+          description="Crée un projet pour suivre livrables, jalons et coéquipiers."
+          action={<ButtonLink href="/projects/new" size="sm">+ Nouveau projet</ButtonLink>}
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

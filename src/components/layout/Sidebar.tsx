@@ -2,23 +2,24 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NAV_ITEMS } from "@/lib/nav";
-import { GraduationCap } from "lucide-react";
+import { navFor, isActive } from "@/lib/nav";
+import { BrandMark } from "@/components/layout/BrandMark";
+import { BRAND } from "@/lib/brand";
 
-export function Sidebar({ userName }: { userName?: string }) {
+export function Sidebar({ userName, student = true }: { userName?: string; student?: boolean }) {
   const pathname = usePathname();
 
   return (
     <aside className="hidden md:flex h-dvh w-56 shrink-0 flex-col border-r border-[rgba(255,220,148,0.14)] bg-[linear-gradient(180deg,rgba(40,27,10,0.96),rgba(22,15,6,0.97))] backdrop-blur-xl">
       <div className="border-b border-[rgba(255,220,148,0.12)] px-5 py-5">
         <Link href="/today" className="flex items-center gap-2.5">
-          <GraduationCap size={22} className="text-[var(--ink-dim)]" />
-          <span className="text-sm font-bold tracking-tight text-[var(--ink)]">App Études</span>
+          <BrandMark />
+          <span className="text-[0.95rem] font-semibold tracking-[0.08em] text-[var(--ink)]">{BRAND.name.toUpperCase()}</span>
         </Link>
       </div>
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
-        {NAV_ITEMS.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(item.href + "/");
+        {navFor(student).map((item) => {
+          const active = isActive(item.href, pathname);
           const Icon = item.icon;
           return (
             <Link

@@ -31,16 +31,16 @@ export function MemberSection({ members, projectId }: { members: Member[]; proje
       <form action={formAction} className="flex gap-2 items-end">
         <input type="hidden" name="projectId" value={projectId} />
         <div className="flex-1">
-          <Field label="Name" htmlFor="memName">
-            <Input id="memName" name="name" placeholder="John" required />
+          <Field label="Nom" htmlFor="memName">
+            <Input id="memName" name="name" placeholder="Sarah" required />
           </Field>
         </div>
         <div className="flex-1">
-          <Field label="Role" htmlFor="memRole">
-            <Input id="memRole" name="role" placeholder="Developer" />
+          <Field label="Rôle" htmlFor="memRole">
+            <Input id="memRole" name="role" placeholder="Conception" />
           </Field>
         </div>
-        <Button type="submit" size="sm" variant="secondary" disabled={pending}>Add</Button>
+        <Button type="submit" size="sm" variant="secondary" disabled={pending}>Ajouter</Button>
       </form>
       {state?.error && <p className="mt-1 text-xs text-red-600">{state.error}</p>}
     </div>

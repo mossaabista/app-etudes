@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "App Études",
-  description: "Academic Life OS — Manage your courses, tasks, and projects.",
-  applicationName: "App Études",
+  title: "Aurum",
+  description: "L'agenda qui range ta vie à ta place : cours, travail, sport, nutrition, finances et proches, planifiés automatiquement.",
+  applicationName: "Aurum",
   appleWebApp: {
     capable: true,
-    title: "Études",
-    statusBarStyle: "default",
+    title: "Aurum",
+    statusBarStyle: "black-translucent",
   },
   other: {
     // Next emits the standardised `mobile-web-app-capable` for appleWebApp.capable,

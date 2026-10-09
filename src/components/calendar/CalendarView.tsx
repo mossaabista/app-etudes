@@ -1,277 +1,265 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { DayDeck } from "@/components/calendar/DayDeck";
+import type { CalCategory, LegendEntry } from "@/lib/calendar-categories";
 
-type Schedule = {
-  id: string; type: string; day: string; startTime: string; endTime: string; room: string | null;
-  course: { code: string; color: string; name: string };
-};
-type Assessment = {
-  id: string; title: string; type: string; dueDate: Date | string | null;
-  course: { code: string; color: string };
-};
-type Task = {
-  id: string; title: string; status: string; dueDate: Date | string | null;
-  course: { code: string; color: string } | null;
-};
-
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const HOURS = Array.from({ length: 14 }, (_, i) => i + 8);
-
-function timeToMinutes(time: string): number {
-  const [h, m] = time.split(":").map(Number);
-  return h * 60 + m;
+export interface CalDay {
+  iso: string;
+  day: number;
+  inMonth: boolean;
+  isToday: boolean;
 }
 
-function getWeekDates(offset: number): Date[] {
-  const now = new Date();
-  const dayOfWeek = now.getDay();
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7) + offset * 7);
-  monday.setHours(0, 0, 0, 0);
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    return d;
-  });
+export interface CalItem {
+  id: string;
+  date: string;
+  time: string | null;
+  end?: string;
+  title: string;
+  code?: string;
+  /** "GNG", "4144": a short course tag for the cramped grid. */
+  short?: string;
+  category: CalCategory;
+  /** Overrides the category colour (rarely needed). */
+  color?: string;
+  detail?: string;
+  done?: boolean;
+  /** Weekly classes: summarised as one line in the grid, listed in full in the day. */
+  recurring?: boolean;
 }
 
-function isSameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+const WEEKDAY_LABELS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
+
+/** How many things a cell shows before "+N". Fewer, larger lines read at a glance. */
+const MAX_LINES = 3;
+
+// What a month view is for: what is due first, then appointments, then the rest.
+const RANK: Partial<Record<CalCategory, number>> = { examen: 0, quiz: 1, devoir: 2, projet: 2, lab: 2, livrable: 2, reunion: 3, equipe: 3 };
+function order(a: CalItem, b: CalItem) {
+  const ra = RANK[a.category] ?? 4;
+  const rb = RANK[b.category] ?? 4;
+  if (ra !== rb) return ra - rb;
+  return (a.time ?? "99").localeCompare(b.time ?? "99");
 }
 
-const TYPE_ICONS: Record<string, string> = {
-  Assignment: "📝", Quiz: "❓", Exam: "📋", Midterm: "📋", Final: "📋", Project: "🔧", Lab: "🔬",
-};
+export function CalendarView({ days, items, legend }: { days: CalDay[]; items: CalItem[]; legend: LegendEntry[] }) {
+  const [hidden, setHidden] = useState<Set<CalCategory>>(new Set());
+  const [selected, setSelected] = useState<string>(() => (days.find((d) => d.isToday) ?? days.find((d) => d.inMonth) ?? days[0]).iso);
+  // Index into `days` of the day zoomed into the deck, or null while the grid is showing.
+  const [open, setOpen] = useState<number | null>(null);
 
-export function CalendarView({ schedules, assessments, tasks }: { schedules: Schedule[]; assessments: Assessment[]; tasks: Task[] }) {
-  const [view, setView] = useState<"week" | "list">("week");
-  const [weekOffset, setWeekOffset] = useState(0);
+  const colorOf = useMemo(() => {
+    const map = new Map(legend.map((l) => [l.key, l.color]));
+    return (i: CalItem) => i.color ?? map.get(i.category) ?? "#b8ad9c";
+  }, [legend]);
+  const labelOf = useMemo(() => {
+    const map = new Map(legend.map((l) => [l.key, l.label]));
+    return (c: CalCategory) => map.get(c) ?? "";
+  }, [legend]);
 
-  const weekDates = useMemo(() => getWeekDates(weekOffset), [weekOffset]);
-  const weekStart = weekDates[0];
-  const weekEnd = new Date(weekDates[6]);
-  weekEnd.setHours(23, 59, 59, 999);
+  const pick = (index: number) => {
+    setSelected(days[index].iso);
+    setOpen(index);
+  };
+  const change = useCallback(
+    (index: number) => {
+      setOpen(index);
+      setSelected(days[index].iso);
+    },
+    [days]
+  );
+  const close = useCallback(() => setOpen(null), []);
 
-  const weekLabel = `${weekDates[0].toLocaleDateString("fr-CA", { month: "short", day: "numeric" })} – ${weekDates[6].toLocaleDateString("fr-CA", { month: "short", day: "numeric", year: "numeric" })}`;
-
-  const assessmentsByDay = useMemo(() => {
-    const map = new Map<number, Assessment[]>();
-    for (const a of assessments) {
-      if (!a.dueDate) continue;
-      const d = new Date(a.dueDate);
-      for (let i = 0; i < 7; i++) {
-        if (isSameDay(d, weekDates[i])) {
-          const arr = map.get(i) || [];
-          arr.push(a);
-          map.set(i, arr);
-          break;
-        }
-      }
+  const byDay = useMemo(() => {
+    const map = new Map<string, CalItem[]>();
+    for (const i of items) {
+      if (hidden.has(i.category)) continue;
+      (map.get(i.date) ?? map.set(i.date, []).get(i.date)!).push(i);
     }
+    for (const list of map.values()) list.sort(order);
     return map;
-  }, [assessments, weekDates]);
+  }, [items, hidden]);
 
-  const tasksByDay = useMemo(() => {
-    const map = new Map<number, Task[]>();
-    for (const t of tasks) {
-      if (!t.dueDate || t.status === "Done") continue;
-      const d = new Date(t.dueDate);
-      for (let i = 0; i < 7; i++) {
-        if (isSameDay(d, weekDates[i])) {
-          const arr = map.get(i) || [];
-          arr.push(t);
-          map.set(i, arr);
-          break;
-        }
-      }
-    }
-    return map;
-  }, [tasks, weekDates]);
+  const counts = useMemo(() => {
+    const monthDays = new Set(days.filter((d) => d.inMonth).map((d) => d.iso));
+    const c = {} as Record<string, number>;
+    for (const i of items) if (monthDays.has(i.date)) c[i.category] = (c[i.category] ?? 0) + 1;
+    return c;
+  }, [items, days]);
 
-  const today = new Date();
+  // The legend lists the profile's categories that have something this month.
+  const shownLegend = legend.filter((l) => counts[l.key]);
 
-  if (view === "list") {
-    return (
-      <div className="p-5">
-        <ViewToggle view={view} setView={setView} />
-        <WeekNav weekLabel={weekLabel} weekOffset={weekOffset} setWeekOffset={setWeekOffset} />
-        <div className="space-y-4">
-          {DAYS.map((day, i) => {
-            const daySchedules = schedules.filter((s) => s.day === day);
-            const dayAssessments = assessmentsByDay.get(i) || [];
-            const dayTasks = tasksByDay.get(i) || [];
-            if (daySchedules.length === 0 && dayAssessments.length === 0 && dayTasks.length === 0) return null;
-            const isToday = isSameDay(weekDates[i], today);
+  const toggle = (key: CalCategory) =>
+    setHidden((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  return (
+    <div className="space-y-4">
+      {/* Legend doubles as the filter. */}
+      {shownLegend.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {shownLegend.map((c) => {
+            const off = hidden.has(c.key);
             return (
-              <div key={day}>
-                <h4 className={`mb-2 text-xs font-semibold uppercase ${isToday ? "text-blue-600" : "text-slate-400"}`}>
-                  {day} {weekDates[i].toLocaleDateString("fr-CA", { month: "short", day: "numeric" })}
-                  {isToday && <span className="ml-2 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-medium text-white normal-case">Aujourd&apos;hui</span>}
-                </h4>
-                <div className="space-y-1">
-                  {daySchedules.map((s) => (
-                    <div key={s.id} className="flex items-center gap-2 rounded px-3 py-2 text-sm" style={{ backgroundColor: s.course.color + "15" }}>
-                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: s.course.color }} />
-                      <span className="font-medium">{s.course.code}</span>
-                      <span className="text-slate-500">{s.type}</span>
-                      <span className="ml-auto text-xs text-slate-500">{s.startTime} – {s.endTime}</span>
-                      {s.room && <span className="text-xs text-slate-400">{s.room}</span>}
-                    </div>
-                  ))}
-                  {dayAssessments.map((a) => (
-                    <div key={a.id} className="flex items-center gap-2 rounded border border-dashed px-3 py-2 text-sm" style={{ borderColor: a.course.color + "60", backgroundColor: a.course.color + "08" }}>
-                      <span className="text-xs">{TYPE_ICONS[a.type] || "📌"}</span>
-                      <span className="font-medium text-slate-800">{a.title}</span>
-                      <span className="text-xs text-slate-400">{a.course.code}</span>
-                      <span className="ml-auto rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: a.course.color + "20", color: a.course.color }}>{a.type}</span>
-                    </div>
-                  ))}
-                  {dayTasks.map((t) => (
-                    <div key={t.id} className="flex items-center gap-2 rounded border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-                      <span className="text-xs">✅</span>
-                      <span className="text-slate-700">{t.title}</span>
-                      {t.course && <span className="text-xs text-slate-400">{t.course.code}</span>}
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <button
+                key={c.key}
+                type="button"
+                onClick={() => toggle(c.key)}
+                aria-pressed={!off}
+                className={`glass-pill focus-ring flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium transition-opacity ${off ? "opacity-40" : ""}`}
+              >
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: c.color }} aria-hidden />
+                <span className="text-[var(--ink)]">{c.label}</span>
+                <span className="text-[var(--ink-faint)]">{counts[c.key]}</span>
+              </button>
             );
           })}
         </div>
-      </div>
-    );
-  }
+      )}
 
-  return (
-    <div className="p-5">
-      <ViewToggle view={view} setView={setView} />
-      <WeekNav weekLabel={weekLabel} weekOffset={weekOffset} setWeekOffset={setWeekOffset} />
-
-      {/* Deadline banners for the week */}
-      <DeadlineBanners weekDates={weekDates} assessmentsByDay={assessmentsByDay} tasksByDay={tasksByDay} today={today} />
-
-      <div className="overflow-x-auto">
-        <div className="grid min-w-[700px]" style={{ gridTemplateColumns: "60px repeat(7, 1fr)" }}>
-          {/* Header */}
-          <div className="border-b border-slate-100 p-2" />
-          {DAYS.map((day, i) => {
-            const isToday = isSameDay(weekDates[i], today);
-            const dateNum = weekDates[i].getDate();
-            const deadlineCount = (assessmentsByDay.get(i)?.length || 0) + (tasksByDay.get(i)?.length || 0);
-            return (
-              <div key={day} className={`border-b border-l border-slate-100 p-2 text-center ${isToday ? "bg-blue-50" : ""}`}>
-                <div className={`text-xs font-semibold ${isToday ? "text-blue-600" : "text-slate-600"}`}>{day.slice(0, 3)}</div>
-                <div className={`text-lg font-bold ${isToday ? "text-blue-600" : "text-slate-800"}`}>{dateNum}</div>
-                {deadlineCount > 0 && (
-                  <div className="mt-0.5 text-[10px] font-medium text-orange-600">{deadlineCount} deadline{deadlineCount > 1 ? "s" : ""}</div>
-                )}
-              </div>
-            );
-          })}
-
-          {/* Time slots */}
-          {HOURS.map((hour) => (
-            <div key={hour} className="contents">
-              <div className="border-b border-slate-50 p-1 pr-2 text-right text-[10px] text-slate-400">
-                {hour}:00
-              </div>
-              {DAYS.map((day, i) => {
-                const isToday = isSameDay(weekDates[i], today);
-                const slotSchedules = schedules.filter(
-                  (s) => s.day === day && timeToMinutes(s.startTime) < (hour + 1) * 60 && timeToMinutes(s.endTime) > hour * 60
-                );
-                return (
-                  <div key={day} className={`relative border-b border-l border-slate-50 p-0.5 ${isToday ? "bg-blue-50/30" : ""}`} style={{ minHeight: 40 }}>
-                    {slotSchedules.map((s) => {
-                      const isStart = timeToMinutes(s.startTime) >= hour * 60;
-                      if (!isStart) return null;
-                      const duration = timeToMinutes(s.endTime) - timeToMinutes(s.startTime);
-                      const heightSlots = duration / 60;
-                      return (
-                        <div
-                          key={s.id}
-                          className="absolute inset-x-0.5 z-10 overflow-hidden rounded px-1.5 py-1 text-white"
-                          style={{ backgroundColor: s.course.color, top: 2, height: `calc(${heightSlots * 100}% - 4px)` }}
-                        >
-                          <p className="text-[10px] font-semibold leading-tight">{s.course.code}</p>
-                          <p className="text-[9px] opacity-80">{s.type} {s.room ? `· ${s.room}` : ""}</p>
-                          <p className="text-[9px] opacity-70">{s.startTime}–{s.endTime}</p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
+      <section className="glass-card p-2.5 sm:p-4">
+        <div className="grid grid-cols-7 gap-1 sm:gap-2">
+          {WEEKDAY_LABELS.map((w) => (
+            <div key={w} className="pb-1 text-center text-[11px] font-semibold uppercase tracking-wide text-[var(--ink-dim)]">
+              {w}
             </div>
           ))}
-        </div>
-      </div>
-    </div>
-  );
-}
 
-function ViewToggle({ view, setView }: { view: string; setView: (v: "week" | "list") => void }) {
-  return (
-    <div className="mb-4 flex gap-2">
-      <button onClick={() => setView("week")} className={`text-xs ${view === "week" ? "font-medium text-slate-900" : "text-slate-500 hover:text-slate-700"}`}>Week view</button>
-      <span className="text-xs text-slate-300">|</span>
-      <button onClick={() => setView("list")} className={`text-xs ${view === "list" ? "font-medium text-slate-900" : "text-slate-500 hover:text-slate-700"}`}>List view</button>
-    </div>
-  );
-}
-
-function WeekNav({ weekLabel, weekOffset, setWeekOffset }: { weekLabel: string; weekOffset: number; setWeekOffset: (n: number) => void }) {
-  return (
-    <div className="mb-4 flex items-center gap-3">
-      <button onClick={() => setWeekOffset(weekOffset - 1)} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50">&larr;</button>
-      <button onClick={() => setWeekOffset(0)} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50">Today</button>
-      <button onClick={() => setWeekOffset(weekOffset + 1)} className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50">&rarr;</button>
-      <span className="text-sm font-medium text-slate-700">{weekLabel}</span>
-    </div>
-  );
-}
-
-function DeadlineBanners({ weekDates, assessmentsByDay, tasksByDay, today }: {
-  weekDates: Date[]; assessmentsByDay: Map<number, Assessment[]>; tasksByDay: Map<number, Task[]>; today: Date;
-}) {
-  const allDeadlines: { date: Date; dayIdx: number; items: (Assessment | Task)[] }[] = [];
-  for (let i = 0; i < 7; i++) {
-    const items = [...(assessmentsByDay.get(i) || []), ...(tasksByDay.get(i) || [])];
-    if (items.length > 0) allDeadlines.push({ date: weekDates[i], dayIdx: i, items });
-  }
-  if (allDeadlines.length === 0) return null;
-
-  return (
-    <div className="mb-4 space-y-2">
-      {allDeadlines.map(({ date, items }) => {
-        const isPast = date < today && !isSameDay(date, today);
-        const isToday = isSameDay(date, today);
-        return (
-          <div key={date.toISOString()} className={`rounded-lg border p-3 ${isToday ? "border-orange-300 bg-orange-50" : isPast ? "border-slate-200 bg-slate-50 opacity-60" : "border-blue-200 bg-blue-50"}`}>
-            <div className="mb-1 flex items-center gap-2">
-              <span className={`text-xs font-semibold ${isToday ? "text-orange-700" : isPast ? "text-slate-500" : "text-blue-700"}`}>
-                {date.toLocaleDateString("fr-CA", { weekday: "short", month: "short", day: "numeric" })}
-                {isToday && " — Aujourd'hui"}
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {items.map((item) => {
-                const isAssessment = "type" in item && "course" in item && item.course;
-                const color = isAssessment ? (item as Assessment).course.color : (item as Task).course?.color || "#6b7280";
-                const code = isAssessment ? (item as Assessment).course.code : (item as Task).course?.code || "";
-                return (
-                  <span key={item.id} className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium text-white" style={{ backgroundColor: color }}>
-                    {isAssessment && <span>{TYPE_ICONS[(item as Assessment).type] || "📌"}</span>}
-                    {code && <span className="opacity-80">{code}</span>}
-                    {item.title}
+          {days.map((d, index) => {
+            const list = byDay.get(d.iso) ?? [];
+            const classes = list.filter((i) => i.recurring);
+            const rest = list.filter((i) => !i.recurring);
+            const isSelected = d.iso === selected;
+            const shown = rest.slice(0, MAX_LINES);
+            const more = rest.length - shown.length;
+            return (
+              <button
+                key={d.iso}
+                type="button"
+                onClick={() => pick(index)}
+                aria-label={`${d.day}${list.length ? `, ${list.length} élément${list.length > 1 ? "s" : ""}` : ""}`}
+                aria-pressed={isSelected}
+                data-today={d.isToday || undefined}
+                data-selected={isSelected || undefined}
+                className={`cal-cell focus-ring flex min-h-[4.5rem] flex-col items-stretch gap-1 p-1 text-left sm:min-h-[8.25rem] sm:gap-1.5 sm:p-2 ${d.inMonth ? "" : "opacity-35"}`}
+              >
+                <span className="flex items-center justify-between">
+                  <span
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                      d.isToday ? "bg-[#e8bf63] text-[#2a1a05] shadow-[0_0_10px_rgba(255,200,90,0.6)]" : "text-[var(--ink)]"
+                    }`}
+                  >
+                    {d.day}
                   </span>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
+                </span>
+
+                {/* Phones: one short bar per thing that is not a class. */}
+                {rest.length > 0 && (
+                  <span className="flex flex-wrap gap-[3px] sm:hidden" aria-hidden>
+                    {rest.slice(0, 4).map((i) => (
+                      <span key={i.id} className="h-1 w-3 rounded-full" style={{ background: colorOf(i) }} />
+                    ))}
+                    {rest.length > 4 && <span className="text-[9px] leading-[4px] text-[var(--ink-dim)]">+{rest.length - 4}</span>}
+                  </span>
+                )}
+
+                <span className="hidden min-w-0 flex-col gap-1 sm:flex">
+                  {shown.map((i) => (
+                    <span
+                      key={i.id}
+                      title={`${i.time ? `${i.time} · ` : ""}${i.code ? `${i.code} · ` : ""}${i.title}`}
+                      data-land={`cal-${i.id}`}
+                      className={`cal-line ${i.done ? "line-through opacity-50" : ""}`}
+                      style={{ "--c": colorOf(i) } as React.CSSProperties}
+                    >
+                      {/* A 23:59 hand-in is "by the end of the day": the time adds nothing. */}
+                      {i.time && i.time !== "23:59" && <span className="cal-line-time">{i.time.replace(":00", "h").replace(":", "h")}</span>}
+                      <span className="line-clamp-2 min-w-0 break-words">{i.title}</span>
+                    </span>
+                  ))}
+                  {more > 0 && <span className="px-1 text-[11px] font-medium text-[var(--ink-dim)]">+{more} autre{more > 1 ? "s" : ""}</span>}
+                  {classes.length > 0 && (
+                    <span className="cal-classes" style={{ "--c": colorOf(classes[0]) } as React.CSSProperties}>
+                      {classes.length} cours
+                    </span>
+                  )}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {open !== null && (
+        <DayDeck
+          active={open}
+          onChange={change}
+          onClose={close}
+          label={dayLabel}
+          days={days.map((d) => ({ iso: d.iso, node: <DayCard day={d} items={byDay.get(d.iso) ?? []} colorOf={colorOf} labelOf={labelOf} /> }))}
+        />
+      )}
     </div>
   );
+}
+
+// In the deck the day is read top to bottom, in clock order; things with no time last.
+const byClock = (a: CalItem, b: CalItem) => (a.time ?? "99").localeCompare(b.time ?? "99");
+
+function DayCard({
+  day,
+  items,
+  colorOf,
+  labelOf,
+}: {
+  day: CalDay;
+  items: CalItem[];
+  colorOf: (i: CalItem) => string;
+  labelOf: (c: CalCategory) => string;
+}) {
+  const list = [...items].sort(byClock);
+  return (
+    <section className="glass-card flex h-full flex-col p-5">
+      <header className="mb-3 flex items-baseline gap-2">
+        <h3 className="text-sm font-semibold capitalize text-[var(--ink)]">{dayLabel(day.iso)}</h3>
+        {list.length > 0 && <span className="text-xs text-[var(--ink-dim)]">{list.length}</span>}
+        {day.isToday && <span className="ml-auto rounded-full bg-[#e8bf63] px-2 py-0.5 text-[10px] font-semibold text-[#2a1a05]">Aujourd&apos;hui</span>}
+      </header>
+      {list.length === 0 ? (
+        <p className="py-6 text-center text-xs text-[var(--ink-faint)]">Rien ce jour-là.</p>
+      ) : (
+        // Every card in the deck is the same height, so a busy day scrolls inside its card.
+        <ol className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+          {list.map((i) => (
+            <li key={i.id} data-land={`deck-${i.id}`} className={`tile flex items-start gap-2.5 px-3.5 py-3 ${i.done ? "opacity-55" : ""}`}>
+              <span className="pill shrink-0" style={{ "--c": colorOf(i) } as React.CSSProperties}>
+                <span className="pill-time">{i.time ?? "—"}</span>
+                <span className="pill-cap" aria-hidden />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className={`line-clamp-2 text-sm font-medium leading-5 text-[var(--ink)] ${i.done ? "line-through" : ""}`}>
+                  {i.code && <span className="text-[var(--ink-dim)]">{i.code} · </span>}
+                  {i.title}
+                </p>
+                <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-[var(--ink-dim)]">
+                  {[labelOf(i.category), i.end ? `jusqu'à ${i.end}` : null, i.detail].filter(Boolean).join(" · ")}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+function dayLabel(iso: string) {
+  // Noon UTC keeps the date stable whatever zone the browser is in.
+  return new Intl.DateTimeFormat("fr-CA", { timeZone: "UTC", weekday: "long", day: "numeric", month: "long" }).format(new Date(`${iso}T12:00:00Z`));
 }

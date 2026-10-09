@@ -5,7 +5,7 @@ import { CourseForm } from "@/components/courses/CourseForm";
 export default function NewCoursePage() {
   return (
     <>
-      <PageHeader title="Add Course" description="Create a new course for this semester." />
+      <PageHeader title="Nouveau cours" description="Ajoute un cours à ta session." />
       <Card>
         <CardBody>
           <CourseForm />

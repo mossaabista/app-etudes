@@ -14,7 +14,7 @@ export default async function NewAssessmentPage() {
 
   return (
     <>
-      <PageHeader title="Add Assessment" description="Create a new assignment, quiz, or exam." />
+      <PageHeader title="Nouvelle évaluation" description="Un devoir, un quiz ou un examen." />
       <Card>
         <CardBody>
           <AssessmentForm courses={courses} />

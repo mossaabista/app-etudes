@@ -12,8 +12,8 @@ export function AddTaskButton({ courses }: { courses: Course[] }) {
 
   return (
     <>
-      <Button size="sm" onClick={() => setOpen(true)}>+ Add Task</Button>
-      <Modal open={open} onClose={() => setOpen(false)} title="New Task">
+      <Button size="sm" onClick={() => setOpen(true)}>+ Nouvelle tâche</Button>
+      <Modal open={open} onClose={() => setOpen(false)} title="Nouvelle tâche">
         <TaskForm courses={courses} onDone={() => setOpen(false)} />
       </Modal>
     </>

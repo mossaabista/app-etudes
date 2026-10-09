@@ -1,5 +1,6 @@
 "use client";
 
+import { label } from "@/lib/labels";
 import { useActionState } from "react";
 import { createAssessmentAction, updateAssessmentAction } from "@/server/actions/assessment.actions";
 import { Field, Input, Select, Textarea } from "@/components/ui/Form";
@@ -28,52 +29,52 @@ export function AssessmentForm({ courses, assessment }: { courses: Course[]; ass
       )}
 
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Course" htmlFor="courseId">
+        <Field label="Cours" htmlFor="courseId">
           <Select id="courseId" name="courseId" required defaultValue={assessment?.courseId ?? ""}>
-            <option value="">Select course</option>
+            <option value="">Choisir un cours</option>
             {courses.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
           </Select>
         </Field>
         <Field label="Type" htmlFor="type">
           <Select id="type" name="type" required defaultValue={assessment?.type ?? "Assignment"}>
-            {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            {TYPES.map((t) => <option key={t} value={t}>{label(t)}</option>)}
           </Select>
         </Field>
       </div>
 
-      <Field label="Title" htmlFor="title">
-        <Input id="title" name="title" placeholder="Midterm Exam" defaultValue={assessment?.title ?? ""} required />
+      <Field label="Titre" htmlFor="title">
+        <Input id="title" name="title" placeholder="Examen de mi-session" defaultValue={assessment?.title ?? ""} required />
       </Field>
 
       <div className="grid grid-cols-3 gap-4">
-        <Field label="Weight (%)" htmlFor="weight">
+        <Field label="Pondération (%)" htmlFor="weight">
           <Input id="weight" name="weight" type="number" step="0.1" min="0" max="100" placeholder="20" defaultValue={assessment?.weight ?? ""} />
         </Field>
-        <Field label="Due date" htmlFor="dueDate">
+        <Field label="Date de remise" htmlFor="dueDate">
           <Input id="dueDate" name="dueDate" type="date" defaultValue={assessment?.dueDate ? new Date(assessment.dueDate).toISOString().split("T")[0] : ""} />
         </Field>
         {assessment && (
-          <Field label="Grade (%)" htmlFor="grade">
+          <Field label="Note (%)" htmlFor="grade">
             <Input id="grade" name="grade" type="number" step="0.1" min="0" max="100" placeholder="85" defaultValue={assessment?.grade ?? ""} />
           </Field>
         )}
       </div>
 
       {assessment && (
-        <Field label="Status" htmlFor="status">
+        <Field label="Statut" htmlFor="status">
           <Select id="status" name="status" defaultValue={assessment.status}>
-            {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+            {STATUSES.map((s) => <option key={s} value={s}>{label(s)}</option>)}
           </Select>
         </Field>
       )}
 
       <Field label="Notes" htmlFor="notes">
-        <Textarea id="notes" name="notes" rows={2} placeholder="Optional notes..." defaultValue={assessment?.notes ?? ""} />
+        <Textarea id="notes" name="notes" rows={2} placeholder="Notes (facultatif)…" defaultValue={assessment?.notes ?? ""} />
       </Field>
 
       <div className="flex justify-end gap-3 pt-2">
         <Button type="submit" disabled={pending}>
-          {pending ? "Saving..." : assessment ? "Update" : "Create assessment"}
+          {pending ? "Enregistrement…" : assessment ? "Enregistrer" : "Créer l'évaluation"}
         </Button>
       </div>
     </form>

@@ -17,7 +17,7 @@ export default async function EditCoursePage({ params }: { params: Promise<{ id:
 
   return (
     <>
-      <PageHeader title={`Edit ${course.code}`} description="Update course details." />
+      <PageHeader title={`Modifier ${course.code}`} description="Les informations du cours." />
       <Card>
         <CardBody>
           <CourseForm course={course} />

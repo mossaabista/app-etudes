@@ -10,11 +10,11 @@ export function DeleteProjectButton({ projectId }: { projectId: string }) {
   if (confirming) {
     return (
       <div className="flex gap-1">
-        <Button size="sm" variant="danger" onClick={() => deleteProjectAction(projectId)}>Confirm</Button>
-        <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>Cancel</Button>
+        <Button size="sm" variant="danger" onClick={() => deleteProjectAction(projectId)}>Confirmer</Button>
+        <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>Annuler</Button>
       </div>
     );
   }
 
-  return <Button size="sm" variant="danger" onClick={() => setConfirming(true)}>Delete</Button>;
+  return <Button size="sm" variant="danger" onClick={() => setConfirming(true)}>Supprimer</Button>;
 }

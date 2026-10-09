@@ -18,7 +18,7 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
 
   return (
     <>
-      <PageHeader title={`Edit: ${project.title}`} />
+      <PageHeader title={`Modifier : ${project.title}`} />
       <Card>
         <CardBody>
           <ProjectForm courses={courses} project={project} />

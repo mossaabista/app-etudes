@@ -11,15 +11,15 @@ export async function registerAction(_prev: unknown, formData: FormData) {
   const password = formData.get("password") as string;
 
   if (!name || !email || !password) {
-    return { error: "All fields are required." };
+    return { error: "Tous les champs sont requis." };
   }
   if (password.length < 6) {
-    return { error: "Password must be at least 6 characters." };
+    return { error: "Le mot de passe doit contenir au moins 6 caractères." };
   }
 
   const exists = await prisma.user.findUnique({ where: { email } });
   if (exists) {
-    return { error: "An account with this email already exists." };
+    return { error: "Un compte existe déjà avec ce courriel." };
   }
 
   const hashed = await bcrypt.hash(password, 12);
@@ -28,7 +28,7 @@ export async function registerAction(_prev: unknown, formData: FormData) {
   });
 
   await setSessionCookie(user.id);
-  redirect("/today");
+  redirect("/onboarding");
 }
 
 export async function loginAction(_prev: unknown, formData: FormData) {
@@ -36,17 +36,17 @@ export async function loginAction(_prev: unknown, formData: FormData) {
   const password = formData.get("password") as string;
 
   if (!email || !password) {
-    return { error: "Email and password are required." };
+    return { error: "Courriel et mot de passe requis." };
   }
 
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
-    return { error: "Invalid email or password." };
+    return { error: "Courriel ou mot de passe incorrect." };
   }
 
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) {
-    return { error: "Invalid email or password." };
+    return { error: "Courriel ou mot de passe incorrect." };
   }
 
   await setSessionCookie(user.id);

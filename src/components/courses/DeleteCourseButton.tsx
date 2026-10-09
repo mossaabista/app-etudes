@@ -11,10 +11,10 @@ export function DeleteCourseButton({ courseId }: { courseId: string }) {
     return (
       <div className="flex gap-1">
         <Button size="sm" variant="danger" onClick={() => deleteCourseAction(courseId)}>
-          Confirm
+          Confirmer
         </Button>
         <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
-          Cancel
+          Annuler
         </Button>
       </div>
     );
@@ -22,7 +22,7 @@ export function DeleteCourseButton({ courseId }: { courseId: string }) {
 
   return (
     <Button size="sm" variant="danger" onClick={() => setConfirming(true)}>
-      Delete
+      Supprimer
     </Button>
   );
 }

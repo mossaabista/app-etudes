@@ -75,3 +75,15 @@ export async function toggleAssessmentStatusAction(id: string) {
   revalidatePath(`/courses/${assessment.courseId}`);
   revalidatePath("/today");
 }
+
+/** Record (or clear) the grade, in percent. A graded assessment is done. */
+export async function setAssessmentGradeAction(id: string, grade: number | null) {
+  const user = await requireUser();
+  const assessment = await prisma.assessment.findFirst({ where: { id, userId: user.id } });
+  if (!assessment) return { error: "Introuvable." };
+  if (grade != null && (!Number.isFinite(grade) || grade < 0 || grade > 150)) return { error: "Note invalide." };
+  await prisma.assessment.update({ where: { id }, data: { grade, ...(grade != null ? { status: "Completed" } : {}) } });
+  revalidatePath(`/courses/${assessment.courseId}`);
+  revalidatePath("/today");
+  return { ok: true };
+}

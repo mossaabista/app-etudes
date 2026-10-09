@@ -18,7 +18,7 @@ export default async function EditAssessmentPage({ params }: { params: Promise<{
 
   return (
     <>
-      <PageHeader title={`Edit: ${assessment.title}`} description="Update assessment details and grade." />
+      <PageHeader title={`Modifier : ${assessment.title}`} description="Détails et note de l'évaluation." />
       <Card>
         <CardBody>
           <AssessmentForm courses={courses} assessment={assessment} />

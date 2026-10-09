@@ -1,10 +1,10 @@
 const TONE_CLASSES = {
-  neutral: "bg-slate-100 text-slate-700",
-  blue: "bg-blue-50 text-blue-700",
-  green: "bg-emerald-50 text-emerald-700",
-  amber: "bg-amber-50 text-amber-800",
-  red: "bg-red-50 text-red-700",
-  violet: "bg-violet-50 text-violet-700",
+  neutral: "bg-[rgba(255,220,148,0.1)] text-[var(--ink-dim)]",
+  blue: "bg-[rgba(96,165,250,0.16)] text-[#bcd8ff]",
+  green: "bg-[rgba(52,211,153,0.16)] text-[#a7f0cf]",
+  amber: "bg-[rgba(251,191,36,0.18)] text-[#ffe08a]",
+  red: "bg-[rgba(248,113,113,0.18)] text-[#ffc2b8]",
+  violet: "bg-[rgba(167,139,250,0.18)] text-[#d9ccff]",
 } as const;
 
 export type BadgeTone = keyof typeof TONE_CLASSES;
@@ -35,12 +35,29 @@ const STATUS_TONE: Record<string, BadgeTone> = {
   Critical: "red",
 };
 
+const LABEL: Record<string, string> = {
+  ToDo: "À faire",
+  InProgress: "En cours",
+  Done: "Fait",
+  Deferred: "Reporté",
+  Upcoming: "À venir",
+  Completed: "Terminé",
+  Submitted: "Remis",
+  Overdue: "En retard",
+  NotStarted: "Pas commencé",
+  Pending: "En attente",
+  Low: "Basse",
+  Medium: "Moyenne",
+  High: "Haute",
+  Critical: "Critique",
+};
+
 export function StatusBadge({ status }: { status: string }) {
-  return <Badge tone={STATUS_TONE[status] ?? "neutral"}>{humanize(status)}</Badge>;
+  return <Badge tone={STATUS_TONE[status] ?? "neutral"}>{LABEL[status] ?? humanize(status)}</Badge>;
 }
 
 export function PriorityBadge({ priority }: { priority: string }) {
-  return <Badge tone={STATUS_TONE[priority] ?? "neutral"}>{priority}</Badge>;
+  return <Badge tone={STATUS_TONE[priority] ?? "neutral"}>{LABEL[priority] ?? priority}</Badge>;
 }
 
 function humanize(value: string): string {

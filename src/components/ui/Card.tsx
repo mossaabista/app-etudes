@@ -5,9 +5,7 @@ export function Card({
   className?: string;
   children: React.ReactNode;
 }) {
-  return (
-    <div className={`rounded-lg border border-slate-200 bg-white ${className}`}>{children}</div>
-  );
+  return <div className={`glass-card ${className}`}>{children}</div>;
 }
 
 export function CardHeader({
@@ -20,10 +18,10 @@ export function CardHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-      <div>
-        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-        {subtitle && <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>}
+    <div className="flex items-center justify-between gap-3 border-b border-[rgba(255,220,148,0.1)] px-5 py-4">
+      <div className="min-w-0">
+        <h3 className="text-sm font-semibold text-[var(--ink)]">{title}</h3>
+        {subtitle && <p className="mt-0.5 text-xs text-[var(--ink-dim)]">{subtitle}</p>}
       </div>
       {action}
     </div>
