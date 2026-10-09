@@ -16,6 +16,7 @@ import { applyWorkspace } from "@/server/workspaces";
 import { radarText, riskRadar } from "@/server/radar";
 import { addFact, forgetFacts, listFacts } from "@/server/memory";
 import { appendTurns, clearTurns, listTurns, type Outcome } from "@/server/conversation";
+import { allow } from "@/server/rate-limit";
 import { detectTemplate, nameFrom } from "@/lib/workspaces";
 import { claim, findOp, isUndoable, markUndone, recentActions, settle, type LoggedAction } from "@/server/agent-log";
 import { saveLayout, LAYOUT_MODULE } from "@/server/layout";
@@ -101,6 +102,7 @@ export async function commandAction(input: string, options?: CommandOptions): Pr
   const user = await requireUser();
   const text = input.trim().slice(0, 300);
   if (!text) return { error: "Dis ou écris ce que tu veux faire." };
+  if (!allow(user.id, "command")) return { error: "Beaucoup de demandes d'un coup : attends une minute avant de recommencer." };
   const opId = typeof options?.opId === "string" && OP_ID.test(options.opId) ? options.opId : null;
   // Answers (history, radar, memory list) leave no trace in the log; changes (« retiens que… ») do.
   const res = await logged(user.id, opId, assistantEnabled() ? "assistant" : "rules", async () => (await metaCommand(user.id, text)) ?? runCommand(user.id, text, options));

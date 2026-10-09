@@ -25,7 +25,7 @@ import { APP_TIMEZONE } from "@/lib/dates";
 
 export default async function SettingsPage() {
   const user = await requireUser();
-  const [profile, autonomy, actions, courses, projects, layout, planning, facts] = await Promise.all([
+  const [profile, autonomy, actions, courses, projects, layout, planning, facts, documents] = await Promise.all([
     getProfile(user.id),
     getAutonomy(user.id),
     historyRows(user.id),
@@ -34,9 +34,10 @@ export default async function SettingsPage() {
     getLayout(user.id),
     getPlanningPrefs(user.id),
     listFacts(user.id),
+    prisma.trackerEntry.count({ where: { userId: user.id, module: "app:documents" } }),
   ]);
   const prefs = profile?.nav ?? { shown: [], hidden: [] };
-  const navCtx = { roles: profile?.roles ?? ["etudiant" as const], prefs, counts: { courses, projects }, areas: layout.areas.map((a) => a.key) };
+  const navCtx = { roles: profile?.roles ?? ["etudiant" as const], prefs, counts: { courses, projects, documents }, areas: layout.areas.map((a) => a.key) };
   const modules = OPTIONAL_MODULES.map((m) => {
     const st = moduleState(m, navCtx);
     return { key: m.key, label: m.label, desc: m.desc, ...st, forced: prefs.shown.includes(m.key) || prefs.hidden.includes(m.key), blocked: !!m.needsArea && !navCtx.areas.includes(m.needsArea) };

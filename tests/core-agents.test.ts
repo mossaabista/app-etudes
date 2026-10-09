@@ -31,6 +31,8 @@ describe("route", () => {
     expect(ids("j'ai mangé une salade et bu deux verres d'eau")).toEqual(["nutrition"]);
     expect(ids("Ajoute une séance de muscu samedi à 10 h")[0]).toBe("fitness");
     expect(ids("crée un projet site web et découpe-le en étapes")[0]).toBe("projects");
+    expect(ids("Que dit mon contrat sur les vacances ?")).toEqual(["documents"]);
+    expect(ids("selon mes notes, quand est l'examen final ?")).toEqual(expect.arrayContaining(["documents", "academic"]));
   });
 
   it("coordinates several domains, never more than three", () => {

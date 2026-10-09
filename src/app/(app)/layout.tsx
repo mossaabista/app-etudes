@@ -15,10 +15,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const role = profile?.type ?? "etudiant";
   const roles = profile?.roles ?? [role];
   // Modules show for the roles that need them and for anyone who already has data in them.
-  const [courses, projects, layout] = user
-    ? await Promise.all([prisma.course.count({ where: { userId: user.id } }), prisma.project.count({ where: { userId: user.id } }), getLayout(user.id)])
-    : [0, 0, null];
-  const nav = navKeys({ roles, prefs: profile?.nav ?? { shown: [], hidden: [] }, counts: { courses, projects }, areas: layout?.areas.map((a) => a.key) ?? [] });
+  const [courses, projects, layout, documents] = user
+    ? await Promise.all([prisma.course.count({ where: { userId: user.id } }), prisma.project.count({ where: { userId: user.id } }), getLayout(user.id), prisma.trackerEntry.count({ where: { userId: user.id, module: "app:documents" } })])
+    : [0, 0, null, 0];
+  const nav = navKeys({ roles, prefs: profile?.nav ?? { shown: [], hidden: [] }, counts: { courses, projects, documents }, areas: layout?.areas.map((a) => a.key) ?? [] });
 
   return (
     <div className="flex h-dvh">

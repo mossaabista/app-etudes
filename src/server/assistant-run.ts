@@ -475,7 +475,7 @@ export async function executePlan(userId: string, actions: AssistantAction[], re
           break;
         }
         case "navigate": {
-          if (a.url && /^\/(today|calendar|courses|tasks|settings|syllabus|sync|assessments|labs)(\/[\w-]+){0,2}$/.test(a.url)) {
+          if (a.url && /^\/(today|calendar|courses|tasks|projects|settings|syllabus|sync|assessments|labs|assistant|documents)(\/[\w-]+){0,2}$/.test(a.url)) {
             navigate = a.url;
             ok = true;
           }

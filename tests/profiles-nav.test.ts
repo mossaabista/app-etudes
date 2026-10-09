@@ -34,18 +34,19 @@ describe("sanitizeProfile", () => {
 
 describe("navigation", () => {
   it("gives each role its modules", () => {
-    expect(navKeys(ctx())).toEqual(["today", "assistant", "calendar", "courses", "sectors", "settings"]);
-    expect(navKeys(ctx({ roles: ["pro"] }))).toEqual(["today", "assistant", "calendar", "projects", "sectors", "settings"]);
+    expect(navKeys(ctx())).toEqual(["today", "assistant", "calendar", "courses", "documents", "sectors", "settings"]);
+    expect(navKeys(ctx({ roles: ["pro"] }))).toEqual(["today", "assistant", "calendar", "projects", "documents", "sectors", "settings"]);
     expect(navKeys(ctx({ roles: ["sportif"] }))).toEqual(["today", "assistant", "calendar", "training", "sectors", "settings"]);
     expect(navKeys(ctx({ roles: ["personnel"] }))).toEqual(["today", "assistant", "calendar", "sectors", "settings"]);
   });
 
   it("switching to Professionnel keeps existing courses reachable (test F)", () => {
-    expect(navKeys(ctx({ roles: ["pro"], counts: { courses: 4, projects: 0 } }))).toEqual(["today", "assistant", "calendar", "courses", "projects", "sectors", "settings"]);
+    expect(navKeys(ctx({ roles: ["pro"], counts: { courses: 4, projects: 0 } }))).toEqual(["today", "assistant", "calendar", "courses", "projects", "documents", "sectors", "settings"]);
   });
 
   it("lets the user's own choice win, never over the core entries", () => {
-    expect(navKeys(ctx({ prefs: { shown: ["projects"], hidden: ["courses", "today"] } }))).toEqual(["today", "assistant", "calendar", "projects", "sectors", "settings"]);
+    expect(navKeys(ctx({ prefs: { shown: ["projects"], hidden: ["courses", "today"] } }))).toEqual(["today", "assistant", "calendar", "projects", "documents", "sectors", "settings"]);
+    expect(navKeys(ctx({ roles: ["personnel"], counts: { courses: 0, projects: 0, documents: 2 } }))).toContain("documents");
   });
 
   it("does not offer Training without a health sector", () => {

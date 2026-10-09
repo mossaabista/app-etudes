@@ -1,4 +1,4 @@
-import { Sun, CalendarDays, BookOpen, LayoutGrid, Settings, FolderKanban, Dumbbell, AudioLines, type LucideIcon } from "lucide-react";
+import { Sun, CalendarDays, BookOpen, LayoutGrid, Settings, FolderKanban, Dumbbell, AudioLines, FileText, type LucideIcon } from "lucide-react";
 import type { NavPrefs, ProfileType } from "@/lib/profile";
 
 /**
@@ -18,7 +18,7 @@ export interface NavModule {
   /** Roles that get this module by default. */
   roles?: ProfileType[];
   /** Shown by default to anyone with data of this kind. */
-  data?: "courses" | "projects";
+  data?: "courses" | "projects" | "documents";
   /** Only meaningful when this sector exists in the user's layout. */
   needsArea?: string;
   /** Pages that belong to this entry, so it stays lit on them. */
@@ -42,6 +42,16 @@ export const NAV_MODULES: NavModule[] = [
   },
   { key: "projects", label: "Projets", href: "/projects", icon: FolderKanban, roles: ["pro", "entrepreneur", "freelance"], data: "projects", under: ["/projects"], desc: "Projets, jalons et équipe" },
   { key: "training", label: "Entraînement", href: "/tasks/sante/sport", icon: Dumbbell, roles: ["sportif"], needsArea: "sante", under: ["/tasks/sante/sport"], desc: "Séances et programme" },
+  {
+    key: "documents",
+    label: "Documents",
+    href: "/documents",
+    icon: FileText,
+    roles: ["etudiant", "pro", "entrepreneur", "freelance"],
+    data: "documents",
+    under: ["/documents"],
+    desc: "Fichiers, résumés et réponses sourcées",
+  },
   { key: "sectors", label: "Secteurs", href: "/tasks", icon: LayoutGrid, core: true, under: ["/tasks", "/projects"], desc: "Les domaines de ta vie" },
   { key: "settings", label: "Réglages", href: "/settings", icon: Settings, core: true, under: ["/settings"], desc: "Profil, assistant, données" },
 ];
@@ -51,7 +61,7 @@ export const OPTIONAL_MODULES = NAV_MODULES.filter((m) => !m.core);
 export interface NavContext {
   roles: ProfileType[];
   prefs: NavPrefs;
-  counts: { courses: number; projects: number };
+  counts: { courses: number; projects: number; documents?: number };
   areas: string[];
 }
 
@@ -62,7 +72,7 @@ export function moduleState(m: NavModule, ctx: NavContext): { on: boolean; why: 
   if (ctx.prefs.hidden.includes(m.key)) return { on: false, why: "Masqué par toi" };
   if (ctx.prefs.shown.includes(m.key)) return { on: true, why: "Affiché par toi" };
   if (m.roles?.some((r) => ctx.roles.includes(r))) return { on: true, why: "Pour ton profil" };
-  if (m.data && ctx.counts[m.data] > 0) return { on: true, why: m.data === "courses" ? "Tu as des cours" : "Tu as des projets" };
+  if (m.data && (ctx.counts[m.data] ?? 0) > 0) return { on: true, why: m.data === "courses" ? "Tu as des cours" : m.data === "projects" ? "Tu as des projets" : "Tu as des documents" };
   return { on: false, why: "Pas utile pour ton profil" };
 }
 

@@ -36,7 +36,8 @@ export const OPS = [
 export type Op = (typeof OPS)[number];
 
 /** Slices of the user's data an agent may need in front of it. */
-export type ContextNeed = "agenda" | "academic" | "sectors" | "projects" | "radar";
+/** "documents": the passages of the user's documents that best match the request. */
+export type ContextNeed = "agenda" | "academic" | "sectors" | "projects" | "radar" | "documents";
 
 export interface AgentDef {
   id: string;
@@ -201,6 +202,21 @@ export const AGENTS: AgentDef[] = [
     instructions: [
       "Suivre une habitude ou une lecture : add_section dans le secteur adapté (apprentissage, esprit) avec la bibliothèque si elle existe, sinon une section sur mesure. " + BLOCKS_HELP,
       "Plan de lecture : create_task par étape (chapitres) avec une date si l'utilisateur en donne une.",
+    ],
+    timeoutMs: 30000,
+  },
+  {
+    id: "documents",
+    name: "Documents et connaissances",
+    version: 1,
+    domain: "Questions sur les fichiers de l'utilisateur (syllabus, notes, rapports), avec leurs sources.",
+    triggers: /\b(document|fichier|pdf|selon mes|dans mes notes|mes notes|d'apres|rapport|contrat|que dit|ou est-il ecrit|source|cite)/,
+    tools: ["create_task", "navigate"],
+    needs: ["documents"],
+    instructions: [
+      "Question sur les documents : réponds UNIQUEMENT à partir des extraits DOCUMENTS fournis et cite la source en clair (« d'après syllabus.pdf, page 2 »). Si les extraits ne contiennent pas la réponse, dis-le ; n'invente rien.",
+      "Aucun extrait fourni : dis que tu ne trouves rien dans ses documents et propose la page Documents (navigate /documents).",
+      "Transformer les actions d'un document en tâches : create_task pour chacune, telles qu'écrites dans l'extrait.",
     ],
     timeoutMs: 30000,
   },
