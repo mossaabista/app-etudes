@@ -97,10 +97,9 @@ export async function commandAction(input: string, options?: CommandOptions): Pr
   const user = await requireUser();
   const text = input.trim().slice(0, 300);
   if (!text) return { error: "Dis ou écris ce que tu veux faire." };
-  const meta = await metaCommand(user.id, text);
-  if (meta) return meta;
   const opId = typeof options?.opId === "string" && OP_ID.test(options.opId) ? options.opId : null;
-  return logged(user.id, opId, assistantEnabled() ? "assistant" : "rules", () => runCommand(user.id, text, options));
+  // Answers (history, radar, memory list) leave no trace in the log; changes (« retiens que… ») do.
+  return logged(user.id, opId, assistantEnabled() ? "assistant" : "rules", async () => (await metaCommand(user.id, text)) ?? runCommand(user.id, text, options));
 }
 
 /**

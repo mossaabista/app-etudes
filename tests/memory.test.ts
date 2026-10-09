@@ -31,6 +31,15 @@ describe("assistant memory", () => {
     expect(await listFacts("alice")).toEqual([]);
   });
 
+  it("logs a remembered fact, so « annule ta dernière action » takes it back", async () => {
+    db.agentAction = table([], { unique: ["userId", "opId"] });
+    await commandAction("retiens que je dors tôt", { opId: "op-memory01" });
+    expect(db.agentAction.rows[0]).toMatchObject({ status: "done", summary: expect.stringMatching(/je dors tôt/) });
+    await commandAction("annule ta dernière action");
+    expect(await listFacts("alice")).toEqual([]);
+    delete db.agentAction;
+  });
+
   it("does not store an ordinary sentence", async () => {
     await commandAction("je préfère le sport le soir");
     expect(await listFacts("alice")).toEqual([]);
