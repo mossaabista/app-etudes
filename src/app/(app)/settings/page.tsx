@@ -59,7 +59,7 @@ export default async function SettingsPage() {
         <Card>
           <CardHeader title="Profil et écran du jour" subtitle="Ce que l'app met en avant pour toi" />
           <CardBody>
-            <ProfileSettings current={profile} />
+            <ProfileSettings key={`${profile?.type}:${profile?.roles.join(",")}:${profile?.cards.join(",")}`} current={profile} />
           </CardBody>
         </Card>
 
