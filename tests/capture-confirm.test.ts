@@ -17,43 +17,49 @@ vi.mock("@/server/autonomy", () => ({ getAutonomy: async () => autonomy.value })
 import { commandAction, confirmCommandAction } from "@/server/actions/capture.actions";
 
 const tomorrow = toISODate(addDays(fromISODate(toISODate(new Date()))!, 1));
+const sport = (id: string, userId: string, start: string) => ({
+  id, userId, title: "Sport", type: "Area:sante:sport", date: fromISODate(tomorrow)!, startTime: start, endTime: start, allDay: false, notes: null, courseId: null,
+});
+const alice = () => db.calendarEvent.rows.filter((e) => e.userId === "alice");
 
 beforeEach(() => {
   autonomy.value = { mode: "equilibre", grants: [] };
-  const day = fromISODate(tomorrow)!;
-  db.calendarEvent = table([
-    { id: "s1", userId: "alice", title: "Sport", type: "Area:sante:sport", date: day, startTime: "10:00", endTime: "11:00", allDay: false, notes: null, courseId: null },
-    { id: "s2", userId: "alice", title: "Sport", type: "Area:sante:sport", date: day, startTime: "18:00", endTime: "19:00", allDay: false, notes: null, courseId: null },
-    { id: "b1", userId: "bob", title: "Sport", type: "Area:sante:sport", date: day, startTime: "10:00", endTime: "11:00", allDay: false, notes: null, courseId: null },
-  ]);
+  db.calendarEvent = table([sport("s1", "alice", "10:00"), sport("s2", "alice", "18:00"), sport("b1", "bob", "10:00")]);
   db.task = table();
 });
 
 describe("deleting through the rule-based parser", () => {
-  it("asks before deleting several events, then deletes exactly those once confirmed", async () => {
+  it("deletes what was asked straight away, with an undo", async () => {
     const r = await commandAction("supprime les séances de sport de demain");
-    expect("confirm" in r).toBe(true);
-    if (!("confirm" in r)) return;
-    expect(r.confirm.risk).toBe("high");
-    expect(r.confirm.items).toHaveLength(2);
-    expect(db.calendarEvent.rows).toHaveLength(3);
+    expect(r).toMatchObject({ ok: true, undo: expect.anything() });
+    expect(db.calendarEvent.rows.map((e) => e.id)).toEqual(["b1"]);
+  });
 
-    const done = await confirmCommandAction(r.confirm.token);
-    expect(done).toMatchObject({ ok: true });
+  it("asks before deleting more than ten events, then deletes exactly those once confirmed", async () => {
+    for (let i = 0; i < 10; i++) db.calendarEvent.rows.push(sport(`x${i}`, "alice", `0${i}:30`));
+    const r = await commandAction("supprime les séances de sport de demain");
+    if (!("confirm" in r)) throw new Error("expected a confirmation");
+    expect(r.confirm.risk).toBe("high");
+    expect(r.confirm.items).toHaveLength(12);
+    expect(alice()).toHaveLength(12);
+
+    expect(await confirmCommandAction(r.confirm.token)).toMatchObject({ ok: true });
     expect(db.calendarEvent.rows.map((e) => e.id)).toEqual(["b1"]);
   });
 
   it("says so honestly when what was confirmed is already gone", async () => {
+    for (let i = 0; i < 10; i++) db.calendarEvent.rows.push(sport(`x${i}`, "alice", `0${i}:30`));
     const r = await commandAction("supprime les séances de sport de demain");
     if (!("confirm" in r)) throw new Error("expected a confirmation");
-    db.calendarEvent.rows.splice(0, 2);
+    const rows = db.calendarEvent.rows;
+    rows.splice(0, rows.length, ...rows.filter((e) => e.userId !== "alice"));
     expect(await confirmCommandAction(r.confirm.token)).toEqual({ error: expect.stringMatching(/rien n'a été supprimé/) });
   });
 
-  it("deletes a single event straight away when the user allowed it", async () => {
-    autonomy.value = { mode: "autonome", grants: ["deletes"] };
+  it("asks before any deletion in prudent mode", async () => {
+    autonomy.value = { mode: "prudent", grants: [] };
     const r = await commandAction("supprime le sport de demain à 18h");
-    expect(r).toMatchObject({ ok: true });
-    expect(db.calendarEvent.rows.map((e) => e.id)).toEqual(["s1", "b1"]);
+    expect("confirm" in r).toBe(true);
+    expect(alice()).toHaveLength(2);
   });
 });

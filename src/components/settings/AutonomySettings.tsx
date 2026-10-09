@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { ShieldCheck } from "lucide-react";
 import { saveAutonomyAction } from "@/server/actions/autonomy.actions";
-import { GRANTS, MODES, type Autonomy, type Grant } from "@/lib/risk";
+import { GRANTS, MASS_DELETE, MODES, type Autonomy, type Grant } from "@/lib/risk";
 
 /** How much the assistant may do on its own: one of three modes, plus explicit grants. */
 export function AutonomySettings({ current }: { current: Autonomy }) {
@@ -56,7 +56,9 @@ export function AutonomySettings({ current }: { current: Autonomy }) {
           ))}
         </div>
       )}
-      <p className="text-xs text-[var(--ink-faint)]">Plusieurs suppressions d&apos;un coup demandent toujours ton accord, quel que soit le mode.</p>
+      <p className="text-xs text-[var(--ink-faint)]">
+        Plus de {MASS_DELETE} suppressions d&apos;un coup, ou une action impossible à annuler, demandent toujours ton accord, quel que soit le mode.
+      </p>
       <p role="status" aria-live="polite" className={`min-h-[1rem] text-xs ${status?.error ? "text-[#ffb3a3]" : "text-[var(--ink-dim)]"}`}>
         {pending ? "Enregistrement…" : status?.text}
       </p>

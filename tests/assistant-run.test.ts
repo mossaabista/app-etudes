@@ -4,7 +4,7 @@ import type { AssistantAction } from "@/server/assistant";
 
 const db = vi.hoisted(() => ({}) as Record<string, ReturnType<typeof import("./fake-db").table>>);
 const ask = vi.hoisted(() => ({ plan: { actions: [] as unknown[], reply: "" }, ids: [] as string[] }));
-const autonomy = vi.hoisted(() => ({ value: { mode: "autonome", grants: ["plans", "sectors", "deletes", "batches"] } as { mode: string; grants: string[] } }));
+const autonomy = vi.hoisted(() => ({ value: { mode: "equilibre", grants: [] } as { mode: string; grants: string[] } }));
 vi.mock("@/lib/db", () => ({ prisma: db }));
 const ctx = () => ({ text: "", ids: new Set(ask.ids), assessmentIds: new Set<string>(), labels: new Map(ask.ids.map((id) => [id, `titre de ${id}`])) });
 vi.mock("@/server/assistant", () => ({
@@ -35,7 +35,7 @@ beforeEach(() => {
   db.task = table();
   db.course = table();
   ask.ids = [];
-  autonomy.value = { mode: "autonome", grants: ["plans", "sectors", "deletes", "batches"] };
+  autonomy.value = { mode: "equilibre", grants: [] };
 });
 
 describe("runAssistant", () => {
@@ -136,45 +136,42 @@ describe("receipt", () => {
   });
 });
 
-describe("confirmation before risky work", () => {
+describe("confirmation before large work", () => {
+  const N = 11;
   beforeEach(() => {
     autonomy.value = { mode: "equilibre", grants: [] };
-    db.calendarEvent.rows.push(
-      { id: "a1", userId: "alice", title: "Sport", date: new Date(), startTime: "10:00", endTime: "11:00", type: "Area:sante:sport" },
-      { id: "a2", userId: "alice", title: "Sport bis", date: new Date(), startTime: "18:00", endTime: "19:00", type: "Area:sante:sport" }
-    );
-    ask.ids = ["e:a1", "e:a2"];
+    for (let i = 0; i < N; i++) db.calendarEvent.rows.push({ id: `a${i}`, userId: "alice", title: `Sport ${i}`, date: new Date(), startTime: "10:00", endTime: "11:00", type: "Area:sante:sport" });
+    ask.ids = Array.from({ length: N }, (_, i) => `e:a${i}`);
   });
 
-  it("asks before deleting two events and changes nothing", async () => {
-    plan("J'ai supprimé tes deux séances.", { op: "delete", id: "e:a1" }, { op: "delete", id: "e:a2" });
+  it("deletes a few events straight away, with an undo", async () => {
+    plan("", { op: "delete", id: "e:a0" }, { op: "delete", id: "e:a1" });
     const r = await ask_("alice", "je ne fais plus de sport aujourd'hui", "/today", []);
-    expect(r && "confirm" in r).toBe(true);
-    if (!r || !("confirm" in r)) return;
+    expect(r && "undos" in r && r.undos).toHaveLength(2);
+    expect(db.calendarEvent.rows.filter((e) => e.userId === "alice")).toHaveLength(N - 2);
+  });
+
+  it("asks before deleting more than ten events and changes nothing", async () => {
+    plan("J'ai tout supprimé.", ...ask.ids.map((id) => ({ op: "delete" as const, id })));
+    const r = await ask_("alice", "supprime tout", "/today", []);
+    if (!r || !("confirm" in r)) throw new Error("expected a confirmation");
     expect(r.confirm.risk).toBe("high");
-    expect(r.confirm.items).toEqual(["supprimer « titre de e:a1 »", "supprimer « titre de e:a2 »"]);
-    expect(db.calendarEvent.rows.filter((e) => e.userId === "alice")).toHaveLength(2);
+    expect(r.confirm.items[0]).toBe("supprimer « titre de e:a0 »");
+    expect(db.calendarEvent.rows.filter((e) => e.userId === "alice")).toHaveLength(N);
 
     // Confirmed: the same plan runs, through the same checks.
     const opened = openPending("alice", r.confirm.token);
-    expect("work" in opened).toBe(true);
-    if (!("work" in opened) || opened.work.kind !== "plan") return;
+    if (!("work" in opened) || opened.work.kind !== "plan") throw new Error("expected a plan");
     const done = await runConfirmedPlan("alice", opened.work);
     expect(done.partial).toBe(false);
     expect(db.calendarEvent.rows.filter((e) => e.userId === "alice")).toHaveLength(0);
   });
 
   it("does not let someone else confirm it", async () => {
-    plan("", { op: "delete", id: "e:a1" }, { op: "delete", id: "e:a2" });
+    plan("", ...ask.ids.map((id) => ({ op: "delete" as const, id })));
     const r = await ask_("alice", "…", "/today", []);
     if (!r || !("confirm" in r)) throw new Error("expected a confirmation");
     expect(openPending("bob", r.confirm.token)).toEqual({ error: expect.any(String) });
-  });
-
-  it("runs a simple addition straight away in balanced mode", async () => {
-    plan("", { op: "create_task", title: "Lire" });
-    const r = await ask_("alice", "…", "/today", []);
-    expect(r && "undos" in r && r.undos).toHaveLength(1);
   });
 
   it("asks before any change in prudent mode", async () => {

@@ -1,13 +1,16 @@
 /**
- * How much the assistant may do on its own. Every action it proposes gets a risk level;
- * the user's autonomy mode decides which levels run straight away and which wait for a
- * yes. Pure functions: the server applies them, the settings page explains them.
+ * How much the assistant may do on its own. What the user asks for explicitly runs
+ * straight away — additions, changes, deletions — and stays undoable from the
+ * confirmation. It stops to ask only before work that is large or cannot be taken back:
+ * a mass deletion, a request that changes many things at once, a plan spread over all
+ * upcoming assessments. Pure functions: the server applies them, the settings page
+ * explains them.
  */
 
 export type Risk = "none" | "low" | "medium" | "high";
 export type AutonomyMode = "prudent" | "equilibre" | "autonome";
-/** Kinds of medium-risk work the user can let run without asking, in autonomous mode. */
-export type Grant = "plans" | "sectors" | "deletes" | "batches";
+/** Kinds of large work the user can let run without asking, in autonomous mode. */
+export type Grant = "plans" | "batches";
 
 export interface Autonomy {
   mode: AutonomyMode;
@@ -16,36 +19,39 @@ export interface Autonomy {
 
 export const DEFAULT_AUTONOMY: Autonomy = { mode: "equilibre", grants: [] };
 
+/** More deletions than this in one request is a mass deletion: always confirmed. */
+export const MASS_DELETE = 10;
+/** More changes than this in one request is a batch. */
+export const BATCH_SIZE = 10;
+
 export const MODES: { mode: AutonomyMode; label: string; desc: string }[] = [
   { mode: "prudent", label: "Prudent", desc: "Je te montre chaque modification et j'attends ton accord avant de la faire." },
-  { mode: "equilibre", label: "Équilibré", desc: "Je fais directement les petites choses claires (ajouter, déplacer, cocher). Je te demande avant un plan, une suppression ou un lot." },
-  { mode: "autonome", label: "Autonome", desc: "Je fais aussi sans demander ce que tu m'autorises ci-dessous. Les suppressions en masse demandent toujours ton accord." },
+  {
+    mode: "equilibre",
+    label: "Direct",
+    desc: `Je fais tout de suite ce que tu demandes — ajouter, modifier, supprimer — avec un bouton Annuler. Je te demande seulement avant plus de ${BATCH_SIZE} changements d'un coup ou un plan sur toutes tes évaluations.`,
+  },
+  { mode: "autonome", label: "Autonome", desc: "Comme Direct, et je fais aussi sans demander les gros lots que tu autorises ci-dessous." },
 ];
 
 export const GRANTS: { grant: Grant; label: string }[] = [
-  { grant: "plans", label: "Planifier ma journée ou mes révisions" },
-  { grant: "sectors", label: "Créer, masquer ou réorganiser mes secteurs" },
-  { grant: "deletes", label: "Supprimer un élément à la fois" },
-  { grant: "batches", label: "Faire plusieurs ajouts d'un coup (plus de 5)" },
+  { grant: "plans", label: "Planifier les révisions de toutes mes évaluations" },
+  { grant: "batches", label: `Faire plus de ${BATCH_SIZE} changements d'un coup` },
 ];
 
 /** What the risk rules need to know about an action. */
 export interface RiskInput {
   op: string;
-  sections?: unknown[];
+  assessment_ids?: unknown[];
 }
 
-/** Above this many changes in one request, it is a batch. */
-export const BATCH_SIZE = 5;
-
 const READ_ONLY = new Set(["navigate"]);
-const MEDIUM: Record<string, Grant> = {
-  plan_day: "plans",
-  plan_revision: "plans",
-  remove_area: "sectors",
-  remove_section: "sectors",
-  delete: "deletes",
-};
+/**
+ * Operations that cannot be taken back: always confirmed, whatever the mode. None of the
+ * assistant's current operations is in this set — each one comes with its undo — but a
+ * future one (sending a message, sharing outside the app) must be listed here.
+ */
+export const IRREVERSIBLE = new Set<string>([]);
 
 export interface RiskVerdict {
   risk: Risk;
@@ -55,46 +61,28 @@ export interface RiskVerdict {
   reasons: string[];
 }
 
-/** Rate one action on its own. */
-export function actionRisk(a: RiskInput): { risk: Risk; grant: Grant | null } {
-  if (READ_ONLY.has(a.op)) return { risk: "none", grant: null };
-  if (MEDIUM[a.op]) return { risk: "medium", grant: MEDIUM[a.op] };
-  // A sector created with its sections already inside is a structure, not one folder.
-  if (a.op === "add_area" && Array.isArray(a.sections) && a.sections.length > 0) return { risk: "medium", grant: "sectors" };
-  return { risk: "low", grant: null };
-}
-
-const REASONS: Record<Grant, string> = {
-  plans: "Ça ajoute plusieurs blocs à ton calendrier.",
-  sectors: "Ça change l'organisation de tes secteurs.",
-  deletes: "Ça supprime un élément.",
-  batches: "Ça fait beaucoup de changements d'un coup.",
-};
+/** A revision plan over every upcoming assessment can fill weeks of calendar. */
+const isLargePlan = (a: RiskInput) => a.op === "plan_revision" && !(Array.isArray(a.assessment_ids) && a.assessment_ids.length > 0);
 
 /** Rate a whole request and decide, for this user's settings, whether to ask first. */
 export function assessRisk(actions: RiskInput[], autonomy: Autonomy = DEFAULT_AUTONOMY): RiskVerdict {
-  const rated = actions.map(actionRisk);
-  const writes = rated.filter((r) => r.risk !== "none");
+  const writes = actions.filter((a) => !READ_ONLY.has(a.op));
   const deletes = actions.filter((a) => a.op === "delete").length;
-  const needed = new Set<Grant>(rated.flatMap((r) => (r.risk === "medium" && r.grant ? [r.grant] : [])));
-  if (writes.length > BATCH_SIZE) needed.add("batches");
+  const irreversible = actions.filter((a) => IRREVERSIBLE.has(a.op));
 
-  const reasons: string[] = [];
-  // Never on autopilot, whatever the mode: several deletions at once.
-  if (deletes > 1) {
-    reasons.push(`Ça supprime ${deletes} éléments.`);
-    return { risk: "high", confirm: true, reasons };
-  }
-  const risk: Risk = needed.size ? "medium" : writes.length ? "low" : "none";
-  for (const g of needed) reasons.push(REASONS[g]);
+  // Never on autopilot, whatever the mode.
+  if (deletes > MASS_DELETE) return { risk: "high", confirm: true, reasons: [`Ça supprime ${deletes} éléments d'un coup.`] };
+  if (irreversible.length) return { risk: "high", confirm: true, reasons: ["Ça ne pourra pas être annulé."] };
 
-  if (!writes.length) return { risk, confirm: false, reasons };
-  if (autonomy.mode === "prudent") return { risk, confirm: true, reasons: reasons.length ? reasons : ["Tu as choisi le mode prudent."] };
-  if (autonomy.mode === "autonome") {
-    const missing = [...needed].filter((g) => !autonomy.grants.includes(g));
-    return { risk, confirm: missing.length > 0, reasons: missing.map((g) => REASONS[g]) };
-  }
-  return { risk, confirm: needed.size > 0, reasons };
+  const needed: { grant: Grant; reason: string }[] = [];
+  if (actions.some(isLargePlan)) needed.push({ grant: "plans", reason: "Ça planifie des révisions pour toutes tes évaluations à venir." });
+  if (writes.length > BATCH_SIZE) needed.push({ grant: "batches", reason: `Ça fait ${writes.length} changements d'un coup.` });
+
+  const risk: Risk = needed.length ? "medium" : writes.length ? "low" : "none";
+  if (!writes.length) return { risk, confirm: false, reasons: [] };
+  if (autonomy.mode === "prudent") return { risk, confirm: true, reasons: needed.length ? needed.map((n) => n.reason) : ["Tu as choisi le mode prudent."] };
+  const missing = autonomy.mode === "autonome" ? needed.filter((n) => !autonomy.grants.includes(n.grant)) : needed;
+  return { risk, confirm: missing.length > 0, reasons: missing.map((n) => n.reason) };
 }
 
 /** Read stored settings defensively: anything unknown falls back to the default. */

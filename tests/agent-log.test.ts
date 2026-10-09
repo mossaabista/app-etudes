@@ -40,10 +40,8 @@ describe("with the log table", () => {
 
   it("runs a confirmation only once, even if confirmed twice", async () => {
     const day = fromISODate(tomorrow)!;
-    db.calendarEvent!.rows.push(
-      { id: "s1", userId: "alice", title: "Sport", type: "Area:sante:sport", date: day, startTime: "10:00", endTime: "11:00", allDay: false, notes: null, courseId: null },
-      { id: "s2", userId: "alice", title: "Sport", type: "Area:sante:sport", date: day, startTime: "18:00", endTime: "19:00", allDay: false, notes: null, courseId: null }
-    );
+    for (let i = 0; i < 11; i++)
+      db.calendarEvent!.rows.push({ id: `s${i}`, userId: "alice", title: "Sport", type: "Area:sante:sport", date: day, startTime: `0${i % 10}:00`, endTime: "11:00", allDay: false, notes: null, courseId: null });
     const r = await commandAction("supprime les séances de sport de demain");
     if (!("confirm" in r)) throw new Error("expected a confirmation");
     expect(await confirmCommandAction(r.confirm.token)).toMatchObject({ ok: true, undo: expect.anything() });

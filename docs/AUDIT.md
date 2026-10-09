@@ -79,20 +79,24 @@ Aucune migration ni modification de données ; aucun changement visuel hors du t
 
 ### Confirmation selon le risque (sans changement de schéma)
 
-- `src/lib/risk.ts` : chaque action proposée reçoit un niveau de risque.
-  - **Faible** : ajouter, déplacer, renommer, cocher, noter, créer un cours ou une section.
-  - **Moyen** : planifier une journée ou des révisions, masquer un secteur ou une section, créer un secteur avec des sections, supprimer un élément, plus de 5 modifications d'un coup.
-  - **Élevé** : plusieurs suppressions à la fois.
-- Trois modes, choisis dans **Réglages → Assistant** :
-  - **Prudent** : demande avant toute modification.
-  - **Équilibré** (par défaut) : demande avant tout risque moyen ou élevé.
-  - **Autonome** : n'exécute sans demander que les catégories cochées (plans, secteurs, suppressions unitaires, lots), révocables à tout moment.
-  - **Plusieurs suppressions demandent toujours confirmation**, quel que soit le mode.
+Règle produit (révisée) : **ce que l'utilisateur demande explicitement s'exécute tout de suite**, y compris les suppressions et modifications, avec le bouton Annuler. L'assistant ne s'arrête pour demander que dans trois cas :
+
+- **suppression massive** : plus de 10 éléments d'un coup — toujours confirmée, quel que soit le mode ;
+- **grosse modification** : plus de 10 changements dans une même demande, ou un plan de révision sur *toutes* les évaluations à venir ;
+- **action irréversible** : ensemble `IRREVERSIBLE` dans `src/lib/risk.ts`, vide aujourd'hui car chaque opération de l'assistant a son annulation. Une future opération sans retour possible (envoi, partage externe) devra y être ajoutée.
+
+Les trois modes, choisis dans **Réglages → Assistant** :
+
+- **Direct** (par défaut) : applique la règle ci-dessus.
+- **Prudent** : demande avant toute modification.
+- **Autonome** : comme Direct, mais exécute aussi sans demander les gros lots ou plans cochés. Ces autorisations sont révocables.
+
+Fonctionnement de la confirmation :
+
 - Quand une confirmation est nécessaire, **rien n'est modifié**. L'assistant affiche la liste des changements, la raison de la demande, et les boutons « Confirmer » ou « Ne rien faire ».
-  - La proposition voyage dans un jeton signé (HMAC, lié à l'utilisateur, valable 10 min, `src/server/pending.ts`).
-  - À la confirmation, le plan est ré-exécuté sur des données fraîches, avec toutes les vérifications habituelles.
-- Le parseur à règles (sans clé API) applique les mêmes règles aux suppressions : texte, voix, avec ou sans IA se comportent pareil.
-- **Changement de comportement visible** : en mode équilibré, « supprime le dentiste de mardi » demande désormais une confirmation. Pour l'éviter, passe en mode autonome et coche « Supprimer un élément à la fois ».
+- La proposition voyage dans un jeton signé (HMAC, lié à l'utilisateur, valable 10 min, `src/server/pending.ts`).
+- À la confirmation, elle est ré-exécutée sur des données fraîches, avec toutes les vérifications.
+- Le parseur à règles (sans clé API) applique les mêmes seuils.
 
 ### Journal de l'agent (`AgentAction`)
 
