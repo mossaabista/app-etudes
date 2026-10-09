@@ -65,6 +65,8 @@ export interface AssistantResult {
 /** What the user is asked before anything risky runs. */
 export interface Confirmation {
   token: string;
+  /** The operation id sealed in the token, so the browser can refer to it once done. */
+  opId: string;
   risk: Risk;
   /** The changes that would be made, in words. */
   items: string[];
@@ -90,8 +92,9 @@ export async function runAssistant(userId: string, text: string, page: string, h
   const verdict = assessRisk(actions, await getAutonomy(userId));
   if (verdict.confirm) {
     const items = actions.filter((a) => a.op !== "navigate").map((a) => describeAction(a, r.ctx.labels));
-    const token = sealPending(userId, { kind: "plan", actions, reply: r.plan.reply, page, opId: newOpId() });
-    return { confirm: { token, risk: verdict.risk, items, reasons: verdict.reasons, reply: r.plan.reply } };
+    const opId = newOpId();
+    const token = sealPending(userId, { kind: "plan", actions, reply: r.plan.reply, page, opId });
+    return { confirm: { token, opId, risk: verdict.risk, items, reasons: verdict.reasons, reply: r.plan.reply } };
   }
   return executePlan(userId, actions, r.plan.reply, r.ctx);
 }

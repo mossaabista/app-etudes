@@ -65,7 +65,13 @@ interface Toast {
   text: string;
   undo: Undo | null;
   error?: boolean;
+  /** The submission this confirms, so undoing it is also recorded in the log. */
+  opId?: string;
 }
+
+/** One id per submission: the server runs the same id only once. */
+const newOpId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `op-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 /**
  * The gold "+" on every page, and the microphone above it. Say or type what you want in
@@ -172,7 +178,7 @@ export function QuickCapture() {
   }, [toast]);
 
   const handle = useCallback(
-    (res: CommandResult, sentence: string, viaVoice: boolean) => {
+    (res: CommandResult, sentence: string, viaVoice: boolean, opId?: string) => {
         if ("confirm" in res) {
           setChoices(null);
           setConfirm({ sentence, c: res.confirm });
@@ -200,7 +206,7 @@ export function QuickCapture() {
           setText("");
           return;
         }
-        setToast({ text: res.message, undo: res.undo, error: !!res.partial });
+        setToast({ text: res.message, undo: res.undo, error: !!res.partial, opId });
         setText("");
         setSection(null);
         setOpen(false);
@@ -214,8 +220,10 @@ export function QuickCapture() {
       const [a, s] = (section ?? "").split(":");
       expectLanding(15000);
       setConfirm(null);
+      const opId = newOpId();
       start(async () => {
         const res = await commandAction(sentence, {
+          opId,
           ...(section ? { area: a, sub: s } : {}),
           ...(pick ? { pick: { kind: pick.kind, id: pick.id } } : {}),
           page: pathname,
@@ -223,7 +231,7 @@ export function QuickCapture() {
         });
         const viaVoice = spoken.current;
         spoken.current = false;
-        handle(res, sentence, viaVoice);
+        handle(res, sentence, viaVoice, opId);
       });
     },
     [section, pathname, handle]
@@ -234,15 +242,16 @@ export function QuickCapture() {
     const { sentence, c } = confirm;
     expectLanding(15000);
     start(async () => {
-      handle(await confirmCommandAction(c.token), sentence, false);
+      handle(await confirmCommandAction(c.token), sentence, false, c.opId);
     });
   };
 
   const undo = () => {
     if (!toast?.undo) return;
     const u = toast.undo;
+    const opId = toast.opId;
     start(async () => {
-      const { missed } = await undoCommandAction(u);
+      const { missed } = await undoCommandAction(u, opId);
       setToast(
         missed
           ? { text: `Annulé en partie : ${missed} élément${missed > 1 ? "s avaient" : " avait"} déjà changé ou disparu.`, undo: null, error: true }

@@ -12,6 +12,7 @@ import { runAssistant, runConfirmedPlan, type Confirmation } from "@/server/assi
 import { assessRisk } from "@/lib/risk";
 import { getAutonomy } from "@/server/autonomy";
 import { newOpId, openPending, sealPending } from "@/server/pending";
+import { claim, findOp, markUndone, recentActions, settle } from "@/server/agent-log";
 import { saveLayout, LAYOUT_MODULE } from "@/server/layout";
 import type { Layout } from "@/lib/layout";
 import { briefing } from "@/server/briefing";
@@ -75,13 +76,82 @@ const atWall = (day: string, time: string) => {
  * (or a deadline) otherwise, never both — or acts on what is already planned: move,
  * delete, rename. Every change comes back with what is needed to undo it.
  */
-export async function commandAction(
-  input: string,
-  options?: { area?: string; sub?: string; pick?: { kind: "event" | "task"; id: string }; page?: string; history?: Turn[] }
-): Promise<CommandResult> {
+type CommandOptions = {
+  area?: string;
+  sub?: string;
+  pick?: { kind: "event" | "task"; id: string };
+  page?: string;
+  history?: Turn[];
+  /** One id per submission, made by the browser: the same submission twice runs once. */
+  opId?: string;
+};
+
+const OP_ID = /^[\w-]{8,64}$/;
+
+export async function commandAction(input: string, options?: CommandOptions): Promise<CommandResult> {
   const user = await requireUser();
   const text = input.trim().slice(0, 300);
   if (!text) return { error: "Dis ou écris ce que tu veux faire." };
+  const meta = await metaCommand(user.id, text);
+  if (meta) return meta;
+  const opId = typeof options?.opId === "string" && OP_ID.test(options.opId) ? options.opId : null;
+  return logged(user.id, opId, assistantEnabled() ? "assistant" : "rules", () => runCommand(user.id, text, options));
+}
+
+/**
+ * Run an operation once per id, and record what it changed. Without an id, or without
+ * the log table, it simply runs.
+ */
+async function logged(userId: string, opId: string | null, source: string, work: () => Promise<CommandResult>): Promise<CommandResult> {
+  const claimed = opId ? await claim(userId, opId, source) : "unavailable";
+  if (claimed === "duplicate") {
+    const first = await findOp(userId, opId!);
+    if (!first || first.status === "running") return { error: "Cette demande est déjà en cours." };
+    return { ok: true, message: `Déjà fait : ${first.summary}`, undo: null, answer: true };
+  }
+  const res = await work();
+  if (claimed === "claimed") {
+    const changed = "ok" in res && !!res.undo;
+    await settle(userId, opId!, { changed, partial: "ok" in res && !!res.partial, summary: "ok" in res ? res.message : "", undo: "ok" in res ? res.undo : null });
+  }
+  return res;
+}
+
+const HISTORY = /(qu'?est-ce que tu as|qu'?as-tu|qu'?est-ce qui a|what did you|what have you) (change|fait|modifie|ete change|ete modifie|do|done|changed)|historique (de l'assistant|des actions)/;
+const UNDO_LAST = /^(stp |s'il te plait )?(annule|defais|undo) (ta|la|ma|mon|ton|le) (derniere|dernier|last) ?(action|modification|changement|commande|change)?\b|annule ce que tu (viens de faire|as fait)/;
+const hhmm24 = (d: Date) => hhmm(d).replace(":", " h ");
+
+/** "Qu'as-tu changé ?" and "annule ta dernière action": answered from the log, not the model. */
+async function metaCommand(userId: string, text: string): Promise<CommandResult | null> {
+  const f = fold(text).replace(/[’]/g, "'").replace(/[?!.]+$/, "").trim();
+  if (HISTORY.test(f)) {
+    const rows = await recentActions(userId, 5);
+    if (!rows) return { ok: true, answer: true, undo: null, message: "L'historique de l'assistant n'est pas encore activé sur ce serveur : je ne peux pas te dire ce que j'ai changé avant cette session." };
+    if (!rows.length) return { ok: true, answer: true, undo: null, message: "Je n'ai encore rien modifié pour toi." };
+    const lines = rows.map((r) => `${toISODate(r.createdAt) === toISODate(new Date()) ? "Aujourd'hui" : dayWords(toISODate(r.createdAt))} à ${hhmm24(r.createdAt)} : ${r.summary}${r.status === "undone" ? " (annulé)" : r.status === "partial" ? " (en partie)" : ""}`);
+    return { ok: true, answer: true, undo: null, message: `Mes dernières modifications. ${lines.join(" ")}` };
+  }
+  if (UNDO_LAST.test(f)) {
+    const rows = await recentActions(userId, 10);
+    if (!rows) return { error: "L'historique de l'assistant n'est pas encore activé sur ce serveur : utilise le bouton Annuler juste après une modification." };
+    const day = 24 * 60 * 60 * 1000;
+    const last = rows.find((r) => r.status !== "undone" && r.undo && Date.now() - r.createdAt.getTime() < day);
+    if (!last) return { error: "Je ne trouve aucune modification récente que je peux annuler." };
+    const missed = await revert(userId, last.undo!);
+    await markUndone(userId, { id: last.id });
+    done();
+    return {
+      ok: true,
+      undo: null,
+      partial: missed > 0,
+      message: missed ? `Annulé en partie (${missed} élément${missed > 1 ? "s avaient" : " avait"} déjà changé) : ${last.summary}` : `J'ai annulé : ${last.summary}`,
+    };
+  }
+  return null;
+}
+
+async function runCommand(userId: string, text: string, options?: CommandOptions): Promise<CommandResult> {
+  const user = { id: userId };
   const today = toISODate(new Date());
 
   // With an API key, Claude reads the sentence against the agenda; the rules are the fallback.
@@ -173,8 +243,9 @@ async function runOne(
   if (intent.kind === "delete" && !options?.only) {
     const verdict = assessRisk(chosen.map(() => ({ op: "delete" })), await getAutonomy(userId));
     if (verdict.confirm) {
-      const token = sealPending(userId, { kind: "rules", text, only: chosen.map((c) => ({ kind: c.kind, id: c.id })), opId: newOpId() });
-      return { confirm: { token, risk: verdict.risk, items: chosen.map((c) => `supprimer « ${c.title} »`), reasons: verdict.reasons, reply: "" } };
+      const opId = newOpId();
+      const token = sealPending(userId, { kind: "rules", text, only: chosen.map((c) => ({ kind: c.kind, id: c.id })), opId });
+      return { confirm: { token, opId, risk: verdict.risk, items: chosen.map((c) => `supprimer « ${c.title} »`), reasons: verdict.reasons, reply: "" } };
     }
   }
 
@@ -277,13 +348,17 @@ export async function confirmCommandAction(token: string): Promise<CommandResult
   const opened = openPending(user.id, token);
   if ("error" in opened) return { error: opened.error };
   const work = opened.work;
-  if (work.kind === "plan") {
-    const r = await runConfirmedPlan(user.id, work);
-    if (r.undos.length) done();
-    return { ok: true, message: r.message, undo: r.undos.length ? (r.undos.length === 1 ? r.undos[0] : { t: "many", list: r.undos }) : null, answer: r.answer, navigate: r.navigate, partial: r.partial };
-  }
-  const only = (Array.isArray(work.only) ? work.only : []).filter((o) => (o.kind === "event" || o.kind === "task") && typeof o.id === "string").slice(0, 50);
-  return runOne(user.id, work.text, parseIntent(work.text), toISODate(new Date()), { only });
+  // The token carries its own id: confirming twice (double tap, replay) runs it once.
+  const opId = typeof work.opId === "string" && OP_ID.test(work.opId) ? work.opId : null;
+  return logged(user.id, opId, "confirmed", async () => {
+    if (work.kind === "plan") {
+      const r = await runConfirmedPlan(user.id, work);
+      if (r.undos.length) done();
+      return { ok: true, message: r.message, undo: r.undos.length ? (r.undos.length === 1 ? r.undos[0] : { t: "many", list: r.undos }) : null, answer: r.answer, navigate: r.navigate, partial: r.partial };
+    }
+    const only = (Array.isArray(work.only) ? work.only : []).filter((o) => (o.kind === "event" || o.kind === "task") && typeof o.id === "string").slice(0, 50);
+    return runOne(user.id, work.text, parseIntent(work.text), toISODate(new Date()), { only });
+  });
 }
 
 function done() {
@@ -295,9 +370,10 @@ function done() {
  * rows. `missed` counts the steps that could not be put back (the row is gone, or a course
  * already holds something), so the user is never told "undone" when it was not.
  */
-export async function undoCommandAction(undo: Undo): Promise<{ ok: true; missed: number }> {
+export async function undoCommandAction(undo: Undo, opId?: string): Promise<{ ok: true; missed: number }> {
   const user = await requireUser();
   const missed = await revert(user.id, undo);
+  if (opId && OP_ID.test(opId)) await markUndone(user.id, { opId });
   done();
   return { ok: true, missed };
 }
