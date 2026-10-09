@@ -5,6 +5,7 @@ const db = vi.hoisted(() => ({}) as Record<string, ReturnType<typeof import("./f
 vi.mock("@/lib/db", () => ({ prisma: db }));
 
 import { briefing } from "@/server/briefing";
+import { parseIntent } from "@/lib/command";
 import { addDays, fromISODate, toISODate, wallTimeToUtc } from "@/lib/dates";
 
 const today = toISODate(new Date());
@@ -46,5 +47,15 @@ describe("Test 1 — « qu'est-ce que j'ai aujourd'hui ? »", () => {
     expect(text).toMatch(/^Demain/);
     expect(text).toMatch(/Cinéma demain/);
     expect(text).not.toMatch(/Dentiste/);
+  });
+
+  it("speaks English to an English-speaking user, and understands the question in English", async () => {
+    expect(parseIntent("What do I have today?").kind).toBe("summary");
+    expect(parseIntent("what's on tomorrow").kind).toBe("summary");
+    expect(parseIntent("ajoute réviser demain").kind).toBe("create");
+    const text = await briefing("alice", "what do I have tomorrow?", "en");
+    expect(text).toMatch(/^Tomorrow, /);
+    expect(text).toMatch(/Cinéma demain at 20:00/);
+    expect(text).not.toMatch(/Demain|À faire|Au programme/);
   });
 });

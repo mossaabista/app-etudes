@@ -24,7 +24,22 @@ export interface UserSettings {
   jarvis: { voice: boolean; rate: number; style: ReplyStyle };
   notifications: { morning: string | null; evening: string | null; deadlines: boolean; muted: string[] };
   plan: Plan;
+  /** What the user told us at onboarding: lets Jarvis and its agents start from the right place. */
+  about: About;
 }
+
+export interface About {
+  university: string | null;
+  program: string | null;
+  sports: string[];
+  level: "beginner" | "intermediate" | "advanced" | null;
+  goal: string | null;
+  workStart: string | null;
+  workEnd: string | null;
+  team: boolean | null;
+}
+
+export const NO_ABOUT: About = { university: null, program: null, sports: [], level: null, goal: null, workStart: null, workEnd: null, team: null };
 
 export const DEFAULT_SETTINGS: UserSettings = {
   locale: DEFAULT_LOCALE,
@@ -37,6 +52,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   jarvis: { voice: true, rate: 1, style: "short" },
   notifications: { morning: "07:30", evening: null, deadlines: true, muted: [] },
   plan: "free",
+  about: NO_ABOUT,
 };
 
 /** A real IANA zone name the runtime knows ("America/Toronto", "Europe/Paris"). */
@@ -79,15 +95,34 @@ export function sanitizeSettings(raw: unknown): UserSettings {
       muted: Array.isArray(n.muted) ? [...new Set(n.muted.filter((x): x is string => typeof x === "string" && /^[a-z0-9-]{1,40}$/.test(x)))].slice(0, 40) : [],
     },
     plan: r.plan === "pro" ? "pro" : "free",
+    about: sanitizeAbout(r.about),
+  };
+}
+
+export function sanitizeAbout(raw: unknown): About {
+  const a = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return {
+    university: str(a.university, 120),
+    program: str(a.program, 120),
+    sports: Array.isArray(a.sports) ? [...new Set(a.sports.map((x) => str(x, 40)).filter((x): x is string => !!x))].slice(0, 6) : [],
+    level: a.level === "beginner" || a.level === "intermediate" || a.level === "advanced" ? a.level : null,
+    goal: str(a.goal, 160),
+    workStart: typeof a.workStart === "string" && HHMM.test(a.workStart) ? a.workStart : null,
+    workEnd: typeof a.workEnd === "string" && HHMM.test(a.workEnd) ? a.workEnd : null,
+    team: typeof a.team === "boolean" ? a.team : null,
   };
 }
 
 /** Deep-merge a partial change into settings, then validate the result. */
-export function mergeSettings(current: UserSettings, patch: Partial<Omit<UserSettings, "jarvis" | "notifications">> & { jarvis?: Partial<UserSettings["jarvis"]>; notifications?: Partial<UserSettings["notifications"]> }): UserSettings {
+export function mergeSettings(
+  current: UserSettings,
+  patch: Partial<Omit<UserSettings, "jarvis" | "notifications" | "about">> & { jarvis?: Partial<UserSettings["jarvis"]>; notifications?: Partial<UserSettings["notifications"]>; about?: Partial<About> }
+): UserSettings {
   return sanitizeSettings({
     ...current,
     ...patch,
     jarvis: { ...current.jarvis, ...(patch.jarvis ?? {}) },
     notifications: { ...current.notifications, ...(patch.notifications ?? {}) },
+    about: { ...current.about, ...(patch.about ?? {}) },
   });
 }

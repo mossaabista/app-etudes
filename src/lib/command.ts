@@ -29,7 +29,7 @@ export function politeless(input: string) {
     .trim();
 }
 
-const SUMMARY = /\b(?:bilan|resume|recap|recapitulatif|qu'est[- ]ce\s+que\s+j'ai|qu'est[- ]ce\s+qu'il\s+y\s+a|qu'ai[- ]je|quoi\s+de\s+prevu|mon\s+programme|mon\s+planning|ce\s+que\s+j'ai\s+(?:fait|a\s+faire)|ce\s+qu'on\s+a\s+fait|ma\s+journee\s+de)\b/;
+const SUMMARY = /\b(?:bilan|resume|recap|recapitulatif|qu'est[- ]ce\s+que\s+j'ai|qu'est[- ]ce\s+qu'il\s+y\s+a|qu'ai[- ]je|quoi\s+de\s+prevu|mon\s+programme|mon\s+planning|ce\s+que\s+j'ai\s+(?:fait|a\s+faire)|ce\s+qu'on\s+a\s+fait|ma\s+journee\s+de|what\s+do\s+i\s+have|what(?:'s|\s+is)\s+on|what(?:'s|\s+is)\s+my\s+(?:day|schedule|plan)|my\s+(?:day|schedule|agenda)\s+(?:today|tomorrow)|recap|summary|brief\s+me)\b/;
 
 const DELETE = /^\s*(?:supprimer?|supprimez|efface[rz]?|annule[rz]?|enleve[rz]?|retire[rz]?)\b\s*/;
 const MOVE = /^\s*(?:decale[rz]?|deplace[rz]?|repousse[rz]?|reporte[rz]?|avance[rz]?|bouge[rz]?|change[rz]?|modifie[rz]?|recule[rz]?)\b\s*/;

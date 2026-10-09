@@ -61,7 +61,7 @@ export async function generateMetadata() {
   return { title: (await getMessages()).nav.today };
 }
 
-export default async function TodayPage({ searchParams }: { searchParams: Promise<{ d?: string }> }) {
+export default async function TodayPage({ searchParams }: { searchParams: Promise<{ d?: string; bienvenue?: string; importes?: string; import?: string }> }) {
   const user = await requireUser();
   const locale = await getLocale();
   const [profile, planningPrefs, radar, t] = await Promise.all([getProfile(user.id), getPlanningPrefs(user.id), riskRadar(user.id, new Date(), locale), getMessages()]);
@@ -334,6 +334,19 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
       <DateNav prev={toISODate(addDays(anchor, -1))} next={toISODate(addDays(anchor, 1))} isToday={isTodayView} label={label.charAt(0).toUpperCase() + label.slice(1)} />
 
       <div className="mx-auto mb-5 max-w-3xl space-y-4">
+        {params.bienvenue && (
+          <section className="glass-card p-5" aria-labelledby="welcome-title">
+            <h2 id="welcome-title" className="text-base font-semibold text-[var(--ink)]">
+              {fmt(t.today.welcomeTitle, { name: user.name.split(" ")[0] })}
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-[var(--ink-dim)]">{t.today.welcomeText}</p>
+            {params.importes && <p className="mt-2 text-sm text-[#86d6a4]">{fmt(t.onboarding.imported, { n: Number(params.importes) || 0 })}</p>}
+            {params.import === "echec" && <p className="mt-2 text-sm text-[#ffd9a8]">{t.onboarding.importFailed}</p>}
+            <p className="mt-3 text-xs text-[var(--ink-faint)]">
+              {t.today.welcomeTry} <span className="text-[#f0cd79]">{t.today.welcomeIdeas}</span>
+            </p>
+          </section>
+        )}
         <PilotPanel day={isoDay} planned={pilotBlocks} prefs={planningPrefs} isToday={isTodayView} />
         <RadarPanel alerts={radar} />
       </div>

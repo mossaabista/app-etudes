@@ -22,6 +22,7 @@ import { claim, findOp, isUndoable, markUndone, recentActions, settle, type Logg
 import { saveLayout, LAYOUT_MODULE } from "@/server/layout";
 import type { Layout } from "@/lib/layout";
 import { briefing } from "@/server/briefing";
+import { getLocale } from "@/i18n/server";
 import { areaByKey } from "@/lib/task-areas";
 
 /** Enough to put back exactly what a command changed. Checked against the user on undo. */
@@ -290,7 +291,7 @@ async function runOne(
   }
 ): Promise<CommandResult> {
   const user = { id: userId };
-  if (intent.kind === "summary") return { ok: true, message: await briefing(userId, fold(text)), undo: null, answer: true };
+  if (intent.kind === "summary") return { ok: true, message: await briefing(userId, fold(text), await getLocale()), undo: null, answer: true };
   if (intent.kind === "create") return create(user.id, politeless(text), today, options);
 
   // Find what the sentence points at.
