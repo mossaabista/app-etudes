@@ -7,6 +7,7 @@ import { riskRadar } from "@/server/radar";
 import { listFacts } from "@/server/memory";
 import { searchDocuments } from "@/server/documents";
 import { sourceLabel } from "@/lib/retrieval";
+import { FOODS, sanitizeFoodPrefs } from "@/lib/nutrition";
 import { OPS, allowedOps, neededContext, route, type AgentDef, type ContextNeed, type Op } from "@/server/core/agents";
 
 /**
@@ -102,7 +103,7 @@ const projectsQuery = (userId: string) =>
     take: 15,
   });
 
-const ALL_NEEDS: ContextNeed[] = ["agenda", "academic", "sectors", "projects", "radar"];
+const ALL_NEEDS: ContextNeed[] = ["agenda", "academic", "sectors", "projects", "radar", "nutrition"];
 
 /**
  * What the model sees: always the page, the profile and what the user asked OROM to
@@ -188,6 +189,16 @@ export async function assistantContext(userId: string, page: string, needs: Iter
   const undated = tasks.filter((t) => !t.dueDate);
   if (undated.length) lines.push("Tâches sans date :", ...undated.map((t) => `  · TÂCHE « ${t.title} » [${t.category ?? ""}] id=t:${t.id}`));
   lines.push(`Tâches cochées aujourd'hui : ${done.map((d) => d.title).join(" ; ") || "aucune"}`);
+  }
+  if (want.has("nutrition")) {
+    const plan = await prisma.trackerEntry.findFirst({ where: { userId, module: "sante:nutrition", kind: "plan" }, select: { data: true } });
+    const d = (plan?.data ?? null) as { kcal?: number; protein?: number; prefs?: unknown } | null;
+    const fp = sanitizeFoodPrefs(d?.prefs);
+    lines.push(
+      d
+        ? `NUTRITION : objectif ${d.kcal ?? "?"} kcal/jour, ${d.protein ?? "?"} g de protéines ; régime ${fp.diet} ; allergies : ${fp.allergens.join(", ") || "aucune indiquée"} ; refuse : ${fp.avoid.map((f) => FOODS[f].label).join(", ") || "rien"}`
+        : "NUTRITION : profil nutritionnel pas encore rempli (page /tasks/sante/nutrition) ; aucune restriction connue, demande-les avant de proposer des repas précis."
+    );
   }
   if (want.has("radar")) lines.push("RADAR DE RISQUE (vérifié par le serveur) :", ...(radar.length ? radar.slice(0, 8).map((r) => `  · ${r.title} — ${r.detail}`) : ["  · rien à signaler"]));
 

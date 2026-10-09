@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, ChevronDown, Droplet, Pencil, Plus, RefreshCw, ShoppingCart, Sparkles, Trash2, Utensils } from "lucide-react";
+import { Check, ChevronDown, Droplet, Pencil, Plus, RefreshCw, ShieldAlert, ShoppingCart, Sparkles, Trash2, Undo2, Utensils } from "lucide-react";
 import { aiHelperAction } from "@/server/actions/ai.actions";
 import {
   Block,
@@ -19,17 +19,25 @@ import {
 } from "@/components/modules/kit";
 import {
   ACTIVITY,
+  ALLERGENS,
+  DIETS,
   FOODS,
   GOALS,
-  RECIPES,
-  SLOTS,
-  portion,
+  dayMenu,
+  foodConflict,
+  gramsLabel,
+  sanitizeFoodPrefs,
+  shoppingList,
   targets,
+  weekMenu,
+  type FoodPrefs,
   type Goal,
   type Macros,
   type NutritionProfile,
   type Sex,
+  type Slot,
 } from "@/lib/nutrition";
+import { addGroceriesAction, removeGroceriesAction } from "@/server/actions/nutrition.actions";
 
 const GLASS_ML = 250;
 const n0 = (x: number) => Math.round(x).toLocaleString("fr-CA");
@@ -116,19 +124,16 @@ export function Nutrition({ module, today, entries, related }: ModuleProps) {
   const [why, setWhy] = useState(false);
   const t = profile ? targets(profile) : null;
 
-  // Which recipe each slot shows today: rotates with the date, "Changer" steps through.
-  const dayIndex = Math.floor(new Date(`${today}T12:00:00Z`).getTime() / 86400000);
-  const [shift, setShift] = useState<Record<string, number>>({});
-  const plan = useMemo(
-    () =>
-      SLOTS.map((s) => {
-        const options = RECIPES.filter((r) => r.slot === s.key);
-        const recipe = options[(dayIndex + (shift[s.key] ?? 0)) % options.length];
-        const p = portion(recipe, (t?.kcal ?? 2000) * s.share);
-        return { slot: s, recipe, ...p };
-      }),
-    [dayIndex, shift, t?.kcal]
-  );
+  const prefs = useMemo(() => sanitizeFoodPrefs((planRow?.data as { prefs?: unknown } | undefined)?.prefs), [planRow?.data]);
+  // Which recipe each slot shows today: rotates with the date, "Changer" steps through;
+  // only recipes that respect every restriction are ever offered.
+  const [shift, setShift] = useState<Partial<Record<Slot, number>>>({});
+  const plan = useMemo(() => dayMenu(today, t?.kcal ?? 2000, prefs, shift), [today, shift, t?.kcal, prefs]);
+  const [groceryNote, setGroceryNote] = useState<string | null>(null);
+  const toGroceries = async (items: Record<string, number>) => {
+    const r = await addGroceriesAction(Object.entries(items).map(([food, grams]) => ({ food, grams })));
+    setGroceryNote("error" in r ? r.error : r.added ? `${r.added} article${r.added > 1 ? "s" : ""} ajouté${r.added > 1 ? "s" : ""} aux courses${r.skipped ? ` (${r.skipped} déjà sur la liste)` : ""}.` : "Tout est déjà sur ta liste de courses.");
+  };
 
   const meals = entries.filter((e) => e.kind === "meal" && e.day === today);
   const eaten = meals.reduce<Macros>(
@@ -216,6 +221,15 @@ export function Nutrition({ module, today, entries, related }: ModuleProps) {
       <Block title="Ton menu du jour" hint="Les portions sont calculées pour ton objectif. Change un repas s'il ne te tente pas, planifie-le, ou envoie ses ingrédients aux courses." wide>
         <ul className="grid gap-3 md:grid-cols-2">
           {plan.map(({ slot, recipe, items, macros }) => {
+            if (!recipe)
+              return (
+                <li key={slot.key} className="tile flex flex-col gap-1.5 px-4 py-3.5">
+                  <p className="text-[0.7rem] font-semibold uppercase tracking-wide text-[#f0cd79]">
+                    {slot.label} · {slot.time}
+                  </p>
+                  <p className="text-xs leading-5 text-[var(--ink-dim)]">Aucune recette de la bibliothèque ne respecte toutes tes restrictions pour ce repas : je préfère ne rien proposer plutôt que de risquer un aliment exclu.</p>
+                </li>
+              );
             const logged = meals.some((m) => m.data.recipe === recipe.key);
             return (
               <li key={slot.key} className="tile flex flex-col gap-2.5 px-4 py-3.5">
@@ -246,16 +260,11 @@ export function Nutrition({ module, today, entries, related }: ModuleProps) {
                   >
                     <Utensils size={12} /> {logged ? "Mangé" : "Je l'ai mangé"}
                   </button>
-                  <button type="button" onClick={() => setShift({ ...shift, [slot.key]: (shift[slot.key] ?? 0) + 1 })} className="mod-chip focus-ring">
+                  <button type="button" onClick={() => setShift({ ...shift, [slot.key]: (shift[slot.key] ?? 0) + 1 })} className="mod-chip focus-ring" aria-label={`Changer ${slot.label.toLowerCase()}`}>
                     <RefreshCw size={12} /> Changer
                   </button>
                   <ScheduleButton title={`${slot.label} : ${recipe.name}`} minutes={30} today={today} defaultTime={slot.time} onSchedule={(x) => schedule(x)} />
-                  <button
-                    type="button"
-                    disabled={pending}
-                    onClick={() => Object.keys(items).forEach((f) => add("item", { text: FOODS[f].label, data: { aisle: FOODS[f].aisle } }, "quotidien:courses"))}
-                    className="mod-chip focus-ring"
-                  >
+                  <button type="button" disabled={pending} onClick={() => toGroceries(items)} className="mod-chip focus-ring">
                     <ShoppingCart size={12} /> Courses
                   </button>
                 </div>
@@ -263,7 +272,16 @@ export function Nutrition({ module, today, entries, related }: ModuleProps) {
             );
           })}
         </ul>
+        {groceryNote && (
+          <p role="status" className="mt-3 text-xs text-[var(--ink-dim)]">
+            {groceryNote}
+          </p>
+        )}
       </Block>
+
+      <FoodPrefsBlock prefs={prefs} pending={pending} onSave={(p) => planRow && update(planRow.id, { data: { prefs: p } })} />
+
+      <WeekBlock today={today} kcal={t!.kcal} prefs={prefs} />
 
       <Block title="Journal du jour" hint="Ce qui sort du menu : décris-le en mots (« un bol de riz au poulet et une pomme ») et l'assistant estime les calories et les macros.">
         <form
@@ -364,6 +382,192 @@ export function Nutrition({ module, today, entries, related }: ModuleProps) {
         </div>
       </Block>
     </>
+  );
+}
+
+/** Diet, allergies and foods to avoid: every menu and grocery list respects them. */
+function FoodPrefsBlock({ prefs, pending, onSave }: { prefs: FoodPrefs; pending: boolean; onSave: (p: FoodPrefs) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(prefs);
+  const toggle = <T extends string>(list: T[], x: T) => (list.includes(x) ? list.filter((y) => y !== x) : [...list, x]);
+  const summary = [
+    DIETS.find((d) => d.key === prefs.diet)!.label,
+    prefs.allergens.length ? `allergies : ${prefs.allergens.map((a) => ALLERGENS.find((k) => k.key === a)!.label.toLowerCase()).join(", ")}` : "aucune allergie indiquée",
+    prefs.avoid.length ? `sans ${prefs.avoid.map((f) => FOODS[f].label.toLowerCase()).join(", ")}` : null,
+  ].filter(Boolean);
+  return (
+    <Block
+      title="Mes restrictions alimentaires"
+      hint="Les menus, la semaine et la liste de courses n'utilisent jamais un aliment exclu. Ce n'est pas un avis médical : en cas d'allergie sévère, vérifie toujours les étiquettes."
+      action={
+        !editing && (
+          <IconButton
+            label="Modifier les restrictions"
+            onClick={() => {
+              setDraft(prefs);
+              setEditing(true);
+            }}
+          >
+            <Pencil size={13} />
+          </IconButton>
+        )
+      }
+      wide
+    >
+      {!editing ? (
+        <p className="flex items-start gap-2 text-sm text-[var(--ink)]">
+          <ShieldAlert size={15} className="mt-0.5 shrink-0 text-[#f0cd79]" />
+          {summary.join(" · ")}
+        </p>
+      ) : (
+        <div className="space-y-4">
+          <fieldset>
+            <legend className="mb-1.5 text-xs font-semibold text-[var(--ink-dim)]">Régime</legend>
+            <div className="flex flex-wrap gap-1.5">
+              {DIETS.map((d) => (
+                <button key={d.key} type="button" aria-pressed={draft.diet === d.key} data-on={draft.diet === d.key || undefined} onClick={() => setDraft({ ...draft, diet: d.key })} className="mod-tab focus-ring">
+                  {d.label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend className="mb-1.5 text-xs font-semibold text-[var(--ink-dim)]">Allergies et intolérances</legend>
+            <div className="flex flex-wrap gap-1.5">
+              {ALLERGENS.map((a) => (
+                <button
+                  key={a.key}
+                  type="button"
+                  aria-pressed={draft.allergens.includes(a.key)}
+                  data-on={draft.allergens.includes(a.key) || undefined}
+                  onClick={() => setDraft({ ...draft, allergens: toggle(draft.allergens, a.key) })}
+                  className="mod-tab focus-ring"
+                >
+                  {a.label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend className="mb-1.5 text-xs font-semibold text-[var(--ink-dim)]">Aliments que tu ne veux pas</legend>
+            <div className="flex flex-wrap gap-1.5">
+              {Object.entries(FOODS).map(([k, f]) => {
+                const blocked = foodConflict(k, { ...draft, avoid: [] });
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    disabled={!!blocked}
+                    title={blocked ?? undefined}
+                    aria-pressed={draft.avoid.includes(k)}
+                    data-on={draft.avoid.includes(k) || undefined}
+                    onClick={() => setDraft({ ...draft, avoid: toggle(draft.avoid, k) })}
+                    className="mod-tab focus-ring text-xs disabled:opacity-40"
+                  >
+                    {f.label}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                onSave(draft);
+                setEditing(false);
+              }}
+              className="mod-chip mod-chip-gold focus-ring"
+            >
+              <Check size={13} /> Enregistrer
+            </button>
+            <button type="button" onClick={() => setEditing(false)} className="mod-chip focus-ring">
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
+    </Block>
+  );
+}
+
+const WEEKDAY = new Intl.DateTimeFormat("fr-CA", { weekday: "short", day: "numeric", timeZone: "UTC" });
+
+/** Seven days of menus and what they need from the store, added up. */
+function WeekBlock({ today, kcal, prefs }: { today: string; kcal: number; prefs: FoodPrefs }) {
+  const week = useMemo(() => weekMenu(today, kcal, prefs), [today, kcal, prefs]);
+  const list = useMemo(() => shoppingList(week), [week]);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<{ text: string; ids: string[] } | null>(null);
+  const missing = week.reduce((n, d) => n + d.meals.filter((m) => !m.recipe).length, 0);
+  return (
+    <Block title="Ma semaine de repas" hint="Sept jours à partir d'aujourd'hui, avec les mêmes portions que le menu du jour, et la liste de courses qui va avec." wide>
+      <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        {week.map((d) => (
+          <li key={d.day} className="tile px-3.5 py-3">
+            <p className="text-[0.7rem] font-semibold uppercase tracking-wide text-[#f0cd79]">{WEEKDAY.format(new Date(`${d.day}T12:00:00Z`))}</p>
+            <ul className="mt-1 space-y-0.5 text-xs leading-5 text-[var(--ink-dim)]">
+              {d.meals.map((m) => (
+                <li key={m.slot.key}>
+                  <span className="text-[var(--ink-faint)]">{m.slot.label} : </span>
+                  {m.recipe ? m.recipe.name : "—"}
+                </li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ul>
+      {missing > 0 && <p className="mt-2 text-xs text-[var(--ink-faint)]">{missing} repas sans recette compatible avec tes restrictions : à compléter toi-même.</p>}
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="mod-chip focus-ring">
+          <ChevronDown size={13} className={`transition-transform ${open ? "rotate-180" : ""}`} /> Liste de la semaine ({list.length})
+        </button>
+        <button
+          type="button"
+          disabled={busy || !list.length}
+          onClick={async () => {
+            setBusy(true);
+            const r = await addGroceriesAction(list.map((i) => ({ food: i.food, grams: i.grams })));
+            setBusy(false);
+            setDone("error" in r ? { text: r.error, ids: [] } : { text: r.added ? `${r.added} article${r.added > 1 ? "s" : ""} ajouté${r.added > 1 ? "s" : ""} aux courses${r.skipped ? `, ${r.skipped} déjà sur la liste` : ""}.` : "Tout est déjà sur ta liste de courses.", ids: r.ids });
+          }}
+          className="mod-chip mod-chip-gold focus-ring"
+        >
+          <ShoppingCart size={13} /> {busy ? "Ajout…" : "Tout ajouter aux courses"}
+        </button>
+        {done && (
+          <span role="status" className="flex items-center gap-2 text-xs text-[var(--ink-dim)]">
+            {done.text}
+            {done.ids.length > 0 && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const r = await removeGroceriesAction(done.ids);
+                  setDone({ text: `Annulé : ${r.removed} article${r.removed > 1 ? "s" : ""} retiré${r.removed > 1 ? "s" : ""}.`, ids: [] });
+                }}
+                className="mod-chip focus-ring"
+              >
+                <Undo2 size={12} /> Annuler
+              </button>
+            )}
+          </span>
+        )}
+      </div>
+      {open && (
+        <ul className="mt-3 grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
+          {list.map((i) => (
+            <li key={i.food} className="flex justify-between gap-3 border-b border-[rgba(255,220,148,0.1)] py-1">
+              <span className="text-[var(--ink)]">
+                {i.label} <span className="text-[var(--ink-faint)]">· {i.aisle}</span>
+              </span>
+              <span className="tabular-nums text-[var(--ink-dim)]">{gramsLabel(i.grams)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Block>
   );
 }
 

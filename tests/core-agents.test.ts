@@ -72,6 +72,17 @@ describe("assistantContext", () => {
     expect(c.text).not.toMatch(/AGENDA JOUR PAR JOUR/);
     expect(c.projectIds.has("p:p1")).toBe(true);
   });
+
+  it("shows the nutrition agent the user's restrictions, and only that user's", async () => {
+    db.trackerEntry = table([
+      { id: "n-bob", userId: "bob", module: "sante:nutrition", kind: "plan", data: { kcal: 3000, prefs: { diet: "omnivore", allergens: [] } } },
+      { id: "n-al", userId: "alice", module: "sante:nutrition", kind: "plan", data: { kcal: 2100, protein: 120, prefs: { diet: "vegetarien", allergens: ["arachides"], avoid: ["tofu"] } } },
+    ]);
+    const c = await assistantContext("alice", "/today", ["nutrition"]);
+    expect(c.text).toMatch(/NUTRITION : objectif 2100 kcal\/jour, 120 g de protéines ; régime vegetarien ; allergies : arachides ; refuse : Tofu ferme/);
+    db.trackerEntry = table();
+    expect((await assistantContext("alice", "/today", ["nutrition"])).text).toMatch(/profil nutritionnel pas encore rempli/);
+  });
 });
 
 describe("executePlan with agents", () => {

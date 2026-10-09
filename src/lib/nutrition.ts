@@ -89,6 +89,7 @@ export function targets(p: NutritionProfile): Targets {
 /** Per 100 g: kcal, protein, carbs, fat, fibre (g). */
 export const FOODS: Record<string, { label: string; kcal: number; p: number; c: number; f: number; fib: number; aisle: string }> = {
   avoine: { label: "Flocons d'avoine", kcal: 379, p: 13.2, c: 67.7, f: 6.5, fib: 10.1, aisle: "Épicerie" },
+  boissonsoja: { label: "Boisson de soja non sucrée", kcal: 33, p: 2.9, c: 1.7, f: 1.6, fib: 0.4, aisle: "Produits laitiers" },
   lait: { label: "Lait 2 %", kcal: 50, p: 3.3, c: 4.8, f: 2, fib: 0, aisle: "Produits laitiers" },
   yogourt: { label: "Yogourt grec nature 2 %", kcal: 73, p: 9.9, c: 3.9, f: 2, fib: 0, aisle: "Produits laitiers" },
   cottage: { label: "Fromage cottage 2 %", kcal: 84, p: 10.5, c: 4.3, f: 2.3, fib: 0, aisle: "Produits laitiers" },
@@ -152,10 +153,13 @@ export const RECIPES: Recipe[] = [
   { key: "omelette", name: "Omelette aux épinards et pain complet", slot: "matin", minutes: 12, items: { oeuf: 150, epinards: 60, poivron: 50, pain: 60, huile: 5 }, steps: "Faire tomber les légumes dans l'huile, ajouter les œufs battus, cuire à feu moyen ; servir avec le pain grillé." },
   { key: "toast", name: "Toast avocat et œufs", slot: "matin", minutes: 10, items: { pain: 70, avocat: 70, oeuf: 100 }, steps: "Écraser l'avocat sur le pain grillé, ajouter deux œufs pochés ou au plat, sel, poivre, citron." },
   { key: "bol-yogourt", name: "Bol de yogourt grec, fruits et amandes", slot: "matin", minutes: 3, items: { yogourt: 200, fruits: 100, amandes: 20, miel: 10 }, steps: "Superposer yogourt, fruits et amandes concassées ; un filet de miel." },
+  { key: "gruau-soja", name: "Gruau à la boisson de soja, banane et chia", slot: "matin", minutes: 8, items: { avoine: 60, boissonsoja: 250, banane: 100, chia: 10 }, steps: "Cuire l'avoine dans la boisson de soja 4 min, ajouter la banane tranchée et le chia." },
+  { key: "tofu-brouille", name: "Tofu brouillé aux légumes", slot: "matin", minutes: 12, items: { tofu: 150, epinards: 50, poivron: 60, patatedouce: 120, huile: 5 }, steps: "Émietter le tofu dans l'huile avec curcuma et poivre, ajouter poivron et épinards ; servir avec la patate douce rôtie." },
   { key: "bol-quinoa", name: "Bol quinoa, poulet et légumes rôtis", slot: "midi", minutes: 30, items: { quinoa: 150, poulet: 120, brocoli: 100, patatedouce: 100, huile: 10 }, steps: "Rôtir patate douce et brocoli 20 min à 220 °C, griller le poulet, servir sur le quinoa." },
   { key: "salade-pc", name: "Salade de pois chiches et feta", slot: "midi", minutes: 10, items: { poischiches: 150, concombre: 100, tomate: 100, feta: 40, huile: 10 }, steps: "Tout couper en dés, assaisonner d'huile d'olive, citron, origan." },
   { key: "wrap-thon", name: "Wrap au thon et houmous", slot: "midi", minutes: 8, items: { tortilla: 70, thon: 100, hummus: 30, epinards: 30, tomate: 60 }, steps: "Tartiner le houmous, ajouter thon égoutté, épinards et tomates, rouler serré." },
   { key: "bowl-tofu", name: "Bowl de tofu croustillant", slot: "midi", minutes: 25, items: { tofu: 150, riz: 150, carotte: 60, epinards: 40, huile: 10 }, steps: "Dorer le tofu en cubes à la poêle, servir sur le riz avec carottes râpées et épinards." },
+  { key: "salade-lentilles", name: "Salade de lentilles, quinoa et crudités", slot: "midi", minutes: 10, items: { lentilles: 150, quinoa: 100, concombre: 80, tomate: 80, carotte: 50, huile: 10 }, steps: "Mélanger lentilles et quinoa cuits avec les légumes en dés ; vinaigrette huile d'olive, citron, moutarde." },
   { key: "pomme-arachide", name: "Pomme et beurre d'arachide", slot: "collation", minutes: 2, items: { pomme: 150, arachide: 20 }, steps: "Trancher la pomme, tremper dans le beurre d'arachide." },
   { key: "cottage", name: "Cottage et petits fruits", slot: "collation", minutes: 2, items: { cottage: 150, fruits: 80 }, steps: "Mélanger, c'est prêt." },
   { key: "houmous", name: "Houmous et crudités", slot: "collation", minutes: 5, items: { hummus: 60, carotte: 80, concombre: 80 }, steps: "Couper les légumes en bâtonnets." },
@@ -163,6 +167,7 @@ export const RECIPES: Recipe[] = [
   { key: "saumon", name: "Saumon, riz brun et haricots verts", slot: "soir", minutes: 25, items: { saumon: 150, riz: 150, haricotsverts: 120, huile: 5 }, steps: "Saumon au four 12 min à 200 °C, haricots à la vapeur 6 min, servir avec le riz." },
   { key: "chili", name: "Chili de lentilles", slot: "soir", minutes: 35, items: { lentilles: 150, haricotsrouges: 100, sauce: 150, poivron: 60, huile: 5 }, steps: "Faire revenir le poivron, ajouter sauce, lentilles et haricots, épices à chili, mijoter 20 min." },
   { key: "bolognaise", name: "Pâtes complètes à la bolognaise maigre", slot: "soir", minutes: 25, items: { pates: 180, boeuf: 100, sauce: 150 }, steps: "Dorer la viande, ajouter la sauce, mijoter 10 min, servir sur les pâtes." },
+  { key: "curry-pc", name: "Curry de pois chiches et riz brun", slot: "soir", minutes: 25, items: { poischiches: 150, riz: 150, sauce: 120, epinards: 50, huile: 5 }, steps: "Faire revenir les épices à cari dans l'huile, ajouter sauce et pois chiches, mijoter 10 min, les épinards à la fin ; servir sur le riz." },
   { key: "poulet-patate", name: "Poulet, patate douce et brocoli", slot: "soir", minutes: 30, items: { poulet: 140, patatedouce: 200, brocoli: 120, huile: 10 }, steps: "Tout sur une plaque, 25 min à 210 °C, paprika et ail." },
 ];
 
@@ -195,3 +200,146 @@ export function portion(recipe: Recipe, kcal: number) {
   const items = Object.fromEntries(Object.entries(recipe.items).map(([f, g]) => [f, Math.max(5, Math.round((g * k) / 5) * 5)]));
   return { items, macros: macrosOf(items), factor: k };
 }
+
+// --------------------------------------------------------------------------- restrictions
+
+export type Diet = "omnivore" | "pescetarien" | "vegetarien" | "vegetalien";
+
+export const DIETS: { key: Diet; label: string }[] = [
+  { key: "omnivore", label: "Je mange de tout" },
+  { key: "pescetarien", label: "Pescétarien" },
+  { key: "vegetarien", label: "Végétarien" },
+  { key: "vegetalien", label: "Végétalien" },
+];
+
+/** The priority allergens of Health Canada that the food table can contain. */
+export const ALLERGENS = [
+  { key: "lait", label: "Lait" },
+  { key: "oeufs", label: "Œufs" },
+  { key: "arachides", label: "Arachides" },
+  { key: "noix", label: "Noix" },
+  { key: "gluten", label: "Gluten (blé, avoine)" },
+  { key: "poisson", label: "Poisson" },
+  { key: "soja", label: "Soja" },
+  { key: "sesame", label: "Sésame" },
+] as const;
+export type Allergen = (typeof ALLERGENS)[number]["key"];
+
+/**
+ * What each food contains. Oats count as gluten: most are cross-contaminated with wheat,
+ * and a meal plan should err on the side of the allergy.
+ */
+const CONTAINS: Partial<Record<string, { allergens?: Allergen[]; animal?: "viande" | "poisson" | "laitier" | "oeuf" | "miel" }>> = {
+  avoine: { allergens: ["gluten"] },
+  boissonsoja: { allergens: ["soja"] },
+  lait: { allergens: ["lait"], animal: "laitier" },
+  yogourt: { allergens: ["lait"], animal: "laitier" },
+  cottage: { allergens: ["lait"], animal: "laitier" },
+  feta: { allergens: ["lait"], animal: "laitier" },
+  oeuf: { allergens: ["oeufs"], animal: "oeuf" },
+  pain: { allergens: ["gluten"] },
+  tortilla: { allergens: ["gluten"] },
+  pates: { allergens: ["gluten"] },
+  poulet: { animal: "viande" },
+  boeuf: { animal: "viande" },
+  saumon: { allergens: ["poisson"], animal: "poisson" },
+  thon: { allergens: ["poisson"], animal: "poisson" },
+  tofu: { allergens: ["soja"] },
+  amandes: { allergens: ["noix"] },
+  arachide: { allergens: ["arachides"] },
+  hummus: { allergens: ["sesame"] },
+  miel: { animal: "miel" },
+};
+
+const EXCLUDED_BY_DIET: Record<Diet, string[]> = {
+  omnivore: [],
+  pescetarien: ["viande"],
+  vegetarien: ["viande", "poisson"],
+  vegetalien: ["viande", "poisson", "laitier", "oeuf", "miel"],
+};
+
+export interface FoodPrefs {
+  diet: Diet;
+  allergens: Allergen[];
+  /** Foods the user does not want, by FOODS key. */
+  avoid: string[];
+}
+
+export const NO_PREFS: FoodPrefs = { diet: "omnivore", allergens: [], avoid: [] };
+
+export function sanitizeFoodPrefs(x: unknown): FoodPrefs {
+  const o = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
+  const list = (v: unknown) => (Array.isArray(v) ? v.filter((i): i is string => typeof i === "string") : []);
+  return {
+    diet: DIETS.some((d) => d.key === o.diet) ? (o.diet as Diet) : "omnivore",
+    allergens: list(o.allergens).filter((a): a is Allergen => ALLERGENS.some((k) => k.key === a)),
+    avoid: list(o.avoid).filter((f) => f in FOODS),
+  };
+}
+
+/** Why a food is ruled out for this person, or null when it is fine. */
+export function foodConflict(key: string, prefs: FoodPrefs): string | null {
+  const c = CONTAINS[key];
+  const allergen = c?.allergens?.find((a) => prefs.allergens.includes(a));
+  if (allergen) return `allergie : ${ALLERGENS.find((a) => a.key === allergen)!.label.toLowerCase()}`;
+  if (c?.animal && EXCLUDED_BY_DIET[prefs.diet].includes(c.animal)) return DIETS.find((d) => d.key === prefs.diet)!.label.toLowerCase();
+  if (prefs.avoid.includes(key)) return "tu ne veux pas en manger";
+  return null;
+}
+
+export const recipeAllowed = (r: Recipe, prefs: FoodPrefs) => Object.keys(r.items).every((f) => !foodConflict(f, prefs));
+
+export const recipesFor = (slot: Slot, prefs: FoodPrefs) => RECIPES.filter((r) => r.slot === slot && recipeAllowed(r, prefs));
+
+// --------------------------------------------------------------------------- menus
+
+const dayNumber = (iso: string) => Math.floor(new Date(`${iso}T12:00:00Z`).getTime() / 86400000);
+
+export interface PlannedMeal {
+  slot: (typeof SLOTS)[number];
+  /** Null when no recipe of the library respects the restrictions for this meal. */
+  recipe: Recipe | null;
+  items: Record<string, number>;
+  macros: Macros;
+}
+
+/**
+ * One day's menu: for each meal, a recipe that respects every restriction, rotating with
+ * the date so the week varies, scaled to the meal's share of the day's calories. A meal
+ * with no compatible recipe stays empty rather than breaking a restriction.
+ */
+export function dayMenu(day: string, kcal: number, prefs: FoodPrefs, shift: Partial<Record<Slot, number>> = {}): PlannedMeal[] {
+  const n = dayNumber(day);
+  return SLOTS.map((slot) => {
+    const options = recipesFor(slot.key, prefs);
+    if (!options.length) return { slot, recipe: null, items: {}, macros: { kcal: 0, p: 0, c: 0, f: 0, fib: 0 } };
+    const recipe = options[(((n + (shift[slot.key] ?? 0)) % options.length) + options.length) % options.length];
+    return { slot, recipe, ...portion(recipe, kcal * slot.share) };
+  });
+}
+
+export function weekMenu(start: string, kcal: number, prefs: FoodPrefs): { day: string; meals: PlannedMeal[] }[] {
+  const n = dayNumber(start);
+  return Array.from({ length: 7 }, (_, i) => {
+    const day = new Date((n + i) * 86400000 + 12 * 3600000).toISOString().slice(0, 10);
+    return { day, meals: dayMenu(day, kcal, prefs) };
+  });
+}
+
+export interface ShoppingItem {
+  food: string;
+  label: string;
+  aisle: string;
+  grams: number;
+}
+
+/** Everything a set of menus needs, added up per food and sorted by aisle. */
+export function shoppingList(days: { meals: PlannedMeal[] }[]): ShoppingItem[] {
+  const total = new Map<string, number>();
+  for (const d of days) for (const m of d.meals) for (const [f, g] of Object.entries(m.items)) total.set(f, (total.get(f) ?? 0) + g);
+  return [...total]
+    .map(([food, grams]) => ({ food, label: FOODS[food].label, aisle: FOODS[food].aisle, grams: Math.ceil(grams / 50) * 50 }))
+    .sort((a, b) => a.aisle.localeCompare(b.aisle, "fr") || a.label.localeCompare(b.label, "fr"));
+}
+
+export const gramsLabel = (g: number) => (g >= 1000 ? `${(g / 1000).toFixed(1).replace(".", ",")} kg` : `${g} g`);

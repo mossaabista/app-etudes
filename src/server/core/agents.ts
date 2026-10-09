@@ -37,7 +37,7 @@ export type Op = (typeof OPS)[number];
 
 /** Slices of the user's data an agent may need in front of it. */
 /** "documents": the passages of the user's documents that best match the request. */
-export type ContextNeed = "agenda" | "academic" | "sectors" | "projects" | "radar" | "documents";
+export type ContextNeed = "agenda" | "academic" | "sectors" | "projects" | "radar" | "documents" | "nutrition";
 
 export interface AgentDef {
   id: string;
@@ -166,11 +166,11 @@ export const AGENTS: AgentDef[] = [
     domain: "Repas, eau, courses, plans de repas et préférences alimentaires.",
     triggers: /\b(repas|mange|manger|nutrition|recette|calorie|kcal|courses|epicerie|menu|diete|regime|meal|food|eau|verre|proteine|dejeuner|diner|souper|allergi)/,
     tools: ["log", "create_task", "navigate"],
-    needs: [],
+    needs: ["nutrition"],
     instructions: [
       "« j'ai mangé… » → log meal avec une estimation de kcal (c'est une estimation, dis-le). « j'ai bu 2 verres » → log water. « ajoute lait et œufs aux courses » → log grocery avec items.",
-      "Plan de repas de la semaine : navigate vers /tasks/sante/nutrition, où le générateur tient compte des allergies et préférences enregistrées.",
-      "Ne donne pas de conseil médical ; en cas d'allergie, ne propose jamais l'aliment concerné.",
+      "Plan de repas de la semaine ou liste de courses de la semaine : navigate vers /tasks/sante/nutrition (« Ma semaine de repas », qui respecte ses restrictions et ajoute la liste aux courses).",
+      "Respecte toujours les restrictions NUTRITION fournies (régime, allergies, aliments refusés) : ne propose jamais un aliment exclu, même en idée de repas. Ne donne pas de conseil médical.",
     ],
     timeoutMs: 30000,
   },
