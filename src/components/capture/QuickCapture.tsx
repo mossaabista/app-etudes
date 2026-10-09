@@ -296,8 +296,17 @@ export function QuickCapture() {
       setText((finalText + interim).trim());
     };
     r.onerror = (e) => {
-      if (e.error === "not-allowed" || e.error === "service-not-allowed") setToast({ text: "Autorise le micro pour dicter.", undo: null, error: true });
-      else if (e.error === "no-speech") setToast({ text: "Je n'ai rien entendu.", undo: null, error: true });
+      // Every way dictation can stop says so: nothing fails silently.
+      const messages: Record<string, string> = {
+        "not-allowed": "Autorise le micro pour dicter (réglages du navigateur), ou écris ta demande.",
+        "service-not-allowed": "La dictée n'est pas autorisée sur cet appareil : écris ta demande.",
+        "no-speech": "Je n'ai rien entendu.",
+        "audio-capture": "Aucun micro détecté : branche-en un ou écris ta demande.",
+        network: "La reconnaissance vocale demande une connexion : écris ta demande ou réessaie.",
+        "language-not-supported": "La dictée en français n'est pas disponible ici : écris ta demande.",
+      };
+      if (e.error === "aborted") return;
+      setToast({ text: messages[e.error] ?? "La dictée s'est interrompue : réessaie ou écris ta demande.", undo: null, error: true });
     };
     r.onend = () => {
       if (silence) clearTimeout(silence);
