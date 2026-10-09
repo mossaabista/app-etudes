@@ -110,7 +110,7 @@ export function CardDeck({
               onClick={() => setActive(i)}
               aria-label={c.label}
               aria-current={i === active}
-              className={`h-1.5 rounded-full transition-all ${
+              className={`focus-ring h-1.5 rounded-full transition-all ${
                 i === active ? "w-7 bg-[#f0cd79]" : "w-1.5 bg-[rgba(255,220,148,0.35)] hover:bg-[rgba(255,220,148,0.6)]"
               }`}
             />
