@@ -7,8 +7,8 @@ const ask = vi.hoisted(() => ({ plan: { actions: [] as unknown[], reply: "" }, i
 const autonomy = vi.hoisted(() => ({ value: { mode: "equilibre", grants: [] } as { mode: string; grants: string[] } }));
 vi.mock("@/lib/db", () => ({ prisma: db }));
 const ctx = () => ({ text: "", ids: new Set(ask.ids), assessmentIds: new Set<string>(), labels: new Map(ask.ids.map((id) => [id, `titre de ${id}`])) });
-vi.mock("@/server/assistant", () => ({
-  askAssistant: async () => ({ plan: ask.plan, ctx: ctx() }),
+vi.mock("@/server/assistant", async () => ({
+  askAssistant: async () => ({ plan: ask.plan, ctx: ctx(), agents: (await import("@/server/core/agents")).AGENTS, usage: null }),
   assistantContext: async () => ctx(),
 }));
 vi.mock("@/server/autonomy", () => ({ getAutonomy: async () => autonomy.value }));

@@ -21,6 +21,9 @@ const match = (row: Row, where: Record<string, unknown> = {}): boolean =>
         if (o === "gt") return x > y;
         if (o === "gte") return x >= y;
         if (o === "startsWith") return String(row[k] ?? "").startsWith(String(w));
+        if (o === "mode") return true;
+        if (o === "equals") return op.mode === "insensitive" ? String(row[k] ?? "").toLowerCase() === String(w).toLowerCase() : row[k] === w;
+        if (o === "contains") return op.mode === "insensitive" ? String(row[k] ?? "").toLowerCase().includes(String(w).toLowerCase()) : String(row[k] ?? "").includes(String(w));
         // A filter on a relation ({ course: { userId } }): match the nested row.
         if (row[k] && typeof row[k] === "object" && !(row[k] instanceof Date)) return match(row[k] as Row, { [o]: w });
         throw new Error(`fake-db: unsupported filter ${o}`);

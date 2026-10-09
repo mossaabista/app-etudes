@@ -10,7 +10,7 @@ import crypto from "node:crypto";
 const TTL_MS = 10 * 60 * 1000;
 
 export type PendingWork =
-  | { kind: "plan"; actions: unknown[]; reply: string; page: string; opId: string }
+  | { kind: "plan"; actions: unknown[]; reply: string; page: string; opId: string; agents?: string[] }
   | { kind: "rules"; text: string; only: { kind: "event" | "task"; id: string }[]; opId: string };
 
 const secret = () => {

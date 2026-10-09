@@ -4,6 +4,7 @@ import { addMinutes, minutesBetween } from "@/lib/command";
 import { guessAisle } from "@/lib/grocery";
 import { LIBRARY, LIBRARY_SUBS, PALETTE, sanitizeLayout, slug, type AreaSpec, type Layout, type SubSpec } from "@/lib/layout";
 import { askAssistant, assistantContext, type AssistantAction, type Turn } from "@/server/assistant";
+import { agentById, allowedOps, neededContext, type AgentDef, type Op } from "@/server/core/agents";
 import { assessRisk, type Risk } from "@/lib/risk";
 import { getAutonomy } from "@/server/autonomy";
 import { newOpId, sealPending } from "@/server/pending";
@@ -46,6 +47,8 @@ const VERBS: Record<AssistantAction["op"], string> = {
   plan_week: "planifier la semaine",
   navigate: "ouvrir la page",
   create_workspace: "créer l'espace",
+  create_project: "créer le projet",
+  add_milestone: "ajouter le jalon",
 };
 
 export const describeAction = (a: AssistantAction, labels?: Map<string, string>) => {
@@ -79,7 +82,7 @@ export interface Confirmation {
   reply: string;
 }
 
-type Ctx = { ids: Set<string>; assessmentIds: Set<string>; labels?: Map<string, string> };
+type Ctx = { ids: Set<string>; assessmentIds: Set<string>; labels?: Map<string, string>; projectIds?: Set<string> };
 
 /** Only actions the server knows how to run; anything else the model made up is dropped. */
 const known = (list: unknown): AssistantAction[] =>
@@ -97,24 +100,28 @@ export async function runAssistant(userId: string, text: string, page: string, h
   if (verdict.confirm) {
     const items = actions.filter((a) => a.op !== "navigate").map((a) => describeAction(a, r.ctx.labels));
     const opId = newOpId();
-    const token = sealPending(userId, { kind: "plan", actions, reply: r.plan.reply, page, opId });
+    const token = sealPending(userId, { kind: "plan", actions, reply: r.plan.reply, page, opId, agents: r.agents.map((a) => a.id) });
     return { confirm: { token, opId, risk: verdict.risk, items, reasons: verdict.reasons, reply: r.plan.reply } };
   }
-  return executePlan(userId, actions, r.plan.reply, r.ctx);
+  return executePlan(userId, actions, r.plan.reply, r.ctx, r.agents);
 }
 
 /** Run a plan the user just confirmed, against a fresh view of their data. */
-export async function runConfirmedPlan(userId: string, work: { actions: unknown[]; reply: string; page: string }): Promise<AssistantResult> {
-  const ctx = await assistantContext(userId, work.page.slice(0, 120));
-  return executePlan(userId, known(work.actions), String(work.reply ?? ""), ctx);
+export async function runConfirmedPlan(userId: string, work: { actions: unknown[]; reply: string; page: string; agents?: string[] }): Promise<AssistantResult> {
+  // The agents that proposed the plan still bound what it may do once confirmed.
+  const agents = (work.agents ?? []).map(agentById).filter((a): a is AgentDef => !!a);
+  const ctx = await assistantContext(userId, work.page.slice(0, 120), agents.length ? neededContext(agents) : undefined);
+  return executePlan(userId, known(work.actions), String(work.reply ?? ""), ctx, agents.length ? agents : undefined);
 }
 
 /**
  * Carry out actions the model proposed. Every id is checked against what the user was
  * shown and looked up under the user again; every write must come back to count as done.
  */
-export async function executePlan(userId: string, actions: AssistantAction[], reply: string, ctx: Ctx): Promise<AssistantResult> {
+export async function executePlan(userId: string, actions: AssistantAction[], reply: string, ctx: Ctx, agents?: AgentDef[]): Promise<AssistantResult> {
   const plan = { actions, reply };
+  // Only the tools of the agents that handled the request: whatever else the model asked for is refused.
+  const allowed: Set<Op> | null = agents ? allowedOps(agents) : null;
   const today = toISODate(new Date());
   const undos: Undo[] = [];
   // What was actually done, in words: the confirmation when the model says nothing useful.
@@ -161,6 +168,10 @@ export async function executePlan(userId: string, actions: AssistantAction[], re
   for (const a of actions.slice(0, 30)) {
     // Set once the database (or the layout being edited) has really taken the change.
     let ok = false;
+    if (allowed && !allowed.has(a.op)) {
+      failed.push(`${describeAction(a, ctx.labels)} (hors de ce que je peux faire ici)`);
+      continue;
+    }
     try {
       switch (a.op) {
         case "create_event": {
@@ -175,7 +186,19 @@ export async function executePlan(userId: string, actions: AssistantAction[], re
         case "create_task": {
           if (!a.title) break;
           const day = a.date && DATE.test(a.date) ? a.date : today;
-          const t = await prisma.task.create({ data: { userId, title: a.title.slice(0, 200), category: section(a.section), dueDate: atWall(day, a.time && TIME.test(a.time) ? a.time : "23:59"), priority: "Medium", status: "ToDo" } });
+          // Filed under a project only if that project was shown and is the user's.
+          const project = a.project && ctx.projectIds?.has(a.project) ? await prisma.project.findFirst({ where: { id: a.project.slice(2), userId }, select: { id: true } }) : null;
+          const t = await prisma.task.create({
+            data: {
+              userId,
+              title: a.title.slice(0, 200),
+              category: project ? `projets:${project.id}` : section(a.section),
+              projectId: project?.id ?? null,
+              dueDate: a.date || !project ? atWall(day, a.time && TIME.test(a.time) ? a.time : "23:59") : null,
+              priority: "Medium",
+              status: "ToDo",
+            },
+          });
           undos.push({ t: "delete-task", id: t.id });
           did.push(`« ${t.title} » ajouté à tes tâches${day !== today ? ` pour ${dayWords(day)}` : ""}.`);
           ok = true;
@@ -401,6 +424,35 @@ export async function executePlan(userId: string, actions: AssistantAction[], re
             `${added} bloc${added > 1 ? "s" : ""} planifié${added > 1 ? "s" : ""} sur la semaine, autour de ${w.fixed} engagement${w.fixed > 1 ? "s" : ""} fixe${w.fixed > 1 ? "s" : ""} qui ne bougent pas.` +
               (w.unplaced.length ? ` Sans place : ${w.unplaced.slice(0, 4).map((u) => `${u.title} (${u.reason})`).join(" ; ")}.` : "")
           );
+          ok = true;
+          break;
+        }
+        case "create_project": {
+          const title = (a.title ?? a.name ?? "").trim().slice(0, 120);
+          if (!title) break;
+          const same = await prisma.project.findFirst({ where: { userId, title: { equals: title, mode: "insensitive" } }, select: { id: true } });
+          if (same) {
+            did.push(`Le projet « ${title} » existe déjà.`);
+            ok = true;
+            break;
+          }
+          const p = await prisma.project.create({ data: { userId, title, status: "NotStarted", dueDate: a.date && DATE.test(a.date) ? atWall(a.date, "23:59") : null } });
+          undos.push({ t: "delete-project", id: p.id });
+          did.push(`Projet « ${p.title} » créé.`);
+          navigate = `/tasks/projets/${p.id}`;
+          ok = true;
+          break;
+        }
+        case "add_milestone": {
+          if (!a.title?.trim() || !a.project || !ctx.projectIds?.has(a.project)) break;
+          const project = await prisma.project.findFirst({ where: { id: a.project.slice(2), userId }, select: { id: true, title: true } });
+          if (!project) break;
+          const count = await prisma.projectMilestone.count({ where: { projectId: project.id } });
+          const m = await prisma.projectMilestone.create({
+            data: { projectId: project.id, title: a.title.trim().slice(0, 200), dueDate: a.date && DATE.test(a.date) ? atWall(a.date, "23:59") : null, sortOrder: count },
+          });
+          undos.push({ t: "delete-milestone", id: m.id });
+          did.push(`Jalon « ${m.title} » ajouté à ${project.title}.`);
           ok = true;
           break;
         }

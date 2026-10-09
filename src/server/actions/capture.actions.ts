@@ -31,6 +31,7 @@ export type Undo =
   | { t: "restore-event"; data: { title: string; type: string; date: string; startTime: string | null; endTime: string | null; allDay: boolean; notes: string | null; courseId: string | null } }
   | { t: "many"; list: Undo[] }
   | { t: "delete-project"; id: string }
+  | { t: "delete-milestone"; id: string }
   | { t: "task-status"; id: string; status: string }
   | { t: "delete-course"; id: string }
   | { t: "layout-was"; data: Layout }
@@ -436,6 +437,8 @@ async function revert(userId: string, undo: Undo): Promise<number> {
   const own = { userId };
   const hit = ({ count }: { count: number }) => (count > 0 ? 0 : 1);
   switch (undo.t) {
+    case "delete-milestone":
+      return hit(await prisma.projectMilestone.deleteMany({ where: { id: undo.id, project: { userId } } }));
     case "delete-project": {
       // Only a project a workspace just created, and only once nothing else is filed in it.
       const p = await prisma.project.findFirst({ where: { id: undo.id, ...own }, select: { id: true } });
