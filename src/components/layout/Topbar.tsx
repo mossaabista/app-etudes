@@ -6,10 +6,13 @@ import { BRAND } from "@/lib/brand";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { navFor, isActive } from "@/lib/nav";
+import { activeKey, navByKeys } from "@/lib/nav";
+import { RoleSwitcher } from "@/components/layout/RoleSwitcher";
+import type { ProfileType } from "@/lib/profile";
 
-export function Topbar({ student = true }: { student?: boolean }) {
+export function Topbar({ nav, role, roles }: { nav: string[]; role: ProfileType; roles: ProfileType[] }) {
   const pathname = usePathname();
+  const current = activeKey(nav, pathname);
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -30,14 +33,20 @@ export function Topbar({ student = true }: { student?: boolean }) {
 
       {menuOpen && (
         <div className="md:hidden fixed inset-0 z-[45] overflow-y-auto bg-[linear-gradient(180deg,#2a1d0a,#140d04)] pt-[var(--mobile-header-h)] pb-[env(safe-area-inset-bottom,0px)]">
-          <nav className="space-y-0.5 p-3">
-            {navFor(student).map((item) => {
-              const active = isActive(item.href, pathname);
+          {roles.length > 1 && (
+            <div className="px-3 pt-3">
+              <RoleSwitcher role={role} roles={roles} />
+            </div>
+          )}
+          <nav aria-label="Menu" className="space-y-0.5 p-3">
+            {navByKeys(nav).map((item) => {
+              const active = item.key === current;
               const Icon = item.icon;
               return (
                 <Link
-                  key={item.href}
+                  key={item.key}
                   href={item.href}
+                  aria-current={active ? "page" : undefined}
                   onClick={() => setMenuOpen(false)}
                   className={`flex items-center gap-2.5 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${
                     active

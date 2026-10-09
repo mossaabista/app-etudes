@@ -78,7 +78,30 @@ export const DEFAULT_LAYOUT: Record<ProfileType, Layout> = {
   sportif: {
     areas: [pick("sante"), pick("quotidien", ["courses", "finances"]), pick("social"), pick("esprit", ["meditation"]), pick("apprentissage", ["lectures"])],
   },
+  freelance: {
+    areas: [pick("travail", ["taches", "livrables", "suivis", "reunions"]), pick("projets"), pick("quotidien", ["finances", "rendezvous"]), pick("apprentissage"), pick("sante", ["sport", "sommeil"]), pick("social")],
+  },
+  personnel: {
+    areas: [pick("quotidien"), pick("sante"), pick("social"), pick("esprit"), pick("apprentissage", ["lectures", "competences"])],
+  },
 };
+
+/**
+ * The ready-made sectors for several roles at once: the active role's set first, then
+ * whatever the other roles add (a missing sector, or missing sections in a shared one).
+ */
+export function layoutForRoles(active: ProfileType, roles: ProfileType[]): Layout {
+  const areas: AreaSpec[] = DEFAULT_LAYOUT[active].areas.map((a) => ({ ...a, subs: [...a.subs] }));
+  for (const r of roles) {
+    if (r === active) continue;
+    for (const a of DEFAULT_LAYOUT[r].areas) {
+      const mine = areas.find((x) => x.key === a.key);
+      if (!mine) areas.push({ ...a, subs: [...a.subs] });
+      else for (const s of a.subs) if (!mine.subs.some((x) => x.key === s.key)) mine.subs.push(s);
+    }
+  }
+  return { areas };
+}
 
 /** Library sections by "area:sub", for "ajoute la nutrition" and the picker. */
 export const LIBRARY_SUBS = LIBRARY.flatMap((a) => a.subs.map((s) => ({ ...s, area: a.key, areaLabel: a.label, id: `${a.key}:${s.key}` })));

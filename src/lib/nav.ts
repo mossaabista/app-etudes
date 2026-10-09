@@ -1,43 +1,90 @@
-import { Sun, CalendarDays, BookOpen, LayoutGrid, Settings, type LucideIcon } from "lucide-react";
+import { Sun, CalendarDays, BookOpen, LayoutGrid, Settings, FolderKanban, Dumbbell, type LucideIcon } from "lucide-react";
+import type { NavPrefs, ProfileType } from "@/lib/profile";
 
-export interface NavItem {
+/**
+ * The navigation, declared once. Four places are always there — Aujourd'hui, Calendrier,
+ * Secteurs, Réglages. The others are modules: shown by default to the roles that need them
+ * AND to anyone who already has data in them, so changing role never hides your courses
+ * or projects. The user's own choices (show / hide) win over both.
+ */
+
+export interface NavModule {
+  key: string;
   label: string;
   href: string;
   icon: LucideIcon;
-  /** Only meaningful for students (courses). */
-  student?: boolean;
+  /** Always shown, cannot be hidden. */
+  core?: boolean;
+  /** Roles that get this module by default. */
+  roles?: ProfileType[];
+  /** Shown by default to anyone with data of this kind. */
+  data?: "courses" | "projects";
+  /** Only meaningful when this sector exists in the user's layout. */
+  needsArea?: string;
+  /** Pages that belong to this entry, so it stays lit on them. */
+  under: string[];
+  desc: string;
 }
 
-/**
- * Five places, no more. Assessments, labs, the syllabus import and the Brightspace sync
- * live inside Cours; projects are a sector. Their old pages still answer, they are simply
- * reached from where they belong.
- */
-export const NAV_ITEMS: NavItem[] = [
-  { label: "Aujourd'hui", href: "/today", icon: Sun },
-  { label: "Calendrier", href: "/calendar", icon: CalendarDays },
-  { label: "Cours", href: "/courses", icon: BookOpen, student: true },
-  { label: "Secteurs", href: "/tasks", icon: LayoutGrid },
-  { label: "Réglages", href: "/settings", icon: Settings },
+export const NAV_MODULES: NavModule[] = [
+  { key: "today", label: "Aujourd'hui", href: "/today", icon: Sun, core: true, under: ["/today"], desc: "Ta journée" },
+  { key: "calendar", label: "Calendrier", href: "/calendar", icon: CalendarDays, core: true, under: ["/calendar"], desc: "Semaine et mois" },
+  {
+    key: "courses",
+    label: "Cours",
+    href: "/courses",
+    icon: BookOpen,
+    roles: ["etudiant"],
+    data: "courses",
+    under: ["/courses", "/assessments", "/labs", "/syllabus", "/sync"],
+    desc: "Cours, évaluations, labos, syllabus",
+  },
+  { key: "projects", label: "Projets", href: "/projects", icon: FolderKanban, roles: ["pro", "entrepreneur", "freelance"], data: "projects", under: ["/projects"], desc: "Projets, jalons et équipe" },
+  { key: "training", label: "Entraînement", href: "/tasks/sante/sport", icon: Dumbbell, roles: ["sportif"], needsArea: "sante", under: ["/tasks/sante/sport"], desc: "Séances et programme" },
+  { key: "sectors", label: "Secteurs", href: "/tasks", icon: LayoutGrid, core: true, under: ["/tasks", "/projects"], desc: "Les domaines de ta vie" },
+  { key: "settings", label: "Réglages", href: "/settings", icon: Settings, core: true, under: ["/settings"], desc: "Profil, assistant, données" },
 ];
 
-/** The navigation for a profile: Cours only for students. */
-export function navFor(student: boolean) {
-  return NAV_ITEMS.filter((i) => student || !i.student);
+export const OPTIONAL_MODULES = NAV_MODULES.filter((m) => !m.core);
+
+export interface NavContext {
+  roles: ProfileType[];
+  prefs: NavPrefs;
+  counts: { courses: number; projects: number };
+  areas: string[];
 }
 
-/** Phone tab bar: four entries. */
-export function mobileNavFor(student: boolean) {
-  return navFor(student).slice(0, 4);
+/** Whether an optional module shows, and why — for the settings page. */
+export function moduleState(m: NavModule, ctx: NavContext): { on: boolean; why: string } {
+  if (m.core) return { on: true, why: "Toujours affiché" };
+  if (m.needsArea && !ctx.areas.includes(m.needsArea)) return { on: false, why: "Le secteur correspondant n'est pas dans tes secteurs" };
+  if (ctx.prefs.hidden.includes(m.key)) return { on: false, why: "Masqué par toi" };
+  if (ctx.prefs.shown.includes(m.key)) return { on: true, why: "Affiché par toi" };
+  if (m.roles?.some((r) => ctx.roles.includes(r))) return { on: true, why: "Pour ton profil" };
+  if (m.data && ctx.counts[m.data] > 0) return { on: true, why: m.data === "courses" ? "Tu as des cours" : "Tu as des projets" };
+  return { on: false, why: "Pas utile pour ton profil" };
 }
 
-/** Pages that belong to Cours, so the Cours entry stays lit on them. */
-export const UNDER_COURSES = ["/courses", "/assessments", "/labs", "/syllabus", "/sync"];
-/** Pages that belong to Secteurs. */
-export const UNDER_SECTORS = ["/tasks", "/projects"];
+/** The keys of the entries to show, in order. */
+export function navKeys(ctx: NavContext): string[] {
+  return NAV_MODULES.filter((m) => moduleState(m, ctx).on).map((m) => m.key);
+}
 
-/** Whether a nav entry is the current one, counting the pages folded into it. */
-export function isActive(href: string, pathname: string) {
-  const under = href === "/courses" ? UNDER_COURSES : href === "/tasks" ? UNDER_SECTORS : [href];
-  return under.some((h) => pathname === h || pathname.startsWith(h + "/"));
+export const navByKeys = (keys: string[]) => NAV_MODULES.filter((m) => keys.includes(m.key));
+
+/** Phone tab bar: four entries — today, calendar, the first module, sectors. */
+export function mobileNav(keys: string[]) {
+  const items = navByKeys(keys).filter((m) => m.key !== "settings");
+  if (items.length <= 4) return items;
+  const optional = items.filter((m) => !m.core);
+  return items.filter((m) => m.core || m === optional[0]);
+}
+
+/** The one entry to light for a page: the most specific match among those shown. */
+export function activeKey(keys: string[], pathname: string): string | null {
+  let best: { key: string; len: number } | null = null;
+  for (const m of navByKeys(keys))
+    for (const h of m.under)
+      if ((pathname === h || pathname.startsWith(h + "/")) && (!best || h.length > best.len)) best = { key: m.key, len: h.length };
+  return best?.key ?? null;
 }

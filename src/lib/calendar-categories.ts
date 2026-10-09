@@ -65,6 +65,8 @@ const BY_PROFILE: Record<ProfileType, CalCategory[]> = {
   pro: ["reunion", "livrable", "tache", "pilote", "formation", "sport", "perso"],
   entrepreneur: ["reunion", "equipe", "livrable", "finances", "tache", "pilote", "perso"],
   sportif: ["sport", "nutrition", "sante", "pilote", "tache", "perso"],
+  freelance: ["reunion", "livrable", "finances", "tache", "pilote", "formation", "perso"],
+  personnel: ["perso", "sante", "sport", "finances", "tache", "pilote"],
 };
 
 /** Where a category goes when the profile does not list it. */

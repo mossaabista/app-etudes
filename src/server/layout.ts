@@ -1,17 +1,17 @@
 import { cache } from "react";
 import { prisma } from "@/lib/db";
-import { DEFAULT_LAYOUT, sanitizeLayout, type AreaSpec, type Layout } from "@/lib/layout";
+import { layoutForRoles, sanitizeLayout, type AreaSpec, type Layout } from "@/lib/layout";
 import { getProfile } from "@/server/profile";
 
 export const LAYOUT_MODULE = "app:layout";
 
-/** The user's sectors: their own if they changed anything, otherwise their profile's set. */
+/** The user's sectors: their own if they changed anything, otherwise their roles' set. */
 export const getLayout = cache(async (userId: string): Promise<Layout> => {
   const row = await prisma.trackerEntry.findFirst({ where: { userId, module: LAYOUT_MODULE, kind: "layout" }, orderBy: { updatedAt: "desc" } });
   const own = row ? sanitizeLayout(row.data) : null;
   if (own) return own;
   const profile = await getProfile(userId);
-  return DEFAULT_LAYOUT[profile?.type ?? "etudiant"];
+  return layoutForRoles(profile?.type ?? "etudiant", profile?.roles ?? ["etudiant"]);
 });
 
 export async function saveLayout(userId: string, layout: Layout) {

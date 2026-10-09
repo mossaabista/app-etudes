@@ -12,12 +12,29 @@ import { AutonomySettings } from "@/components/settings/AutonomySettings";
 import { getAutonomy } from "@/server/autonomy";
 import { AgentHistory } from "@/components/settings/AgentHistory";
 import { historyRows } from "@/server/agent-log";
+import { NavSettings } from "@/components/settings/NavSettings";
+import { OPTIONAL_MODULES, moduleState } from "@/lib/nav";
+import { getLayout } from "@/server/layout";
+import { prisma } from "@/lib/db";
 import { BRAND } from "@/lib/brand";
 import { APP_TIMEZONE } from "@/lib/dates";
 
 export default async function SettingsPage() {
   const user = await requireUser();
-  const [profile, autonomy, actions] = await Promise.all([getProfile(user.id), getAutonomy(user.id), historyRows(user.id)]);
+  const [profile, autonomy, actions, courses, projects, layout] = await Promise.all([
+    getProfile(user.id),
+    getAutonomy(user.id),
+    historyRows(user.id),
+    prisma.course.count({ where: { userId: user.id } }),
+    prisma.project.count({ where: { userId: user.id } }),
+    getLayout(user.id),
+  ]);
+  const prefs = profile?.nav ?? { shown: [], hidden: [] };
+  const navCtx = { roles: profile?.roles ?? ["etudiant" as const], prefs, counts: { courses, projects }, areas: layout.areas.map((a) => a.key) };
+  const modules = OPTIONAL_MODULES.map((m) => {
+    const st = moduleState(m, navCtx);
+    return { key: m.key, label: m.label, desc: m.desc, ...st, forced: prefs.shown.includes(m.key) || prefs.hidden.includes(m.key), blocked: !!m.needsArea && !navCtx.areas.includes(m.needsArea) };
+  });
   const when = new Intl.DateTimeFormat("fr-CA", { timeZone: APP_TIMEZONE, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   const history = actions?.map(({ createdAt, ...a }) => ({ ...a, when: when.format(createdAt) })) ?? null;
   const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
@@ -43,6 +60,13 @@ export default async function SettingsPage() {
           <CardHeader title="Profil et écran du jour" subtitle="Ce que l'app met en avant pour toi" />
           <CardBody>
             <ProfileSettings current={profile} />
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader title="Menu" subtitle="Les modules de ta navigation" />
+          <CardBody>
+            <NavSettings modules={modules} />
           </CardBody>
         </Card>
 

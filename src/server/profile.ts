@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { prisma } from "@/lib/db";
-import { CARDS, LEGACY_CARDS, profileOf, type Profile, type ProfileType, type TodayCard } from "@/lib/profile";
+import { profileOf, sanitizeProfile, type Profile } from "@/lib/profile";
 
 /** Settings rows live with the section rows, under a module of their own. */
 export const PROFILE_MODULE = "app:profile";
@@ -12,12 +12,17 @@ export const PROFILE_MODULE = "app:profile";
  */
 export const getProfile = cache(async (userId: string): Promise<Profile | null> => {
   const row = await prisma.trackerEntry.findFirst({ where: { userId, module: PROFILE_MODULE, kind: "profile" }, orderBy: { updatedAt: "desc" } });
-  if (row) {
-    const data = (row.data ?? {}) as { type?: ProfileType; cards?: TodayCard[] };
-    const type = data.type ?? "etudiant";
-    const cards = [...new Set((data.cards ?? []).map((c) => LEGACY_CARDS[c] ?? c))].filter((c) => CARDS.some((x) => x.key === c));
-    return { type, cards: cards.length ? cards : profileOf(type).cards };
-  }
+  if (row) return sanitizeProfile(row.data);
   const courses = await prisma.course.count({ where: { userId } });
-  return courses > 0 ? { type: "etudiant", cards: profileOf("etudiant").cards } : null;
+  return courses > 0 ? { type: "etudiant", roles: ["etudiant"], cards: profileOf("etudiant").cards, cardsByRole: {}, nav: { shown: [], hidden: [] } } : null;
 });
+
+/** Write the whole profile (one row per user). */
+export async function saveProfile(userId: string, profile: Profile) {
+  const clean = sanitizeProfile(profile);
+  const data = JSON.parse(JSON.stringify({ type: clean.type, roles: clean.roles, cards: clean.cards, cardsByRole: { ...clean.cardsByRole, [clean.type]: clean.cards }, nav: clean.nav }));
+  const existing = await prisma.trackerEntry.findFirst({ where: { userId, module: PROFILE_MODULE, kind: "profile" } });
+  if (existing) await prisma.trackerEntry.update({ where: { id: existing.id }, data: { data } });
+  else await prisma.trackerEntry.create({ data: { userId, module: PROFILE_MODULE, kind: "profile", data } });
+  return clean;
+}
