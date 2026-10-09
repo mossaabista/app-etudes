@@ -3,6 +3,7 @@ import { APP_TIMEZONE, fromISODate, toISODate, wallTimeToUtc } from "@/lib/dates
 import { addMinutes, minutesBetween } from "@/lib/command";
 import { guessAisle } from "@/lib/grocery";
 import { LIBRARY, LIBRARY_SUBS, PALETTE, sanitizeLayout, slug, type AreaSpec, type Layout, type SubSpec } from "@/lib/layout";
+import { scheduleWorkouts } from "@/server/fitness";
 import { askAssistant, assistantContext, type AssistantAction, type Turn } from "@/server/assistant";
 import { agentById, allowedOps, neededContext, type AgentDef, type Op } from "@/server/core/agents";
 import { assessRisk, type Risk } from "@/lib/risk";
@@ -49,6 +50,7 @@ const VERBS: Record<AssistantAction["op"], string> = {
   create_workspace: "créer l'espace",
   create_project: "créer le projet",
   add_milestone: "ajouter le jalon",
+  plan_workouts: "planifier les séances",
 };
 
 export const describeAction = (a: AssistantAction, labels?: Map<string, string>) => {
@@ -424,6 +426,13 @@ export async function executePlan(userId: string, actions: AssistantAction[], re
             `${added} bloc${added > 1 ? "s" : ""} planifié${added > 1 ? "s" : ""} sur la semaine, autour de ${w.fixed} engagement${w.fixed > 1 ? "s" : ""} fixe${w.fixed > 1 ? "s" : ""} qui ne bougent pas.` +
               (w.unplaced.length ? ` Sans place : ${w.unplaced.slice(0, 4).map((u) => `${u.title} (${u.reason})`).join(" ; ")}.` : "")
           );
+          ok = true;
+          break;
+        }
+        case "plan_workouts": {
+          const w = await scheduleWorkouts(userId, { count: a.sessions, minutes: a.minutes, when: a.when, title: a.title });
+          for (const id of w.ids) undos.push({ t: "delete-event", id });
+          did.push(w.message);
           ok = true;
           break;
         }

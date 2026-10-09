@@ -23,6 +23,7 @@ import {
   type ModuleProps,
 } from "@/components/modules/kit";
 import { ProgramBuilder, StrengthLog } from "@/components/modules/sections/sport-extra";
+import { WorkoutPlanner } from "@/components/modules/sections/WorkoutPlanner";
 
 // =========================================================================== Sport
 
@@ -227,6 +228,8 @@ export function Sport({ module, today, entries, related }: ModuleProps) {
       </Block>
 
       <StrengthLog module={module} today={today} entries={entries} exercises={EXERCISES.filter((x) => x.muscle !== "Cardio").map((x) => x.name)} />
+      <WorkoutPlanner />
+
       <ProgramBuilder module={module} today={today} entries={entries} />
 
       <Block title="Programmes" hint="Des séances prêtes : planifie-les dans ton calendrier, ou note-les comme faites.">

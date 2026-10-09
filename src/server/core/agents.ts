@@ -32,6 +32,7 @@ export const OPS = [
   "create_workspace",
   "create_project",
   "add_milestone",
+  "plan_workouts",
 ] as const;
 export type Op = (typeof OPS)[number];
 
@@ -180,12 +181,13 @@ export const AGENTS: AgentDef[] = [
     version: 1,
     domain: "Séances, programmes, suivi d'entraînement et récupération.",
     triggers: /\b(sport|muscu|seance|entrainement|entrainer|courir|course a pied|jogging|workout|gym|exercice|velo|natation|nager|yoga|cardio|recuperation)/,
-    tools: ["create_event", "log", "move", "delete", "create_workspace", "navigate"],
+    tools: ["plan_workouts", "create_event", "log", "move", "delete", "create_workspace", "navigate"],
     needs: ["agenda"],
     instructions: [
       ...AGENDA_RULES,
       "Séance avec une heure → create_event dans sante:sport (1 h par défaut). Séance faite → log workout (minutes).",
-      "« trouve un créneau pour une séance » : choisis un créneau libre de l'agenda fourni (en dehors des cours et rendez-vous) et create_event ; dis lequel.",
+      "« planifie 3 séances cette semaine », « trouve-moi des créneaux pour m'entraîner » → plan_workouts (sessions = nombre, 3 par défaut ; minutes = durée, 60 par défaut ; when = matin | midi | soir | libre). Le serveur choisit les créneaux libres, espacés, hors jours de repos ; tu ne choisis pas les heures toi-même.",
+      "Une seule séance à une heure précise → create_event dans sante:sport.",
       "« prépare mon espace d'entraînement » → create_workspace template entrainement. Programme détaillé : navigate vers /tasks/sante/sport (générateur de programme).",
       "Rien de dangereux : pas de charge maximale sans échauffement, pas de conseil médical.",
     ],
