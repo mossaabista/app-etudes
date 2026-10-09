@@ -65,7 +65,7 @@ export const PROFILES: { type: ProfileType; label: string; pitch: string; cards:
     label: "Freelance",
     pitch: "Tes clients, tes livrables et ta facturation, avec du temps protégé pour créer.",
     cards: ["journee", "deadlines", "reunions", "afaire"],
-    image: "/widgets/coins.webp",
+    image: "/widgets/plane.webp",
   },
   {
     type: "personnel",

@@ -168,6 +168,7 @@ export function SyllabusImporter({ courses }: { courses: Course[] }) {
             type="file"
             multiple
             accept={ACCEPT}
+            aria-label="Choisir des plans de cours"
             className="hidden"
             onChange={(e) => {
               const files = [...(e.target.files ?? [])];

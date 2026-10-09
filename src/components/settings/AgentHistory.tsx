@@ -40,7 +40,7 @@ export function AgentHistory({ rows }: { rows: HistoryRow[] | null }) {
         {list.map((r) => (
           <li key={r.id} className="flex flex-wrap items-start gap-x-3 gap-y-1 py-2.5">
             <History size={14} className="mt-0.5 shrink-0 text-[#f0cd79]" aria-hidden />
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 basis-[13rem]">
               <p className="text-sm text-[var(--ink)]">{r.summary}</p>
               <p className="text-xs text-[var(--ink-dim)]">
                 {r.when} · <span className={r.status === "partial" ? "text-[#ffb3a3]" : undefined}>{STATUS[r.status] ?? r.status}</span>

@@ -37,7 +37,7 @@ export function NavSettings({ modules }: { modules: NavModuleRow[] }) {
       <ul className="space-y-2">
         {modules.map((m) => (
           <li key={m.key} className="tile flex flex-wrap items-center gap-3 px-4 py-3">
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 basis-[13rem]">
               <p className="text-sm font-semibold text-[var(--ink)]">{m.label}</p>
               <p className="text-xs text-[var(--ink-dim)]">
                 {m.desc} · <span className={m.on ? "text-[#f0cd79]" : ""}>{m.on ? "Affiché" : "Masqué"}</span> — {m.why}

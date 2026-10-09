@@ -23,8 +23,8 @@ export function RadarPanel({ alerts }: { alerts: RadarAlert[] }) {
             <span className={`rounded-full px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide ${a.level === "high" ? "bg-[rgba(255,140,120,0.16)] text-[#ffb3a3]" : "bg-[rgba(240,205,121,0.14)] text-[#f0cd79]"}`}>
               {KIND[a.kind]}
             </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm text-[var(--ink)]">{a.title}</p>
+            <div className="min-w-0 flex-1 basis-[13rem]">
+              <p className="text-sm text-[var(--ink)]">{a.title}</p>
               <p className="text-xs text-[var(--ink-dim)]">{a.detail}</p>
             </div>
             <Link href={a.href} className="mod-chip focus-ring shrink-0">
