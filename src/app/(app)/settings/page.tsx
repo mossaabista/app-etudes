@@ -21,11 +21,14 @@ import { OPTIONAL_MODULES, moduleState } from "@/lib/nav";
 import { getLayout } from "@/server/layout";
 import { prisma } from "@/lib/db";
 import { BRAND } from "@/lib/brand";
+import { integrationStatus } from "@/server/integrations";
+import { Integrations } from "@/components/settings/Integrations";
+import { DeleteAccount } from "@/components/settings/DeleteAccount";
 import { APP_TIMEZONE } from "@/lib/dates";
 
 export default async function SettingsPage() {
   const user = await requireUser();
-  const [profile, autonomy, actions, courses, projects, layout, planning, facts, documents] = await Promise.all([
+  const [profile, autonomy, actions, courses, projects, layout, planning, facts, documents, integrations] = await Promise.all([
     getProfile(user.id),
     getAutonomy(user.id),
     historyRows(user.id),
@@ -35,6 +38,7 @@ export default async function SettingsPage() {
     getPlanningPrefs(user.id),
     listFacts(user.id),
     prisma.trackerEntry.count({ where: { userId: user.id, module: "app:documents" } }),
+    integrationStatus(user.id),
   ]);
   const prefs = profile?.nav ?? { shown: [], hidden: [] };
   const navCtx = { roles: profile?.roles ?? ["etudiant" as const], prefs, counts: { courses, projects, documents }, areas: layout.areas.map((a) => a.key) };
@@ -130,6 +134,13 @@ export default async function SettingsPage() {
         </Card>
 
         <Card>
+          <CardHeader title="Intégrations" subtitle="Ce qui est vraiment connecté, et ce qui ne l'est pas" />
+          <CardBody>
+            <Integrations items={integrations} />
+          </CardBody>
+        </Card>
+
+        <Card>
           <CardHeader title="Tes données" subtitle="Elles t'appartiennent" />
           <CardBody className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -142,6 +153,9 @@ export default async function SettingsPage() {
             </div>
             <div className="border-t border-[rgba(255,220,148,0.1)] pt-4">
               <LogoutButton />
+            </div>
+            <div className="border-t border-[rgba(255,220,148,0.1)] pt-4">
+              <DeleteAccount />
             </div>
           </CardBody>
         </Card>
