@@ -43,9 +43,9 @@ Aucune base de données n'est accessible dans cet environnement : les flux ci-de
 | Profils (Étudiant, Pro, Entrepreneur, Sportif) | Partiel | 4 profils, un seul actif, la navigation ne varie que par « Cours » |
 | Réglages | Fonctionnel | Profil, cartes Aujourd'hui, notifications push |
 | Assistant texte / voix | Partiel → amélioré | Exécutait sans confirmation, et affichait la réponse du modèle même si l'action avait échoué (corrigé au lot 1) |
-| Confirmation selon le risque | Non implémenté | Suppressions en lot exécutées sans confirmation (annulables) |
-| Historique des actions (« qu'as-tu changé ? ») | Non implémenté | Seule la dernière commande est annulable, côté client |
-| Idempotence des actions de l'agent | Non implémenté | Un renvoi de la requête recrée l'événement |
+| Confirmation selon le risque | Implémenté (phase 2) | Voir § 7 |
+| Historique des actions (« qu'as-tu changé ? ») | Implémenté, inactif tant que la migration n'est pas lancée | Voir § 7 |
+| Idempotence des actions de l'agent | Implémenté, inactif tant que la migration n'est pas lancée | Voir § 7 |
 | Mémoire contrôlable | Non implémenté | Historique de 6 tours côté client seulement |
 | Fuseau par utilisateur | Non implémenté | |
 
@@ -74,3 +74,60 @@ Aucune migration ni modification de données ; aucun changement visuel hors du t
 3. **Import de syllabus** (phase 4) : source et niveau de confiance par élément, dates ambiguës signalées, DOCX et images.
 4. **Fuseau par utilisateur** : `APP_TIMEZONE` est utilisé partout ; le rendre paramétrable demande un passage soigneux sur `src/lib/dates.ts` et ses appelants.
 5. **Migrations Prisma** : le dépôt n'a pas d'historique de migrations. Avant toute évolution du schéma, il faut établir une migration de référence (`prisma migrate diff`) **avec l'accord du propriétaire et une sauvegarde de la base Neon**.
+
+## 7. Phase 2 — confirmation selon le risque et journal de l'agent
+
+### Confirmation selon le risque (sans changement de schéma)
+
+- `src/lib/risk.ts` : chaque action proposée reçoit un niveau de risque.
+  - **Faible** : ajouter, déplacer, renommer, cocher, noter, créer un cours ou une section.
+  - **Moyen** : planifier une journée ou des révisions, masquer un secteur ou une section, créer un secteur avec des sections, supprimer un élément, plus de 5 modifications d'un coup.
+  - **Élevé** : plusieurs suppressions à la fois.
+- Trois modes, choisis dans **Réglages → Assistant** :
+  - **Prudent** : demande avant toute modification.
+  - **Équilibré** (par défaut) : demande avant tout risque moyen ou élevé.
+  - **Autonome** : n'exécute sans demander que les catégories cochées (plans, secteurs, suppressions unitaires, lots), révocables à tout moment.
+  - **Plusieurs suppressions demandent toujours confirmation**, quel que soit le mode.
+- Quand une confirmation est nécessaire, **rien n'est modifié**. L'assistant affiche la liste des changements, la raison de la demande, et les boutons « Confirmer » ou « Ne rien faire ».
+  - La proposition voyage dans un jeton signé (HMAC, lié à l'utilisateur, valable 10 min, `src/server/pending.ts`).
+  - À la confirmation, le plan est ré-exécuté sur des données fraîches, avec toutes les vérifications habituelles.
+- Le parseur à règles (sans clé API) applique les mêmes règles aux suppressions : texte, voix, avec ou sans IA se comportent pareil.
+- **Changement de comportement visible** : en mode équilibré, « supprime le dentiste de mardi » demande désormais une confirmation. Pour l'éviter, passe en mode autonome et coche « Supprimer un élément à la fois ».
+
+### Journal de l'agent (`AgentAction`)
+
+- Modèle Prisma `AgentAction` et script additif `scripts/migrate-agent-log.mjs`. **Le script n'a pas été exécuté.**
+- Une ligne par requête qui a réellement modifié quelque chose. Elle contient le message affiché et l'annulation, stockée côté serveur. **La phrase brute n'est jamais stockée** : elle peut contenir des données de santé.
+- On garde les 200 dernières lignes par utilisateur ; la suppression du compte efface le journal (cascade).
+- Ce que le journal permet :
+  - **Idempotence** : chaque envoi porte un identifiant d'opération. La même soumission, ou la même confirmation validée deux fois, ne s'exécute qu'une fois et répond « Déjà fait ».
+  - « **Qu'est-ce que tu as changé ?** » liste les dernières modifications.
+  - « **Annule ta dernière action** » annule la dernière modification de moins de 24 h, avec l'annulation stockée côté serveur et jamais avec celle envoyée par le navigateur.
+  - **Réglages → Ce que l'assistant a changé** : historique avec un bouton Annuler par entrée récente.
+- **Avant la migration**, tout appel au journal répond « indisponible » : les commandes fonctionnent comme avant, et l'historique indique honnêtement qu'il n'est pas activé.
+
+### Activer le journal (à lancer en local, après une sauvegarde Neon)
+
+```bash
+npm install                                   # régénère le client Prisma (postinstall)
+node scripts/migrate-agent-log.mjs --dry-run  # affiche le SQL, ne touche à rien
+node scripts/migrate-agent-log.mjs            # crée la table (CREATE ... IF NOT EXISTS)
+```
+
+Pour revenir en arrière : `DROP TABLE "AgentAction";` (seul le journal est perdu).
+
+### Tests
+
+57 tests (`npm test`) :
+- risque et modes ;
+- jeton de confirmation : refus d'un autre utilisateur, d'un jeton falsifié ou expiré ;
+- confirmation de bout en bout, par l'assistant et par le parseur à règles ;
+- idempotence ;
+- historique et annulation : isolation entre comptes, élagage ;
+- fonctionnement sans la table.
+
+### Non vérifié faute d'environnement
+
+- Exécution contre une vraie base Neon.
+- Rendu du panneau de confirmation et de l'historique dans un navigateur.
+- Réponse réelle de Claude : le modèle est simulé dans les tests.
