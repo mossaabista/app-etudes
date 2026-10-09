@@ -6,27 +6,96 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/server/auth/current-user";
 import { toISODate, wallTimeToUtc } from "@/lib/dates";
 import { parseSyllabus, type FoundAssessment, type FoundSlot, type ParsedSyllabus } from "@/lib/syllabus-parse";
-import { parseSyllabusWithClaude } from "@/server/syllabus-ai";
+import { parseSyllabusFileWithClaude, parseSyllabusWithClaude, syllabusAiEnabled, type SyllabusFile } from "@/server/syllabus-ai";
+import { docxText } from "@/server/docx";
+import { sourceNote, suspiciousLines, titleKey } from "@/lib/syllabus-review";
 
 const MAX_BYTES = 4 * 1024 * 1024;
+const IMAGE_TYPES: Record<string, SyllabusFile["mediaType"]> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif" };
 
-/** Read a syllabus PDF and return what was found, for the student to review. Nothing is saved. */
-export async function analyzeSyllabusAction(form: FormData): Promise<{ error: string } | { fileName: string; parsed: ParsedSyllabus; pages: number; excerpt: string }> {
+export type AnalyzedSyllabus = {
+  fileName: string;
+  parsed: ParsedSyllabus;
+  pages: number;
+  /** The document's text, page by page: what each date is traced back to. */
+  pageTexts: string[];
+  excerpt: string;
+  /** How it was read, in words, and anything the student should know about it. */
+  readBy: string;
+  warnings: string[];
+};
+
+/**
+ * Read a syllabus — PDF with text, Word document, scanned PDF or photo — and return what
+ * was found, for the student to review. Nothing is saved.
+ */
+export async function analyzeSyllabusAction(form: FormData): Promise<{ error: string } | AnalyzedSyllabus> {
   await requireUser();
   const file = form.get("file");
-  if (!(file instanceof File) || !file.size) return { error: "Choisis un fichier PDF." };
-  if (!file.name.toLowerCase().endsWith(".pdf")) return { error: "Seuls les PDF sont acceptés." };
+  if (!(file instanceof File) || !file.size) return { error: "Choisis un fichier." };
   if (file.size > MAX_BYTES) return { error: "Fichier trop lourd (4 Mo maximum)." };
+  const ext = file.name.toLowerCase().split(".").pop() ?? "";
+  const today = toISODate(new Date());
+  const buf = Buffer.from(await file.arrayBuffer());
+  const warnings: string[] = [];
+
   try {
-    const pdf = await getDocumentProxy(new Uint8Array(await file.arrayBuffer()));
-    const { totalPages, text } = await extractText(pdf, { mergePages: true });
-    const content = Array.isArray(text) ? text.join("\n") : text;
-    if (content.trim().length < 40) return { error: "Ce PDF ne contient pas de texte lisible (c'est peut-être une image scannée)." };
-    const today = toISODate(new Date());
-    const parsed = (await parseSyllabusWithClaude(content, today)) ?? parseSyllabus(content, today);
-    return { fileName: file.name, parsed, pages: totalPages, excerpt: content.slice(0, 12000) };
+    let pageTexts: string[] = [];
+    let readBy = "";
+    let parsed: ParsedSyllabus | null = null;
+
+    if (ext === "pdf") {
+      const pdf = await getDocumentProxy(new Uint8Array(buf));
+      const { text } = await extractText(pdf, { mergePages: false });
+      pageTexts = (Array.isArray(text) ? text : [text]).map(String);
+      readBy = "texte du PDF";
+    } else if (ext === "docx") {
+      const text = docxText(buf);
+      if (text == null) return { error: "Impossible de lire ce document Word (.docx)." };
+      pageTexts = [text];
+      readBy = "texte du document Word";
+    } else if (IMAGE_TYPES[ext]) {
+      if (!syllabusAiEnabled()) return { error: "Lire une photo demande l'assistant (clé API absente sur ce serveur). Envoie plutôt le PDF ou le document Word du plan de cours." };
+      const r = await parseSyllabusFileWithClaude({ mediaType: IMAGE_TYPES[ext], base64: buf.toString("base64") }, today);
+      if (!r) return { error: "L'assistant n'a pas pu lire cette photo. Réessaie avec une image plus nette, ou envoie le PDF." };
+      parsed = r.parsed;
+      pageTexts = r.pages;
+      readBy = "photo lue par l'assistant";
+      warnings.push("Texte lu sur une photo : vérifie chaque date avant d'importer.");
+    } else {
+      return { error: "Formats acceptés : PDF, Word (.docx) et photos (JPG, PNG, WebP)." };
+    }
+
+    const content = pageTexts.join("\n");
+    if (!parsed && content.trim().length < 40) {
+      // A scanned PDF: no text layer. Claude can read the page images.
+      if (ext === "pdf" && syllabusAiEnabled()) {
+        const r = await parseSyllabusFileWithClaude({ mediaType: "application/pdf", base64: buf.toString("base64") }, today);
+        if (!r) return { error: "Ce PDF est une image scannée et l'assistant n'a pas pu le lire." };
+        parsed = r.parsed;
+        pageTexts = r.pages;
+        readBy = "PDF scanné lu par l'assistant";
+        warnings.push("PDF scanné : le texte a été reconnu par l'assistant, vérifie chaque date avant d'importer.");
+      } else {
+        return { error: "Ce document ne contient pas de texte lisible (c'est peut-être une image scannée). Sans l'assistant activé, envoie un PDF avec du texte ou le document Word." };
+      }
+    }
+
+    if (!parsed) {
+      const ai = await parseSyllabusWithClaude(content, today);
+      parsed = ai ?? parseSyllabus(content, today);
+      readBy += ai ? ", analysé par l'assistant" : ", analysé par règles";
+    }
+
+    const suspicious = suspiciousLines(pageTexts);
+    if (suspicious.length)
+      warnings.push(`Ce document contient ${suspicious.length} phrase${suspicious.length > 1 ? "s" : ""} qui ressemble${suspicious.length > 1 ? "nt" : ""} à des instructions (« ${suspicious[0].slice(0, 80)} ») : traitée${suspicious.length > 1 ? "s" : ""} comme du texte, jamais exécutée${suspicious.length > 1 ? "s" : ""}.`);
+    const total = parsed.assessments.reduce((n, a) => n + (a.weight ?? 0), 0);
+    if (parsed.assessments.length && total && Math.abs(total - 100) > 1) warnings.push(`Les pondérations trouvées font ${total} % au lieu de 100 % : il en manque ou il y en a en trop.`);
+
+    return { fileName: file.name, parsed, pages: pageTexts.length, pageTexts: pageTexts.map((p) => p.slice(0, 20000)).slice(0, 60), excerpt: pageTexts.join("\n").slice(0, 12000), readBy, warnings };
   } catch {
-    return { error: "Impossible de lire ce PDF." };
+    return { error: "Impossible de lire ce fichier." };
   }
 }
 
@@ -43,7 +112,7 @@ export async function importSyllabusAction(input: {
   fileName: string;
   topics?: string[];
   excerpt?: string;
-  assessments: FoundAssessment[];
+  assessments: (FoundAssessment & { source?: { page: number | null; excerpt: string } | null })[];
   schedule: FoundSlot[];
 }) {
   const user = await requireUser();
@@ -69,11 +138,12 @@ export async function importSyllabusAction(input: {
   }
 
   const existing = await prisma.assessment.findMany({ where: { userId: user.id, courseId }, select: { title: true, dueDate: true } });
-  const known = new Set(existing.map((a) => `${a.title.toLowerCase()}|${a.dueDate ? toISODate(a.dueDate) : ""}`));
+  // Same title (case, accents and spacing aside) and same day: already there, skipped.
+  const known = new Set(existing.map((a) => `${titleKey(a.title)}|${a.dueDate ? toISODate(a.dueDate) : ""}`));
   let added = 0;
   for (const a of input.assessments.slice(0, 80)) {
     const title = a.title.trim().slice(0, 200);
-    if (!title || known.has(`${title.toLowerCase()}|${a.date ?? ""}`)) continue;
+    if (!title || known.has(`${titleKey(title)}|${a.date ?? ""}`)) continue;
     let dueDate: Date | null = null;
     if (a.date) {
       const [y, m, d] = a.date.split("-").map(Number);
@@ -81,9 +151,20 @@ export async function importSyllabusAction(input: {
       dueDate = wallTimeToUtc([y, m, d, hh, mm, 0]);
     }
     await prisma.assessment.create({
-      data: { userId: user.id, courseId, title, type: a.type, weight: a.weight, dueDate, status: "Upcoming", source: "syllabus" },
+      data: {
+        userId: user.id,
+        courseId,
+        title,
+        type: a.type,
+        weight: a.weight,
+        dueDate,
+        status: "Upcoming",
+        source: "syllabus",
+        // Where the date came from, so it can always be checked against the document.
+        notes: sourceNote(input.fileName, a.source ?? null),
+      },
     });
-    known.add(`${title.toLowerCase()}|${a.date ?? ""}`);
+    known.add(`${titleKey(title)}|${a.date ?? ""}`);
     added++;
   }
 

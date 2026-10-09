@@ -2,9 +2,11 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Check, ChevronDown, FileUp, Loader2, Sparkles, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, Check, ChevronDown, FileUp, Loader2, Sparkles, X } from "lucide-react";
 import { analyzeSyllabusAction, importSyllabusAction } from "@/server/actions/syllabus.actions";
 import type { FoundAssessment, FoundSlot } from "@/lib/syllabus-parse";
+import { reviewAssessments, type Confidence, type ReviewedAssessment } from "@/lib/syllabus-review";
+import { toISODate } from "@/lib/dates";
 import { CheckBox, field } from "@/components/modules/kit";
 
 const TYPE_LABEL: Record<FoundAssessment["type"], string> = {
@@ -15,6 +17,15 @@ const TYPE_LABEL: Record<FoundAssessment["type"], string> = {
   Assignment: "Devoir",
   Presentation: "Présentation",
 };
+const CONFIDENCE: Record<Confidence, { label: string; color: string }> = {
+  high: { label: "Sûr", color: "#7fe0b0" },
+  medium: { label: "À vérifier", color: "#f0cd79" },
+  low: { label: "Douteux", color: "#ffb3a3" },
+};
+type Course = { id: string; code: string; name: string; assessments: { title: string; date: string | null }[] };
+const ACCEPT = ".pdf,.docx,.png,.jpg,.jpeg,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg,image/webp";
+const accepted = (name: string) => /\.(pdf|docx|png|jpe?g|webp)$/i.test(name);
+
 const DAY_LABEL: Record<string, string> = { Monday: "Lundi", Tuesday: "Mardi", Wednesday: "Mercredi", Thursday: "Jeudi", Friday: "Vendredi", Saturday: "Samedi", Sunday: "Dimanche" };
 
 interface Draft {
@@ -23,10 +34,13 @@ interface Draft {
   status: "reading" | "ready" | "error" | "importing" | "imported";
   error?: string;
   excerpt: string;
+  pageTexts: string[];
+  readBy: string;
+  warnings: string[];
   topics: string[];
   courseId: string;
   course: { code: string; name: string; professor: string; email: string; term: string };
-  rows: (FoundAssessment & { on: boolean })[];
+  rows: ReviewedAssessment[];
   slots: (FoundSlot & { on: boolean })[];
   result?: { courseId: string; added: number; slotsAdded: number };
   open: boolean;
@@ -37,7 +51,7 @@ interface Draft {
  * set, by rules otherwise), shown for a quick check, and imported — course folder,
  * assessments with dates and weights, weekly timetable and chapters — in one tap.
  */
-export function SyllabusImporter({ courses }: { courses: { id: string; code: string; name: string }[] }) {
+export function SyllabusImporter({ courses }: { courses: Course[] }) {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const input = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -47,7 +61,7 @@ export function SyllabusImporter({ courses }: { courses: { id: string; code: str
 
   const analyze = async (files: File[]) => {
     const fresh = files
-      .filter((f) => f.name.toLowerCase().endsWith(".pdf"))
+      .filter((f) => accepted(f.name))
       .slice(0, 12)
       .map((f) => ({ file: f, id: `${f.name}-${f.size}-${Math.random().toString(36).slice(2, 6)}` }));
     setDrafts((ds) => [
@@ -57,6 +71,9 @@ export function SyllabusImporter({ courses }: { courses: { id: string; code: str
         fileName: file.name,
         status: "reading" as const,
         excerpt: "",
+        pageTexts: [],
+        readBy: "",
+        warnings: [],
         topics: [],
         courseId: "",
         course: { code: "", name: "", professor: "", email: "", term: "" },
@@ -79,14 +96,23 @@ export function SyllabusImporter({ courses }: { courses: { id: string; code: str
       patch(id, {
         status: "ready",
         excerpt: res.excerpt,
+        pageTexts: res.pageTexts,
+        readBy: res.readBy,
+        warnings: res.warnings,
         topics: p.topics ?? [],
         courseId: match?.id ?? "",
         course: { code: p.code ?? "", name: p.name ?? "", professor: p.professor ?? "", email: p.email ?? "", term: p.term ?? "" },
-        rows: p.assessments.map((a) => ({ ...a, on: true })),
+        rows: review(p.assessments, res.pageTexts, match?.id ?? ""),
+        // Anything uncertain opens the review straight away.
+        open: res.warnings.length > 0 || review(p.assessments, res.pageTexts, match?.id ?? "").some((r) => r.confidence !== "high"),
         slots: p.schedule.map((s) => ({ ...s, on: true })),
       });
     }
   };
+
+  function review(items: FoundAssessment[], pageTexts: string[], courseId: string) {
+    return reviewAssessments({ items, pages: pageTexts, existing: courses.find((c) => c.id === courseId)?.assessments ?? [], today: toISODate(new Date()) });
+  }
 
   const importOne = async (d: Draft) => {
     patch(d.id, { status: "importing" });
@@ -96,7 +122,7 @@ export function SyllabusImporter({ courses }: { courses: { id: string; code: str
       fileName: d.fileName,
       topics: d.topics,
       excerpt: d.excerpt,
-      assessments: d.rows.filter((r) => r.on).map((r) => ({ title: r.title, type: r.type, date: r.date, time: r.time, weight: r.weight, line: r.line })),
+      assessments: d.rows.filter((r) => r.on).map((r) => ({ title: r.title, type: r.type, date: r.date, time: r.time, weight: r.weight, line: r.line, source: r.source })),
       schedule: d.slots.filter((s) => s.on).map((s) => ({ day: s.day, start: s.start, end: s.end, type: s.type, room: s.room })),
     });
     if ("error" in res) return patch(d.id, { status: "error", error: res.error ?? "Import impossible." });
@@ -130,15 +156,15 @@ export function SyllabusImporter({ courses }: { courses: { id: string; code: str
           <div className="min-w-0 flex-1">
             <h2 className="text-base font-semibold text-[var(--ink)]">Dépose tous tes syllabus</h2>
             <p className="mt-1 text-sm leading-6 text-[var(--ink-dim)]">
-              Un ou douze PDF, glissés ici ou choisis. Chaque cours obtient son dossier, ses évaluations datées et pondérées, son horaire et ses chapitres — que le plan de révision
-              utilisera.
+              PDF, Word (.docx) ou photos, glissés ici ou choisis. Tu vérifies chaque date — avec la page d&apos;où elle vient — puis chaque cours obtient son dossier, ses
+              évaluations, son horaire et ses chapitres. Réimporter le même plan n&apos;ajoute pas de doublons.
             </p>
           </div>
           <input
             ref={input}
             type="file"
             multiple
-            accept="application/pdf,.pdf"
+            accept={ACCEPT}
             className="hidden"
             onChange={(e) => {
               const files = [...(e.target.files ?? [])];
@@ -147,7 +173,7 @@ export function SyllabusImporter({ courses }: { courses: { id: string; code: str
             }}
           />
           <button type="button" onClick={() => input.current?.click()} className="mod-chip mod-chip-gold focus-ring shrink-0 px-5 py-3 text-sm">
-            <Sparkles size={15} /> Choisir des PDF
+            <Sparkles size={15} /> Choisir des fichiers
           </button>
         </div>
       </section>
@@ -161,7 +187,12 @@ export function SyllabusImporter({ courses }: { courses: { id: string; code: str
       )}
 
       {drafts.map((d) => (
-        <DraftCard key={d.id} d={d} courses={courses} patch={(p) => patch(d.id, p)} onImport={() => void importOne(d)} onRemove={() => setDrafts((ds) => ds.filter((x) => x.id !== d.id))} />
+        <DraftCard
+          key={d.id}
+          d={d}
+          courses={courses}
+          rereview={(courseId) => patch(d.id, (x) => ({ courseId, rows: review(x.rows, x.pageTexts, courseId) }))}
+          patch={(p) => patch(d.id, p)} onImport={() => void importOne(d)} onRemove={() => setDrafts((ds) => ds.filter((x) => x.id !== d.id))} />
       ))}
     </div>
   );
@@ -170,17 +201,19 @@ export function SyllabusImporter({ courses }: { courses: { id: string; code: str
 function DraftCard({
   d,
   courses,
+  rereview,
   patch,
   onImport,
   onRemove,
 }: {
   d: Draft;
-  courses: { id: string; code: string; name: string }[];
+  courses: Course[];
+  rereview: (courseId: string) => void;
   patch: (p: Partial<Draft> | ((d: Draft) => Partial<Draft>)) => void;
   onImport: () => void;
   onRemove: () => void;
 }) {
-  const setRow = (i: number, p: Partial<FoundAssessment & { on: boolean }>) => patch((x) => ({ rows: x.rows.map((r, j) => (j === i ? { ...r, ...p } : r)) }));
+  const setRow = (i: number, p: Partial<ReviewedAssessment>) => patch((x) => ({ rows: x.rows.map((r, j) => (j === i ? { ...r, ...p } : r)) }));
   const total = d.rows.filter((r) => r.on).reduce((s, r) => s + (r.weight ?? 0), 0);
   const name = d.courseId ? courses.find((c) => c.id === d.courseId)?.code : d.course.code || d.fileName;
 
@@ -201,7 +234,7 @@ function DraftCard({
                 ? `${d.result!.added} évaluation${d.result!.added > 1 ? "s" : ""} et ${d.result!.slotsAdded} créneau${d.result!.slotsAdded > 1 ? "x" : ""} importés`
                 : d.status === "reading"
                   ? "Cours, évaluations, horaire et chapitres…"
-                  : `${d.rows.length} évaluations · ${d.slots.length} créneaux · ${d.topics.length} chapitres · ${d.courseId ? "cours existant" : "nouveau cours"}`}
+                  : `${d.rows.length} évaluations (${d.rows.filter((r) => r.confidence !== "high").length} à vérifier) · ${d.slots.length} créneaux · ${d.topics.length} chapitres · ${d.courseId ? "cours existant" : "nouveau cours"} · ${d.readBy}`}
           </p>
         </div>
         {d.status === "ready" && (
@@ -226,10 +259,20 @@ function DraftCard({
         )}
       </header>
 
+      {d.status === "ready" && d.warnings.length > 0 && (
+        <ul className="mt-3 space-y-1" role="status">
+          {d.warnings.map((w) => (
+            <li key={w} className="flex gap-2 text-xs leading-5 text-[#ffd9a8]">
+              <AlertTriangle size={13} className="mt-0.5 shrink-0" aria-hidden /> {w}
+            </li>
+          ))}
+        </ul>
+      )}
+
       {d.status === "ready" && d.open && (
         <div className="mt-4 space-y-4">
           <div className="flex flex-wrap gap-2">
-            <select value={d.courseId} onChange={(e) => patch({ courseId: e.target.value })} aria-label="Cours" className={`${field} w-64 cursor-pointer appearance-none`}>
+            <select value={d.courseId} onChange={(e) => rereview(e.target.value)} aria-label="Cours" className={`${field} w-64 cursor-pointer appearance-none`}>
               <option value="">Créer un nouveau cours</option>
               {courses.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -273,6 +316,14 @@ function DraftCard({
                     aria-label="Pondération"
                     className={`${field} w-20`}
                   />
+                  <span className="basis-full text-[0.7rem] leading-5 text-[var(--ink-dim)]">
+                    <span className="mr-2 inline-flex items-center gap-1 font-semibold" style={{ color: CONFIDENCE[r.confidence].color }}>
+                      <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: CONFIDENCE[r.confidence].color }} />
+                      {CONFIDENCE[r.confidence].label}
+                    </span>
+                    {r.source ? `${r.source.page ? `p. ${r.source.page} — ` : ""}« ${r.source.excerpt.slice(0, 120)} »` : "Source inconnue"}
+                    {r.flags.length > 0 && <span className="block text-[var(--ink-faint)]">{r.flags.join(" ")}</span>}
+                  </span>
                 </li>
               ))}
             </ul>
