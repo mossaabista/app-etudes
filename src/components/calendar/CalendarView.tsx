@@ -1,6 +1,10 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Pencil, Trash2, Undo2 } from "lucide-react";
+import { deleteEventAction, updateEventAction } from "@/server/actions/event.actions";
+import { undoCommandAction, type Undo } from "@/server/actions/capture.actions";
 import { DayDeck } from "@/components/calendar/DayDeck";
 import type { CalCategory, LegendEntry } from "@/lib/calendar-categories";
 
@@ -27,6 +31,8 @@ export interface CalItem {
   done?: boolean;
   /** Weekly classes: summarised as one line in the grid, listed in full in the day. */
   recurring?: boolean;
+  /** The user's own events: can be changed or deleted from the day view. */
+  edit?: { id: string; notes: string | null };
 }
 
 const WEEKDAY_LABELS = ["dim.", "lun.", "mar.", "mer.", "jeu.", "ven.", "sam."];
@@ -224,6 +230,9 @@ function DayCard({
   labelOf: (c: CalCategory) => string;
 }) {
   const list = [...items].sort(byClock);
+  const router = useRouter();
+  const [editing, setEditing] = useState<string | null>(null);
+  const [note, setNote] = useState<{ text: string; undo?: Undo } | null>(null);
   return (
     <section className="glass-card flex h-full flex-col p-5">
       <header className="mb-3 flex items-baseline gap-2">
@@ -236,7 +245,20 @@ function DayCard({
       ) : (
         // Every card in the deck is the same height, so a busy day scrolls inside its card.
         <ol className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-          {list.map((i) => (
+          {list.map((i) =>
+            editing === i.id && i.edit ? (
+              <li key={i.id} className="tile px-3.5 py-3">
+                <EventEditor
+                  item={i}
+                  onCancel={() => setEditing(null)}
+                  onSaved={(undo) => {
+                    setEditing(null);
+                    setNote({ text: "Événement modifié.", undo });
+                    router.refresh();
+                  }}
+                />
+              </li>
+            ) : (
             <li key={i.id} data-land={`deck-${i.id}`} className={`tile flex items-start gap-2.5 px-3.5 py-3 ${i.done ? "opacity-55" : ""}`}>
               <span className="pill shrink-0" style={{ "--c": colorOf(i) } as React.CSSProperties}>
                 <span className="pill-time">{i.time ?? "—"}</span>
@@ -251,9 +273,47 @@ function DayCard({
                   {[labelOf(i.category), i.end ? `jusqu'à ${i.end}` : null, i.detail].filter(Boolean).join(" · ")}
                 </p>
               </div>
+              {i.edit && (
+                <span className="flex shrink-0 gap-0.5">
+                  <button type="button" onClick={() => setEditing(i.id)} aria-label={`Modifier ${i.title}`} className="focus-ring rounded p-1.5 text-[var(--ink-faint)] hover:text-[var(--ink)]">
+                    <Pencil size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const r = await deleteEventAction(i.edit!.id);
+                      setNote("error" in r ? { text: r.error } : { text: `« ${i.title} » supprimé.`, undo: r.undo });
+                      router.refresh();
+                    }}
+                    aria-label={`Supprimer ${i.title}`}
+                    className="focus-ring rounded p-1.5 text-[var(--ink-faint)] hover:text-[#ffb3a3]"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </span>
+              )}
             </li>
-          ))}
+            )
+          )}
         </ol>
+      )}
+      {note && (
+        <p role="status" className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--ink-dim)]">
+          {note.text}
+          {note.undo && (
+            <button
+              type="button"
+              onClick={async () => {
+                const { missed } = await undoCommandAction(note.undo!);
+                setNote({ text: missed ? "Annulé en partie : l'événement avait déjà changé." : "Annulé." });
+                router.refresh();
+              }}
+              className="mod-chip focus-ring text-xs"
+            >
+              <Undo2 size={12} /> Annuler
+            </button>
+          )}
+        </p>
       )}
     </section>
   );
@@ -262,4 +322,51 @@ function DayCard({
 function dayLabel(iso: string) {
   // Noon UTC keeps the date stable whatever zone the browser is in.
   return new Intl.DateTimeFormat("fr-CA", { timeZone: "UTC", weekday: "long", day: "numeric", month: "long" }).format(new Date(`${iso}T12:00:00Z`));
+}
+
+const input = "w-full rounded-lg border border-[rgba(255,220,148,0.16)] bg-[rgba(20,14,6,0.55)] px-2.5 py-1.5 text-sm text-[var(--ink)] outline-none focus:border-[rgba(255,220,148,0.45)]";
+
+/** Change an event's title, day, times and notes. */
+function EventEditor({ item, onCancel, onSaved }: { item: CalItem; onCancel: () => void; onSaved: (undo: Undo) => void }) {
+  const [title, setTitle] = useState(item.title);
+  const [date, setDate] = useState(item.date);
+  const [start, setStart] = useState(item.time ?? "");
+  const [end, setEnd] = useState(item.end ?? "");
+  const [notes, setNotes] = useState(item.edit?.notes ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  return (
+    <form
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setSaving(true);
+        const r = await updateEventAction(item.edit!.id, { title, date, start: start || null, end: end || null, notes: notes || null });
+        setSaving(false);
+        if ("error" in r) return setError(r.error);
+        onSaved(r.undo);
+      }}
+      className="space-y-2"
+    >
+      <input value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Titre" maxLength={200} className={input} />
+      <div className="grid grid-cols-3 gap-2">
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Date" className={input} />
+        <input type="time" value={start} onChange={(e) => setStart(e.target.value)} aria-label="Début" className={input} />
+        <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} aria-label="Fin" className={input} />
+      </div>
+      <input value={notes} onChange={(e) => setNotes(e.target.value)} aria-label="Notes" placeholder="Notes" maxLength={2000} className={input} />
+      {error && (
+        <p role="alert" className="text-xs text-[#ffb3a3]">
+          {error}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <button type="submit" disabled={saving} className="mod-chip mod-chip-gold focus-ring text-xs">
+          Enregistrer
+        </button>
+        <button type="button" onClick={onCancel} className="mod-chip focus-ring text-xs">
+          Fermer
+        </button>
+      </div>
+    </form>
+  );
 }

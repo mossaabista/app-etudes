@@ -145,6 +145,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         code: pilot ? undefined : tag?.area.front,
         category: fold(pilot ? "pilote" : (sectionCategory(e.type) ?? (e.type === "Meeting" ? "reunion" : "perso"))),
         detail: pilot ? "Planifié par le Pilote" : [tag?.sub?.label, e.notes].filter(Boolean).join(" · ") || undefined,
+        edit: { id: e.id, notes: e.notes },
       };
     }),
   ];

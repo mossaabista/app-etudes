@@ -28,7 +28,7 @@ import { areaByKey } from "@/lib/task-areas";
 export type Undo =
   | { t: "delete-event"; id: string }
   | { t: "delete-task"; id: string }
-  | { t: "event-was"; id: string; date: string; startTime: string | null; endTime: string | null; title: string }
+  | { t: "event-was"; id: string; date: string; startTime: string | null; endTime: string | null; title: string; notes?: string | null }
   | { t: "task-was"; id: string; dueDate: string | null; title: string }
   | { t: "restore-event"; data: { title: string; type: string; date: string; startTime: string | null; endTime: string | null; allDay: boolean; notes: string | null; courseId: string | null } }
   | { t: "many"; list: Undo[] }
@@ -520,7 +520,7 @@ async function revert(userId: string, undo: Undo): Promise<number> {
       return hit(
         await prisma.calendarEvent.updateMany({
           where: { id: undo.id, ...own },
-          data: { date: fromISODate(undo.date)!, startTime: undo.startTime, endTime: undo.endTime, title: undo.title.slice(0, 200) },
+          data: { date: fromISODate(undo.date)!, startTime: undo.startTime, endTime: undo.endTime, allDay: !undo.startTime, title: undo.title.slice(0, 200), ...(undo.notes !== undefined ? { notes: undo.notes } : {}) },
         })
       );
     case "task-was":
