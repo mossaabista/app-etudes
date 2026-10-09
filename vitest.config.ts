@@ -7,6 +7,6 @@ export default defineConfig({
     include: ["tests/**/*.test.ts"],
     environment: "node",
     // Day boundaries are computed in Ottawa whatever the machine's zone: run in UTC to prove it.
-    env: { TZ: "UTC" },
+    env: { TZ: "UTC", SESSION_SECRET: "test-secret-for-signing-only" },
   },
 });

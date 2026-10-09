@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { ArrowRight, CalendarClock, Check, Clock, Mic, PencilLine, Plus, Sparkles, Trash2, Undo2, Volume2, VolumeX, X } from "lucide-react";
-import { commandAction, undoCommandAction, type Choice, type Undo } from "@/server/actions/capture.actions";
+import { ArrowRight, CalendarClock, Check, Clock, Mic, PencilLine, Plus, ShieldAlert, Sparkles, Trash2, Undo2, Volume2, VolumeX, X } from "lucide-react";
+import { commandAction, confirmCommandAction, undoCommandAction, type Choice, type CommandResult, type Undo } from "@/server/actions/capture.actions";
+import type { Confirmation } from "@/server/assistant-run";
 import { parseCapture } from "@/lib/capture";
 import { intentsOf, isDeadline, parseIntent, splitCommands } from "@/lib/command";
 import { AREAS, areaByKey } from "@/lib/task-areas";
@@ -84,6 +85,8 @@ export function QuickCapture() {
   const [toast, setToast] = useState<Toast | null>(null);
   const [choices, setChoices] = useState<{ question: string; list: Choice[] } | null>(null);
   const [answer, setAnswer] = useState<string | null>(null);
+  // Work the assistant prepared and will only do once the user says yes.
+  const [confirm, setConfirm] = useState<{ sentence: string; c: Confirmation } | null>(null);
   const [listening, setListening] = useState(false);
   const [canListen, setCanListen] = useState(false);
   const [pending, start] = useTransition();
@@ -168,20 +171,15 @@ export function QuickCapture() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  const run = useCallback(
-    (sentence: string, pick?: Choice) => {
-      if (!sentence.trim()) return;
-      const [a, s] = (section ?? "").split(":");
-      expectLanding(15000);
-      start(async () => {
-        const res = await commandAction(sentence, {
-          ...(section ? { area: a, sub: s } : {}),
-          ...(pick ? { pick: { kind: pick.kind, id: pick.id } } : {}),
-          page: pathname,
-          history: history.current,
-        });
-        const viaVoice = spoken.current;
-        spoken.current = false;
+  const handle = useCallback(
+    (res: CommandResult, sentence: string, viaVoice: boolean) => {
+        if ("confirm" in res) {
+          setChoices(null);
+          setConfirm({ sentence, c: res.confirm });
+          if (viaVoice || voice) speak(`Avant de le faire, j'ai besoin de ton accord : ${res.confirm.items.length} modification${res.confirm.items.length > 1 ? "s" : ""}.`);
+          return;
+        }
+        setConfirm(null);
         if ("choose" in res) {
           setChoices({ question: res.question, list: res.choose });
           return;
@@ -206,10 +204,39 @@ export function QuickCapture() {
         setText("");
         setSection(null);
         setOpen(false);
+    },
+    [router, voice]
+  );
+
+  const run = useCallback(
+    (sentence: string, pick?: Choice) => {
+      if (!sentence.trim()) return;
+      const [a, s] = (section ?? "").split(":");
+      expectLanding(15000);
+      setConfirm(null);
+      start(async () => {
+        const res = await commandAction(sentence, {
+          ...(section ? { area: a, sub: s } : {}),
+          ...(pick ? { pick: { kind: pick.kind, id: pick.id } } : {}),
+          page: pathname,
+          history: history.current,
+        });
+        const viaVoice = spoken.current;
+        spoken.current = false;
+        handle(res, sentence, viaVoice);
       });
     },
-    [section, pathname, router, voice]
+    [section, pathname, handle]
   );
+
+  const approve = () => {
+    if (!confirm) return;
+    const { sentence, c } = confirm;
+    expectLanding(15000);
+    start(async () => {
+      handle(await confirmCommandAction(c.token), sentence, false);
+    });
+  };
 
   const undo = () => {
     if (!toast?.undo) return;
@@ -359,6 +386,7 @@ export function QuickCapture() {
                   setSection(null);
                   setChoices(null);
                   setAnswer(null);
+                  setConfirm(null);
                 }}
                 placeholder={listening ? "Parle…" : `ex. ${EXAMPLES[example]}`}
                 aria-label="Ce que tu veux faire"
@@ -434,6 +462,33 @@ export function QuickCapture() {
               <div className="qc-answer mt-4" role="status">
                 <Sparkles size={14} className="mt-0.5 shrink-0 text-[#f0cd79]" />
                 <p>{answer}</p>
+              </div>
+            )}
+
+            {confirm && (
+              <div className="qc-answer mt-4 flex-col items-stretch" role="alertdialog" aria-labelledby="qc-confirm-title">
+                <p id="qc-confirm-title" className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
+                  <ShieldAlert size={15} className="shrink-0 text-[#f0cd79]" />
+                  {confirm.c.risk === "high" ? "Action sensible : confirme avant que je la fasse" : "Je te demande avant de le faire"}
+                </p>
+                {confirm.c.reasons.length > 0 && <p className="mt-1 text-xs text-[var(--ink-dim)]">{confirm.c.reasons.join(" ")}</p>}
+                <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto text-sm text-[var(--ink)]">
+                  {confirm.c.items.map((item, i) => (
+                    <li key={i} className="flex gap-2">
+                      <span aria-hidden className="text-[var(--ink-faint)]">•</span>
+                      <span className="min-w-0 flex-1">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-[0.7rem] text-[var(--ink-faint)]">Rien n&apos;a encore été modifié.</p>
+                <div className="mt-3 flex flex-wrap justify-end gap-2">
+                  <button type="button" onClick={() => setConfirm(null)} disabled={pending} className="mod-chip focus-ring">
+                    Ne rien faire
+                  </button>
+                  <button type="button" onClick={approve} disabled={pending} className="mod-chip mod-chip-gold focus-ring" autoFocus>
+                    {pending ? "…" : "Confirmer"}
+                  </button>
+                </div>
               </div>
             )}
 

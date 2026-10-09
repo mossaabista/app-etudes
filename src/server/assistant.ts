@@ -131,6 +131,8 @@ export async function assistantContext(userId: string, page: string) {
   return {
     text: lines.join("\n"),
     ids: new Set([...events.map((e) => `e:${e.id}`), ...tasks.map((t) => `t:${t.id}`)]),
+    /** What each id is called, so a confirmation can say what it will touch. */
+    labels: new Map([...events.map((e) => [`e:${e.id}`, e.title] as const), ...tasks.map((t) => [`t:${t.id}`, t.title] as const)]),
     assessmentIds: new Set(assessments.map((a) => a.id)),
   };
 }

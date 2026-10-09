@@ -8,7 +8,10 @@ import { parseCapture } from "@/lib/capture";
 import { addMinutes, describeSource, intentsOf, isDeadline, minutesBetween, parseIntent, politeless, score, splitCommands, type Intent } from "@/lib/command";
 import { fold } from "@/lib/capture";
 import { assistantEnabled, type Turn } from "@/server/assistant";
-import { runAssistant } from "@/server/assistant-run";
+import { runAssistant, runConfirmedPlan, type Confirmation } from "@/server/assistant-run";
+import { assessRisk } from "@/lib/risk";
+import { getAutonomy } from "@/server/autonomy";
+import { newOpId, openPending, sealPending } from "@/server/pending";
 import { saveLayout, LAYOUT_MODULE } from "@/server/layout";
 import type { Layout } from "@/lib/layout";
 import { briefing } from "@/server/briefing";
@@ -38,6 +41,8 @@ export interface Choice {
 export type CommandResult =
   | { error: string }
   | { choose: Choice[]; question: string }
+  /** Nothing was changed: the user is asked first, and confirms with the token. */
+  | { confirm: Confirmation }
   | {
       ok: true;
       message: string;
@@ -83,6 +88,7 @@ export async function commandAction(
   if (assistantEnabled() && !options?.pick) {
     const history = (options?.history ?? []).filter((t) => (t.role === "user" || t.role === "assistant") && typeof t.text === "string").slice(-6);
     const r = await runAssistant(user.id, text, (options?.page ?? "/today").slice(0, 120), history);
+    if (r && "confirm" in r) return r;
     if (r) {
       if (r.undos.length) done();
       return { ok: true, message: r.message, undo: r.undos.length ? (r.undos.length === 1 ? r.undos[0] : { t: "many", list: r.undos }) : null, answer: r.answer, navigate: r.navigate, partial: r.partial };
@@ -102,6 +108,7 @@ export async function commandAction(
         done.push(r.message);
         if (r.undo) undos.push(r.undo);
       } else if ("error" in r) missed.push(`« ${parts[i]} » : ${r.error}`);
+      else if ("confirm" in r) missed.push(`« ${parts[i]} » : demande-le seul, je te demanderai confirmation`);
     }
     if (!done.length) return { error: missed.join(" ") || "Rien n'a pu être fait." };
     return { ok: true, message: [...done, ...missed].join(" "), undo: undos.length ? { t: "many", list: undos } : null };
@@ -114,7 +121,13 @@ async function runOne(
   text: string,
   intent: Intent,
   today: string,
-  options?: { area?: string; sub?: string; pick?: { kind: "event" | "task"; id: string } }
+  options?: {
+    area?: string;
+    sub?: string;
+    pick?: { kind: "event" | "task"; id: string };
+    /** Confirmed: act on exactly these, and ask nothing more. */
+    only?: { kind: "event" | "task"; id: string }[];
+  }
 ): Promise<CommandResult> {
   const user = { id: userId };
   if (intent.kind === "summary") return { ok: true, message: await briefing(userId, fold(text)), undo: null, answer: true };
@@ -136,7 +149,10 @@ async function runOne(
   type Candidate = (typeof candidates)[number];
   let chosen: Candidate[];
   const picked = options?.pick ? candidates.find((c) => c.kind === options.pick!.kind && c.id === options.pick!.id) : undefined;
-  if (picked) chosen = [picked];
+  if (options?.only) {
+    chosen = candidates.filter((c) => options.only!.some((o) => o.kind === c.kind && o.id === c.id));
+    if (!chosen.length) return { error: "Ces éléments ont déjà changé ou disparu : rien n'a été supprimé." };
+  } else if (picked) chosen = [picked];
   else {
     const ranked = candidates
       .map((c) => ({ c, s: score(src, c) + (c.day >= today ? 1 : 0) }))
@@ -151,6 +167,15 @@ async function runOne(
     if (src.count) chosen = ranked.slice(0, src.count).map((r) => r.c);
     else if (src.all || byKindOnly) chosen = ranked.filter((r) => r.s === ranked[0].s).map((r) => r.c);
     else chosen = [ranked[0].c];
+  }
+
+  // Deleting asks first when the user's mode says so; the same rules as the assistant.
+  if (intent.kind === "delete" && !options?.only) {
+    const verdict = assessRisk(chosen.map(() => ({ op: "delete" })), await getAutonomy(userId));
+    if (verdict.confirm) {
+      const token = sealPending(userId, { kind: "rules", text, only: chosen.map((c) => ({ kind: c.kind, id: c.id })), opId: newOpId() });
+      return { confirm: { token, risk: verdict.risk, items: chosen.map((c) => `supprimer « ${c.title} »`), reasons: verdict.reasons, reply: "" } };
+    }
   }
 
   const undos: Undo[] = [];
@@ -244,6 +269,21 @@ async function create(userId: string, text: string, today: string, options?: { a
   });
   done();
   return { ok: true, message: `${p.title} → ${section}, ${isDeadline(text) ? "à rendre " : "à faire "}${when}.`, undo: { t: "delete-task", id: t.id } };
+}
+
+/** The user said yes to what was proposed: do it now, through the usual checks. */
+export async function confirmCommandAction(token: string): Promise<CommandResult> {
+  const user = await requireUser();
+  const opened = openPending(user.id, token);
+  if ("error" in opened) return { error: opened.error };
+  const work = opened.work;
+  if (work.kind === "plan") {
+    const r = await runConfirmedPlan(user.id, work);
+    if (r.undos.length) done();
+    return { ok: true, message: r.message, undo: r.undos.length ? (r.undos.length === 1 ? r.undos[0] : { t: "many", list: r.undos }) : null, answer: r.answer, navigate: r.navigate, partial: r.partial };
+  }
+  const only = (Array.isArray(work.only) ? work.only : []).filter((o) => (o.kind === "event" || o.kind === "task") && typeof o.id === "string").slice(0, 50);
+  return runOne(user.id, work.text, parseIntent(work.text), toISODate(new Date()), { only });
 }
 
 function done() {

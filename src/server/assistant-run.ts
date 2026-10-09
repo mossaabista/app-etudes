@@ -3,7 +3,10 @@ import { APP_TIMEZONE, fromISODate, toISODate, wallTimeToUtc } from "@/lib/dates
 import { addMinutes, minutesBetween } from "@/lib/command";
 import { guessAisle } from "@/lib/grocery";
 import { LIBRARY, LIBRARY_SUBS, PALETTE, sanitizeLayout, slug, type AreaSpec, type Layout, type SubSpec } from "@/lib/layout";
-import { askAssistant, type AssistantAction, type Turn } from "@/server/assistant";
+import { askAssistant, assistantContext, type AssistantAction, type Turn } from "@/server/assistant";
+import { assessRisk, type Risk } from "@/lib/risk";
+import { getAutonomy } from "@/server/autonomy";
+import { newOpId, sealPending } from "@/server/pending";
 import { getLayout, saveLayout } from "@/server/layout";
 import { PILOT_NOTE, planDay } from "@/server/pilot";
 import { STUDY_PREFIX, planStudy } from "@/server/study";
@@ -41,8 +44,8 @@ const VERBS: Record<AssistantAction["op"], string> = {
   navigate: "ouvrir la page",
 };
 
-export const describeAction = (a: AssistantAction) => {
-  const name = a.title ?? a.label ?? a.name ?? a.code ?? a.area ?? "";
+export const describeAction = (a: AssistantAction, labels?: Map<string, string>) => {
+  const name = (a.id && labels?.get(a.id)) ?? a.title ?? a.label ?? a.name ?? a.code ?? a.area ?? (a.op === "plan_day" ? a.date : "") ?? "";
   return `${VERBS[a.op] ?? "faire une action"}${name ? ` « ${String(name).slice(0, 60)} »` : ""}`;
 };
 
@@ -59,11 +62,52 @@ export interface AssistantResult {
   partial: boolean;
 }
 
-/** Ask Claude and carry out what it decided. Null means "no assistant": use the rules. */
-export async function runAssistant(userId: string, text: string, page: string, history: Turn[]): Promise<AssistantResult | null> {
+/** What the user is asked before anything risky runs. */
+export interface Confirmation {
+  token: string;
+  risk: Risk;
+  /** The changes that would be made, in words. */
+  items: string[];
+  reasons: string[];
+  /** What the assistant said it would do. */
+  reply: string;
+}
+
+type Ctx = { ids: Set<string>; assessmentIds: Set<string>; labels?: Map<string, string> };
+
+/** Only actions the server knows how to run; anything else the model made up is dropped. */
+const known = (list: unknown): AssistantAction[] =>
+  (Array.isArray(list) ? list : []).filter((a): a is AssistantAction => !!a && typeof a === "object" && typeof (a as AssistantAction).op === "string" && (a as AssistantAction).op in VERBS);
+
+/**
+ * Ask Claude, then either carry out what it decided or, when the user's autonomy mode says
+ * so, hand back a confirmation instead and change nothing. Null means "no assistant".
+ */
+export async function runAssistant(userId: string, text: string, page: string, history: Turn[]): Promise<AssistantResult | { confirm: Confirmation } | null> {
   const r = await askAssistant(userId, text, page, history);
   if ("error" in r) return null;
-  const { plan, ctx } = r;
+  const actions = known(r.plan.actions);
+  const verdict = assessRisk(actions, await getAutonomy(userId));
+  if (verdict.confirm) {
+    const items = actions.filter((a) => a.op !== "navigate").map((a) => describeAction(a, r.ctx.labels));
+    const token = sealPending(userId, { kind: "plan", actions, reply: r.plan.reply, page, opId: newOpId() });
+    return { confirm: { token, risk: verdict.risk, items, reasons: verdict.reasons, reply: r.plan.reply } };
+  }
+  return executePlan(userId, actions, r.plan.reply, r.ctx);
+}
+
+/** Run a plan the user just confirmed, against a fresh view of their data. */
+export async function runConfirmedPlan(userId: string, work: { actions: unknown[]; reply: string; page: string }): Promise<AssistantResult> {
+  const ctx = await assistantContext(userId, work.page.slice(0, 120));
+  return executePlan(userId, known(work.actions), String(work.reply ?? ""), ctx);
+}
+
+/**
+ * Carry out actions the model proposed. Every id is checked against what the user was
+ * shown and looked up under the user again; every write must come back to count as done.
+ */
+export async function executePlan(userId: string, actions: AssistantAction[], reply: string, ctx: Ctx): Promise<AssistantResult> {
+  const plan = { actions, reply };
   const today = toISODate(new Date());
   const undos: Undo[] = [];
   // What was actually done, in words: the confirmation when the model says nothing useful.
@@ -106,7 +150,6 @@ export async function runAssistant(userId: string, text: string, page: string, h
     return { key, label: spec.label.trim(), image: spec.image ?? "gears", custom: { intro: spec.intro ?? "", blocks: (spec.blocks ?? []) as never } };
   };
 
-  const actions = (plan.actions as AssistantAction[]).filter((a) => a && typeof a === "object" && a.op in VERBS);
   if (actions.length > 30) failed.push(`${actions.length - 30} action(s) au-delà de la limite de 30`);
   for (const a of actions.slice(0, 30)) {
     // Set once the database (or the layout being edited) has really taken the change.
@@ -349,7 +392,7 @@ export async function runAssistant(userId: string, text: string, page: string, h
       // One bad action does not stop the others, but it is reported.
       ok = false;
     }
-    if (!ok) failed.push(describeAction(a));
+    if (!ok) failed.push(describeAction(a, ctx.labels));
   }
 
   if (layout && layoutBefore && layoutOps.length) {
