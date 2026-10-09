@@ -38,7 +38,11 @@ export function AssistantConsole({ initial, suggestions }: { initial: Turn[]; su
     }, 0);
     return () => clearTimeout(t);
   }, [o, o.state]);
-  useEffect(() => end.current?.scrollIntoView({ block: "end", behavior: "smooth" }), [o.turns.length]);
+  // Braces matter: in recent browsers scrollIntoView returns a Promise, which React
+  // would take for a clean-up function.
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: "end", behavior: "smooth" });
+  }, [o.turns.length]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && o.stop();
     window.addEventListener("keydown", onKey);
