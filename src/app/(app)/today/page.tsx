@@ -9,6 +9,8 @@ import { DeleteEvent } from "@/components/today/DeleteEvent";
 import { TaskCheck } from "@/components/today/TaskCheck";
 import { PilotPanel } from "@/components/today/PilotPanel";
 import { getPlanningPrefs } from "@/server/planning-prefs";
+import { RadarPanel } from "@/components/today/RadarPanel";
+import { riskRadar } from "@/server/radar";
 import { PILOT_NOTE } from "@/server/pilot";
 import { areaOfTag } from "@/lib/task-areas";
 import { CARDS, type TodayCard } from "@/lib/profile";
@@ -72,7 +74,7 @@ export default async function TodayPage({
   searchParams: Promise<{ d?: string; r?: string; cartes?: string }>;
 }) {
   const user = await requireUser();
-  const [profile, planningPrefs] = await Promise.all([getProfile(user.id), getPlanningPrefs(user.id)]);
+  const [profile, planningPrefs, radar] = await Promise.all([getProfile(user.id), getPlanningPrefs(user.id), riskRadar(user.id)]);
   // A brand-new account sets itself up first.
   if (!profile) redirect("/onboarding");
   const params = await searchParams;
@@ -394,8 +396,9 @@ export default async function TodayPage({
       <DateNav anchor={anchor} range={range} label={label} />
 
       {range === "day" && (
-        <div className="mx-auto mb-5 max-w-3xl">
+        <div className="mx-auto mb-5 max-w-3xl space-y-4">
           <PilotPanel day={isoAnchor} planned={pilotBlocks} prefs={planningPrefs} />
+          <RadarPanel alerts={radar} />
         </div>
       )}
 

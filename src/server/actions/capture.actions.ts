@@ -13,6 +13,7 @@ import { assessRisk } from "@/lib/risk";
 import { getAutonomy } from "@/server/autonomy";
 import { newOpId, openPending, sealPending } from "@/server/pending";
 import { applyWorkspace } from "@/server/workspaces";
+import { radarText, riskRadar } from "@/server/radar";
 import { detectTemplate, nameFrom } from "@/lib/workspaces";
 import { claim, findOp, isUndoable, markUndone, recentActions, settle, type LoggedAction } from "@/server/agent-log";
 import { saveLayout, LAYOUT_MODULE } from "@/server/layout";
@@ -120,6 +121,7 @@ async function logged(userId: string, opId: string | null, source: string, work:
   return res;
 }
 
+const RISK = /(qu'?est-ce qui|quoi|qu'?est ce qui|what).{0,40}(risque|a risque|en retard|pas (fini|termine)|ne sera pas|at risk|behind|late)|\bradar\b|\ba risque\b/;
 const HISTORY = /(qu'?est-ce que tu as|qu'?as-tu|qu'?est-ce qui a|what did you|what have you) (change|fait|modifie|ete change|ete modifie|do|done|changed)|historique (de l'assistant|des actions)/;
 const UNDO_LAST = /^(stp |s'il te plait )?(annule|defais|undo) (ta|la|ma|mon|ton|le) (derniere|dernier|last) ?(action|modification|changement|commande|change)?\b|annule ce que tu (viens de faire|as fait)/;
 const hhmm24 = (d: Date) => hhmm(d).replace(":", " h ");
@@ -134,6 +136,7 @@ async function metaCommand(userId: string, text: string): Promise<CommandResult 
     const lines = rows.map((r) => `${toISODate(r.createdAt) === toISODate(new Date()) ? "Aujourd'hui" : dayWords(toISODate(r.createdAt))} à ${hhmm24(r.createdAt)} : ${r.summary}${r.status === "undone" ? " (annulé)" : r.status === "partial" ? " (en partie)" : ""}`);
     return { ok: true, answer: true, undo: null, message: `Mes dernières modifications. ${lines.join(" ")}` };
   }
+  if (RISK.test(f)) return { ok: true, answer: true, undo: null, message: radarText(await riskRadar(userId)) };
   if (UNDO_LAST.test(f)) {
     const rows = await recentActions(userId, 10);
     if (!rows) return { error: "L'historique de l'assistant n'est pas encore activé sur ce serveur : utilise le bouton Annuler juste après une modification." };

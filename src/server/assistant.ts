@@ -3,6 +3,7 @@ import { APP_TIMEZONE, addDays, dayName, fromISODate, toISODate } from "@/lib/da
 import { IMAGES, LIBRARY_SUBS } from "@/lib/layout";
 import { getLayout } from "@/server/layout";
 import { getProfile } from "@/server/profile";
+import { riskRadar } from "@/server/radar";
 
 /**
  * The assistant behind the microphone, when ANTHROPIC_API_KEY is set. Claude reads the
@@ -84,7 +85,7 @@ export async function assistantContext(userId: string, page: string) {
   const span = page.startsWith("/calendar") ? 31 : 10;
   const from = addDays(fromISODate(today)!, -1);
   const to = addDays(from, span + 1);
-  const [events, tasks, done, assessments, labs, schedules, courses, layout, profile] = await Promise.all([
+  const [events, tasks, done, assessments, labs, schedules, courses, layout, profile, radar] = await Promise.all([
     prisma.calendarEvent.findMany({ where: { userId, date: { gte: from, lt: to } }, orderBy: [{ date: "asc" }, { startTime: "asc" }] }),
     prisma.task.findMany({ where: { userId, parentId: null, status: { not: "Done" }, OR: [{ dueDate: { gte: from, lt: to } }, { dueDate: null }] }, orderBy: { dueDate: "asc" }, take: 100 }),
     prisma.task.findMany({ where: { userId, status: "Done", updatedAt: { gte: fromISODate(today)! } }, select: { title: true } }),
@@ -94,6 +95,7 @@ export async function assistantContext(userId: string, page: string) {
     prisma.course.findMany({ where: { userId }, select: { id: true, code: true, name: true }, orderBy: { code: "asc" } }),
     getLayout(userId),
     getProfile(userId),
+    riskRadar(userId).catch(() => []),
   ]);
 
   const lines: string[] = [];
@@ -129,6 +131,7 @@ export async function assistantContext(userId: string, page: string) {
   const undated = tasks.filter((t) => !t.dueDate);
   if (undated.length) lines.push("Tâches sans date :", ...undated.map((t) => `  · TÂCHE « ${t.title} » [${t.category ?? ""}] id=t:${t.id}`));
   lines.push(`Tâches cochées aujourd'hui : ${done.map((d) => d.title).join(" ; ") || "aucune"}`);
+  lines.push("RADAR DE RISQUE (vérifié par le serveur) :", ...(radar.length ? radar.slice(0, 8).map((r) => `  · ${r.title} — ${r.detail}`) : ["  · rien à signaler"]));
 
   return {
     text: lines.join("\n"),
